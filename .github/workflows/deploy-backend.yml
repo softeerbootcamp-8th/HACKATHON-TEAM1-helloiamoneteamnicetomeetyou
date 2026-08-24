@@ -1,8 +1,13 @@
-name: Deploy to EC2
+name: Deploy Backend to EC2
 
 on:
   push:
     branches: [main]
+    # 모노레포라 프론트엔드만 바뀐 push 로는 백엔드를 재배포하지 않는다.
+    # 워크플로 파일 자체를 고쳤을 때는 돌아야 하므로 경로에 함께 넣는다.
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
   # 실패한 배포를 커밋 없이 다시 돌리고 싶을 때 Actions 탭에서 수동 실행한다.
   workflow_dispatch:
 
@@ -26,6 +31,10 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    # 모노레포 전환 이후 gradle 프로젝트는 backend/ 아래에 있다.
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v7
 
@@ -74,7 +83,9 @@ jobs:
       - name: Build and push (arm64 for t4g)
         uses: docker/build-push-action@v7
         with:
-          context: .
+          # Dockerfile 이 backend/ 안에 있고 COPY 경로도 그 기준이라 컨텍스트를 좁혀 준다.
+          # 프론트엔드 소스가 빌드 컨텍스트로 전송되지 않아 빌드도 그만큼 가벼워진다.
+          context: ./backend
           # t4g.micro = Graviton = arm64. amd64 이미지를 올리면 인스턴스에서 exec format error 가 난다.
           platforms: linux/arm64
           push: true

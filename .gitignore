@@ -1,18 +1,14 @@
-HELP.md
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
+# 루트 .gitignore 는 어느 워크스페이스에서 생기든 상관없는 것들만 둔다.
+# 빌드 산출물·의존성처럼 스택마다 다른 규칙은 backend/.gitignore, frontend/.gitignore 로 나눠 둔다.
+
+### macOS ###
+.DS_Store
 
 ### IntelliJ IDEA ###
 .idea
 *.iws
 *.iml
 *.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
 
 ### Eclipse ###
 .apt_generated
@@ -22,19 +18,6 @@ out/
 .settings
 .springBeans
 .sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
 
 ### VS Code ###
 .vscode/
-
-### macOS ###
-.DS_Store

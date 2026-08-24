@@ -1,0 +1,9 @@
+# 개행은 저장소에 LF 로 통일한다. 팀원마다 core.autocrlf 설정이 달라도
+# 커밋되는 내용이 같아지도록 여기서 못박는다.
+* text=auto eol=lf
+
+# gradle wrapper 배치 파일은 처음부터 CRLF 로 커밋돼 있다.
+# 변환 대상에 넣으면 파일을 옮기기만 해도 전체 줄이 바뀐 것으로 잡히므로 제외한다.
+*.bat -text
+
+*.jar binary

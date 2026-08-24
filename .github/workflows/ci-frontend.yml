@@ -1,0 +1,51 @@
+name: Frontend CI
+
+# 프론트엔드는 아직 배포 파이프라인이 없다. PR 단계에서 포맷·린트·빌드만 막아 준다.
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  # PR 에 커밋을 연달아 밀면 앞선 실행은 의미가 없으므로 취소한다.
+  # 배포와 달리 중간에 끊겨도 남는 상태가 없다.
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      # 모노레포라 루트에 package.json 이 없다. 어느 걸 보고 pnpm 버전을 정할지 짚어 준다.
+      # (frontend/package.json 의 packageManager 필드)
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      # --frozen-lockfile: 락파일과 package.json 이 어긋나면 조용히 맞추지 않고 실패시킨다.
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm build
