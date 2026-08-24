@@ -1,0 +1,20 @@
+# 로컬 E2E 테스트용 compose 파일.
+# 사용법: docker compose up --build -d 로 띄우고 http://localhost:8080 으로 테스트 후 docker compose down.
+#
+# EC2 배포는 이 파일을 쓰지 않고 아래 Dockerfile 이미지를 직접 docker run 한다.
+# 이후 DB/Redis 등 의존 서비스가 추가되면 여기 services 에 함께 추가하고
+# app 의 depends_on / environment 에 연결 정보를 넣으면 된다.
+services:
+  app:
+    build: .
+    image: helloiamoneteamnicetomeetyou:local
+    environment:
+      SPRING_PROFILES_ACTIVE: e2e
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
