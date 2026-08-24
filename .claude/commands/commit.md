@@ -49,7 +49,9 @@ allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git add:*), Bash(git c
 본문은 diff 만 봐서는 알 수 없는 이유가 있을 때만 빈 줄 뒤에 붙인다.
 무엇을 했는지를 본문에 나열하지 않는다. diff 에 이미 있다.
 
-커밋 author 는 실제 작업자다. `Co-Authored-By` 같은 도구 이름을 이력에 넣지 않는다.
+**커밋 메시지에 Claude 나 AI 도구 이름을 절대 남기지 않는다.**
+`Co-Authored-By: Claude ...` 트레일러를 붙이지 않는다. 본문만 쓰고 끝낸다.
+author 는 실제 작업자다.
 
 ## 4. 커밋
 

@@ -16,7 +16,9 @@
 - PR base 는 `dev` 다. `main` 으로 직접 열지 않는다.
 - CI 가 통과하고 팀원 1명 이상이 승인하면 머지한다.
 
-커밋 author 는 실제 작업자로 남기고, 도구 이름을 이력에 넣지 않는다.
+**커밋과 PR 에 Claude 나 AI 도구 이름을 절대 남기지 않는다.**
+`Co-Authored-By: Claude ...` 트레일러와 `🤖 Generated with Claude Code` 같은 줄을
+커밋 메시지, PR 본문, 이슈 어디에도 넣지 않는다. author 는 실제 작업자다.
 
 ## 환경 변수
 
