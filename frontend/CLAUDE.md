@@ -39,6 +39,10 @@ pnpm build
 표 정렬이 어긋나면 CI 가 빨개진다. `.prettierignore` 에 있는 `dist`,
 `node_modules`, `pnpm-lock.yaml` 만 예외다.
 
+Claude Code 로 작업할 때는 `frontend/` 아래 파일을 고치는 즉시
+`.claude/hooks/format-frontend.sh` 가 Prettier 를 돌린다. 손으로 고쳤거나
+스크립트로 바꿨을 때는 이 훅이 돌지 않으므로 위 명령을 직접 돌린다.
+
 ## 폴더와 import
 
 ```

@@ -82,6 +82,15 @@ PR 의 base 는 `dev` 다. CI 가 통과하고 팀원 1명 이상이 승인하�
 | `/commit` | 변경사항을 읽고 컨벤션에 맞게 커밋한다 |
 | `/pr` | 지정한 커밋부터 현재까지를 묶어 PR 을 연다 |
 | `/verify` | 바뀐 영역의 테스트, lint, 빌드를 돌린다 |
+| `/dev` | 백엔드와 프론트 개발 서버를 띄우고 붙었는지 확인한다 |
+| `/sync` | `dev` 최신 내용을 현재 기능 브랜치로 가져온다 |
+
+**서브에이전트**: `.claude/agents/` 에 `backend-api` 와 `frontend-screen` 이 있다.
+API 하나나 화면 하나를 컨벤션대로 만드는 작업을 맡길 때 쓴다.
+
+**자동 포맷**: `frontend/` 아래 파일을 고치면 Prettier 가 바로 돌아간다
+(`.claude/hooks/format-frontend.sh`). CI 가 `format:check` 를 돌리기 때문에
+포맷이 어긋난 채로 push 하면 빌드가 통과해도 빨개진다.
 
 ## 금지
 
