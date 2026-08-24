@@ -18,15 +18,15 @@ allowed-tools: Bash(gh issue:*), Bash(gh label:*), Bash(gh auth:*), Bash(git bra
 
 ## 1. 제목
 
-형식은 `[영역] 타입: 이슈 이름` 이다. 커밋 메시지와 같은 형식을 쓴다.
+형식은 `타입(범위): 이슈 이름` 이다. 커밋, PR 제목과 같은 형식을 쓴다.
 
-- 영역: `BE` / `FE` / `ALL` (양쪽에 걸치거나 루트 설정)
 - 타입: `feat` / `fix` / `refactor` / `chore` / `test` / `docs`
+- 범위: `be` / `fe` / `cd` (배포와 CI). **저장소 전체에 걸치면 범위를 생략한다**
 
-요청 내용만으로 영역이나 타입이 애매하면 추측하지 말고 사용자에게 묻는다.
+요청 내용만으로 타입이나 범위가 애매하면 추측하지 말고 사용자에게 묻는다.
 이름은 무엇을 하는지 드러나게 쓴다. "API 작업" 대신 "주문 생성 API 구현".
 
-예: `[BE] feat: 주문 생성 API 구현`
+예: `feat(be): 주문 생성 API 구현`, `chore: 개발 컨벤션 문서 추가`
 
 ## 2. 본문
 
@@ -51,9 +51,9 @@ allowed-tools: Bash(gh issue:*), Bash(gh label:*), Bash(gh auth:*), Bash(git bra
 
 **브랜치명** 형식은 `{영역}/{타입}/{이슈번호}-{기능}` 이다.
 
-- 영역은 대문자 `BE` / `FE` / `ALL`
+- 영역은 소문자 `be` / `fe` 다. 양쪽에 걸치면 영역을 생략한다
 - 기능 부분은 영문 kebab-case
-- 예: `BE/feat/10-order-create`, `ALL/chore/4-claude-agent-setup`
+- 예: `be/feat/10-order-create`, `chore/14-claude-agent-setup`
 
 이슈 번호는 만들기 전에는 모르므로, 브랜치명 자리를 `TBD` 로 두고 이슈를 만든 뒤
 실제 번호로 채워 넣는다.

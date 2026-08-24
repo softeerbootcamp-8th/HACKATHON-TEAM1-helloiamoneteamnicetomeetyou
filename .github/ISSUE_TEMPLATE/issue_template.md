@@ -1,7 +1,7 @@
 ---
 name: 작업 이슈
 about: 구현할 내용과 작업 범위를 적습니다
-title: '[영역] 타입: 이슈 이름'
+title: '타입(범위): 이슈 이름'
 labels: ''
 assignees: ''
 ---
@@ -9,7 +9,8 @@ assignees: ''
 ## 🌿 Branch Name
 
 > 생성할 브랜치명을 작성해주세요. `{영역}/{타입}/{이슈번호}-{기능}` 형식입니다.
-> 예: `BE/feat/10-order-create`
+> 영역은 소문자 `be` 나 `fe` 이고, 양쪽에 걸치면 생략합니다.
+> 예: `be/feat/10-order-create`, `chore/14-claude-agent-setup`
 
 ---
 

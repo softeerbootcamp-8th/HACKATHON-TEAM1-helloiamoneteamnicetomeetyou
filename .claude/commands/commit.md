@@ -31,15 +31,16 @@ allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git add:*), Bash(git c
 
 ## 3. 메시지
 
-형식은 `[영역] 타입: 요약` 이다. 콜론 앞에 공백을 넣지 않는다.
+형식은 `타입(범위): 요약` 이다. Conventional Commits 를 따른다.
 
-**영역**: 바뀐 경로로 판단한다.
+**범위**: 바뀐 경로로 판단한다.
 
-| 경로 | 영역 |
-|---|---|
-| `backend/` 만 | `BE` |
-| `frontend/` 만 | `FE` |
-| 양쪽 또는 루트(`.github/`, `.claude/`, `CLAUDE.md`, `.gitignore`, `README.md`) | `ALL` |
+| 경로 | 범위 | 예시 |
+|---|---|---|
+| `backend/` 만 | `(be)` | `feat(be): 주문 생성 API 구현` |
+| `frontend/` 만 | `(fe)` | `fix(fe): 로그인 후 리다이렉트 오류 수정` |
+| `.github/workflows/`, `Dockerfile`, 배포 설정 | `(cd)` | `fix(cd): GHCR pull 인증 실패 수정` |
+| 양쪽 또는 루트(`.claude/`, `CLAUDE.md`, `.gitignore`, `README.md`) | **생략** | `refactor: 모노레포 구조로 전환` |
 
 **타입**: `feat` / `fix` / `refactor` / `chore` / `test` / `docs`
 

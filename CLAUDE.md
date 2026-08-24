@@ -44,25 +44,29 @@
 ```
 main
 └── dev
-    ├── BE/feat/10-order
-    ├── FE/feat/12-profile
-    └── ALL/chore/4-claude-agent-setup
+    ├── be/feat/10-order
+    ├── fe/feat/12-profile
+    └── chore/14-claude-agent-setup
 ```
 
 형식은 `{영역}/{타입}/{이슈번호}-{기능}` 이다.
 
-- 영역: `BE` / `FE` / `ALL` (양쪽에 걸치거나 루트 설정)
+- 영역: `be` / `fe`. **소문자로 쓴다.** 양쪽에 걸치거나 루트 설정이면 영역을 생략한다
 - 타입: `feat` / `fix` / `refactor` / `chore` / `test` / `docs`
 - 기능 부분은 영문 kebab-case 로 쓴다
 
-**커밋**: `[영역] 타입: 요약` 형식이다. 콜론 앞에 공백을 넣지 않는다.
+**커밋**: `타입(범위): 요약` 형식이다. Conventional Commits 를 따른다.
 
 ```
-[BE] fix: 로그인 안되는 문제 수정
+fix(be): 로그인 안되는 문제 수정
 
 - 수정사항 1
 - 수정사항 2
 ```
+
+- 타입: `feat` / `fix` / `refactor` / `chore` / `test` / `docs`
+- 범위: `be` / `fe` / `cd` (배포와 CI). **저장소 전체에 걸치면 범위를 생략한다**
+  (`refactor: 백엔드를 backend/ 로 옮겨 모노레포 구조로 전환`)
 
 요약은 한글로, 무엇을 했는지 드러나게 쓴다. "수정" 대신 "재고 검증 추가" 처럼 쓴다.
 본문은 diff 만 봐서는 알 수 없는 이유가 있을 때만 붙인다.
@@ -74,6 +78,9 @@ main
 **이슈와 PR**: 작업은 이슈에서 시작한다. 이슈를 만들고, 그 번호로 브랜치를 따고,
 PR 본문에 `Closes #번호` 로 연결한다. `.github/ISSUE_TEMPLATE/issue_template.md` 와
 `.github/PULL_REQUEST_TEMPLATE.md` 양식을 따른다.
+
+**이슈와 PR 제목도 커밋과 같은 `타입(범위): 요약` 형식으로 쓴다.**
+예: `feat(be): 주문 생성 API 구현`
 
 PR 의 base 는 `dev` 다. CI 가 통과하고 팀원 1명 이상이 승인하면 머지한다.
 

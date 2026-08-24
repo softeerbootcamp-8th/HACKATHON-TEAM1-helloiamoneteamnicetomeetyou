@@ -30,8 +30,8 @@
 | [`frontend/CLAUDE.md`](./frontend/CLAUDE.md) | 폴더 구조, API 호출, 화면 상태, 네이밍 |
 | [`.claude/skills/oneteam-development/`](./.claude/skills/oneteam-development/) | API 응답 형식과 영역별 상세 지침 |
 
-브랜치는 `main ← dev ← {BE\|FE\|ALL}/{타입}/{이슈번호}-{기능}` 순서로 따고,
-커밋은 `[BE] feat: 주문 생성 API 구현` 형식으로 씁니다.
+브랜치는 `main ← dev ← {be\|fe}/{타입}/{이슈번호}-{기능}` 순서로 따고, 커밋과 이슈,
+PR 제목은 모두 `feat(be): 주문 생성 API 구현` 형식(Conventional Commits)으로 씁니다.
 
 <br>
 
