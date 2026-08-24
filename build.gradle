@@ -29,3 +29,12 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+// bootJar 산출물 이름을 고정한다.
+// `./gradlew build` 는 bootJar 와 별개로 `jar` 태스크도 돌려서 -plain.jar 를 함께 만든다.
+// 그러면 build/libs 에 jar 가 2개가 되고, Dockerfile 이 `*.jar` 글롭으로 COPY 하는 순간
+// "여러 소스를 단일 파일 대상으로 복사"라서 빌드가 깨진다.
+// 이름을 못박아 두면 Dockerfile 이 글롭 없이 app.jar 하나만 집어올 수 있다.
+tasks.named('bootJar') {
+    archiveFileName = 'app.jar'
+}
