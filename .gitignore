@@ -21,3 +21,11 @@
 
 ### VS Code ###
 .vscode/
+
+### Gradle (루트 레벨) ###
+.gradle/
+build/
+
+### Environment ###
+.env
+.env.*
