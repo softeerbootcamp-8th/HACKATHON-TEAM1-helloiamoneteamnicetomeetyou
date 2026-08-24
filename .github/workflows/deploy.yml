@@ -1,0 +1,193 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+  # 실패한 배포를 커밋 없이 다시 돌리고 싶을 때 Actions 탭에서 수동 실행한다.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  # 배포 도중 취소되면 `docker rm -f app` 과 `docker run` 사이에서 멈춰
+  # 컨테이너가 아예 없는 상태로 남을 수 있으므로 직렬화한다.
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  # GHCR은 이미지 이름에 대문자를 허용하지 않는다. 이 레포는 HACKATHON-TEAM1-... 이라
+  # github.repository 를 그대로 쓰면 push 가 "repository name must be lowercase" 로 실패한다.
+  # github.repository_owner(softeerbootcamp-8th)는 이미 소문자라 그대로 쓴다.
+  IMAGE_NAME: hackathon-team1-helloiamoneteamnicetomeetyou
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      # 이미지 빌드는 `bootJar -x test` 라 테스트를 건너뛴다.
+      # 테스트는 여기서만 돌고, deploy 가 이 잡을 게이트로 삼는다.
+      - run: ./gradlew --no-daemon test
+
+      # 로컬 docker compose E2E 를 CI 에서도 돌리려면 이 자리에 추가한다:
+      #   docker compose up --build -d && ./gradlew e2eTest ; docker compose down
+
+  build:
+    name: Build & push image
+    # test 와 병렬로 돈다 — 이미지는 SHA 태그라 테스트가 깨져도 배포되지 않으므로
+    # 여기서 기다리게 하지 않고 전체 소요시간을 줄인다. 게이트는 deploy 가 잡는다.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve image ref
+        id: image
+        run: |
+          echo "ref=${REGISTRY}/${{ github.repository_owner }}/${IMAGE_NAME}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # QEMU 셋업이 없는 건 의도적이다 — Dockerfile 런타임 스테이지에 RUN 이 없어서
+      # arm64 명령을 실행할 일이 없다. 런타임 스테이지에 RUN 을 추가하면
+      # docker/setup-qemu-action@v3 도 같이 넣어야 한다.
+      - name: Build and push (arm64 for t4g)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          # t4g.micro = Graviton = arm64. amd64 이미지를 올리면 인스턴스에서 exec format error 가 난다.
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ steps.image.outputs.ref }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+          # Gradle 의존성 레이어를 런 간에 재사용한다. 없으면 매번 전체 재다운로드.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to EC2
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull & restart container over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          # 배포가 걸려도 러너를 물고 있지 않게 자른다.
+          command_timeout: 5m
+          envs: IMAGE,GHCR_USER,GHCR_TOKEN
+          script_stop: true
+          script: |
+            set -euo pipefail
+
+            # 패키지가 private이면 pull 에 인증이 필요하다.
+            # GHCR 패키지를 public 으로 바꿨다면 GHCR_PULL_TOKEN 시크릿을 안 만들어도 되고,
+            # 그 경우 이 블록은 그냥 건너뛴다.
+            if [ -n "${GHCR_TOKEN:-}" ]; then
+              echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            fi
+
+            docker pull "$IMAGE"
+
+            # 힙덤프·GC로그는 반드시 호스트에 남겨야 한다.
+            # 컨테이너 안에 쓰면 다음 배포의 `docker rm -f` 때 함께 사라져 진단이 불가능해진다.
+            # 이미지가 USER 1000:1000 으로 돌고 Ubuntu 의 ubuntu 계정이 uid 1000 이라
+            # 이 디렉터리에 그대로 쓸 수 있다.
+            mkdir -p /home/ubuntu/app/dumps
+
+            # -XX:+UseG1GC 를 명시하는 이유:
+            # JVM 은 "server class"(CPU 2개 이상 AND 메모리 1792MB 이상)에서만 G1 을 기본으로 쓴다.
+            # --memory 640m 이면 이 문턱 아래라 JVM 이 SerialGC 를 골라버린다.
+            # ADR-011 이 G1 으로 되돌린 결론이므로 컨테이너에서는 반드시 명시해야 한다.
+            #
+            # HeapDumpPath 는 %p(PID)를 그냥 쓴다 — systemd 의 Environment= 와 달리
+            # Docker -e 에는 %p 를 유닛 이름으로 치환하는 보간이 없어 %%p 이스케이프가 불필요하다.
+            #
+            # MaxRAMPercentage=70 × 640m = 힙 448m.
+            JVM_OPTS="-XX:MaxRAMPercentage=70.0 -XX:+UseG1GC"
+            JVM_OPTS="$JVM_OPTS -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/dumps/heapdump-%p.hprof"
+            JVM_OPTS="$JVM_OPTS -Xlog:gc*,gc+heap=debug:file=/dumps/gc.log:time,uptime,level,tags:filecount=5,filesize=20m"
+
+            docker rm -f app 2>/dev/null || true
+
+            docker run -d \
+              --name app \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              --memory 640m \
+              -v /home/ubuntu/app/dumps:/dumps \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e JAVA_OPTS="$JVM_OPTS" \
+              "$IMAGE"
+
+            # 배포를 fire-and-forget 으로 두지 않는다. 안 뜨면 로그를 남기고 워크플로를 실패시킨다.
+            for i in $(seq 1 30); do
+              if curl -fsS http://localhost:8080/health >/dev/null 2>&1; then
+                echo "healthy after ${i} tries"
+                # 롤백용으로 최근 이미지는 남기고 오래된 것만 정리한다 (루트 볼륨이 작다).
+                docker image prune -af --filter "until=72h" || true
+                exit 0
+              fi
+              sleep 2
+            done
+
+            echo "::error::health check failed"
+            docker logs --tail 100 app
+            exit 1
+        env:
+          IMAGE: ${{ needs.build.outputs.image }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+
+  notify:
+    name: Notify Slack
+    needs: [test, build, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Post result to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          # secrets 컨텍스트는 job/step 의 if 에서 못 쓰므로 스크립트 안에서 확인한다.
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "SLACK_WEBHOOK_URL 미설정 — 알림을 건너뜁니다."
+            exit 0
+          fi
+
+          if [ "${{ needs.test.result }}" != "success" ]; then
+            STATUS="배포 중단 (테스트: ${{ needs.test.result }})"; COLOR="#e01e5a"
+          elif [ "${{ needs.build.result }}" != "success" ]; then
+            STATUS="배포 중단 (이미지 빌드: ${{ needs.build.result }})"; COLOR="#e01e5a"
+          elif [ "${{ needs.deploy.result }}" != "success" ]; then
+            STATUS="배포 실패 (배포 단계)"; COLOR="#e01e5a"
+          else
+            STATUS="배포 성공"; COLOR="#2eb886"
+          fi
+
+          curl -sX POST -H 'Content-type: application/json' \
+            --data "{\"attachments\":[{\"color\":\"${COLOR}\",\"title\":\"${STATUS}\",\"fields\":[{\"title\":\"브랜치\",\"value\":\"${{ github.ref_name }}\",\"short\":true},{\"title\":\"실행자\",\"value\":\"${{ github.actor }}\",\"short\":true}],\"actions\":[{\"type\":\"button\",\"text\":\"로그 보기\",\"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}]}]}" \
+            "$SLACK_WEBHOOK_URL"
