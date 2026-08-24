@@ -27,9 +27,9 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -53,16 +53,16 @@ jobs:
     outputs:
       image: ${{ steps.image.outputs.ref }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Resolve image ref
         id: image
         run: |
           echo "ref=${REGISTRY}/${{ github.repository_owner }}/${IMAGE_NAME}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -72,7 +72,7 @@ jobs:
       # arm64 명령을 실행할 일이 없다. 런타임 스테이지에 RUN 을 추가하면
       # docker/setup-qemu-action@v3 도 같이 넣어야 한다.
       - name: Build and push (arm64 for t4g)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           # t4g.micro = Graviton = arm64. amd64 이미지를 올리면 인스턴스에서 exec format error 가 난다.
@@ -89,6 +89,11 @@ jobs:
     name: Deploy to EC2
     needs: [test, build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # GITHUB_TOKEN 으로 GHCR 에서 pull 하기 위해 필요하다.
+      # 최상위 permissions 는 contents: read 뿐이라 여기서 따로 올려줘야 한다.
+      packages: read
     steps:
       - name: Pull & restart container over SSH
         uses: appleboy/ssh-action@v1
@@ -99,18 +104,21 @@ jobs:
           # 배포가 걸려도 러너를 물고 있지 않게 자른다.
           command_timeout: 5m
           envs: IMAGE,GHCR_USER,GHCR_TOKEN
-          script_stop: true
+          # script_stop 은 이 액션의 입력이 아니다(Unexpected input 경고).
+          # 스크립트 첫 줄의 set -euo pipefail 이 같은 역할을 한다.
           script: |
             set -euo pipefail
 
-            # 패키지가 private이면 pull 에 인증이 필요하다.
-            # GHCR 패키지를 public 으로 바꿨다면 GHCR_PULL_TOKEN 시크릿을 안 만들어도 되고,
-            # 그 경우 이 블록은 그냥 건너뛴다.
-            if [ -n "${GHCR_TOKEN:-}" ]; then
-              echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            fi
+            # 패키지가 internal/private 이어도 GITHUB_TOKEN 으로 pull 할 수 있다.
+            # 이 토큰은 잡 실행 중에만 유효하지만 pull 이 그 안에서 끝나므로 충분하고,
+            # PAT 를 만들거나 패키지를 public 으로 열 필요가 없다.
+            # (deploy 잡에 permissions.packages: read 가 있어야 동작한다.)
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
             docker pull "$IMAGE"
+
+            # 만료된 자격증명을 인스턴스에 남기지 않는다.
+            docker logout ghcr.io
 
             # 힙덤프·GC로그는 반드시 호스트에 남겨야 한다.
             # 컨테이너 안에 쓰면 다음 배포의 `docker rm -f` 때 함께 사라져 진단이 불가능해진다.
@@ -160,7 +168,7 @@ jobs:
         env:
           IMAGE: ${{ needs.build.outputs.image }}
           GHCR_USER: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   notify:
     name: Notify Slack
