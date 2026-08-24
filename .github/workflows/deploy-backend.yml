@@ -172,12 +172,25 @@ jobs:
               amir20/dozzle:v10.7.4
 
             # continue-on-error 라 스텝이 초록이 되므로, 문제는 경고로 남겨 눈에 띄게 한다.
-            if curl -fsS -o /dev/null --retry 5 --retry-delay 2 http://localhost:8081/; then
-              echo "dozzle up on :8081"
-            else
-              echo "::warning::Dozzle 응답 없음 — 아래 로그 확인 (users.yml 권한 문제일 수 있음)"
-              docker logs --tail 50 dozzle || true
-            fi
+            #
+            # curl --retry 를 쓰지 않는다. --retry 는 타임아웃과 5xx 같은 "전송상 오류"만
+            # 재시도하고, 컨테이너가 아직 포트를 바인딩하지 않았을 때 나는
+            # errno 56(connection reset by peer)은 재시도 대상이 아니다.
+            # 실제로 컨테이너 시작 0.2초 뒤 단 한 번 찍고 실패해서, 정상 기동한 Dozzle 을
+            # 죽은 것으로 오판했다. 앱 배포 스텝과 같은 명시적 루프로 바꾼다.
+            #
+            # /healthcheck 를 대상으로 삼는다 — 인증을 켜도 200 을 주는 전용 엔드포인트다
+            # (/ 는 로그인으로 307, /api/* 는 401 이라 성공 판정이 애매하다).
+            for i in $(seq 1 15); do
+              if curl -fsS -o /dev/null http://localhost:8081/healthcheck 2>/dev/null; then
+                echo "dozzle up on :8081 (${i} tries)"
+                exit 0
+              fi
+              sleep 2
+            done
+
+            echo "::warning::Dozzle 응답 없음 — 아래 로그 확인"
+            docker logs --tail 50 dozzle || true
         env:
           DOZZLE_USERS_B64: ${{ secrets.DOZZLE_USERS_B64 }}
 
