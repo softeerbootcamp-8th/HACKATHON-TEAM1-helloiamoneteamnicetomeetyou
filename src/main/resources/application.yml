@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: helloiamoneteamnicetomeetyou
+
+server:
+  port: 8080
+
+---
+# 로컬 docker compose E2E 테스트용 프로파일 (SPRING_PROFILES_ACTIVE=e2e)
+spring:
+  config:
+    activate:
+      on-profile: e2e
+
+---
+# EC2 배포용 프로파일 (SPRING_PROFILES_ACTIVE=prod)
+spring:
+  config:
+    activate:
+      on-profile: prod
