@@ -58,8 +58,11 @@ push:
 # YAML 목록으로 쓰면 @Value 가 못 읽어서 쉼표로 구분한 한 줄로 둔다.
 # - https://*.vercel.app : 배포와 프리뷰. 프리뷰는 커밋마다 도메인이 바뀐다
 # - http://localhost:5173 : Vite 개발 서버
+# - http://localhost:4173 : Vite preview 서버. 서비스 워커가 dev 에서 돌지 않아서 PWA 와
+#   푸시 확인은 preview 로만 할 수 있다. 브라우저는 same-origin 이어도 POST 에는 Origin 을
+#   붙이기 때문에, 프록시를 거쳐도 이 오리진이 허용 목록에 없으면 403 이 된다.
 cors:
-  allowed-origin-patterns: https://*.vercel.app,http://localhost:5173
+  allowed-origin-patterns: https://*.vercel.app,http://localhost:5173,http://localhost:4173
 
 ---
 # 로컬 docker compose E2E 테스트용 프로파일 (SPRING_PROFILES_ACTIVE=e2e)

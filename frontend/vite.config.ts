@@ -5,6 +5,12 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// dev 서버와 preview 서버가 같이 쓴다. 한쪽만 고치면 둘 중 하나에서만 백엔드가 붙는다.
+const API_PROXY = {
+  '/api': { target: 'http://localhost:8080', changeOrigin: true },
+  '/health': { target: 'http://localhost:8080', changeOrigin: true },
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -67,9 +73,16 @@ export default defineConfig({
     // 개발 중에는 프론트(5173)와 백엔드(8080)의 오리진이 달라 그냥 부르면 CORS 에 막힌다.
     // 서버 쪽에 CORS 설정을 넣는 대신 dev 서버가 같은 오리진인 척 프록시해 준다.
     // 덕분에 코드에서는 배포 환경과 똑같이 상대경로('/api/...')로만 호출하면 된다.
-    proxy: {
-      '/api': { target: 'http://localhost:8080', changeOrigin: true },
-      '/health': { target: 'http://localhost:8080', changeOrigin: true },
-    },
+    proxy: API_PROXY,
+  },
+  preview: {
+    port: 4173,
+    // preview 는 server.proxy 를 물려받지 않는다. 여기에 같은 설정을 두지 않으면
+    // `pnpm preview` 로 띄운 화면의 /api 호출이 전부 404 가 된다.
+    //
+    // 서비스 워커는 dev 에서 돌지 않기 때문에 푸시와 오프라인 확인은 preview 로만 할 수 있고,
+    // 그 확인에는 백엔드가 붙어 있어야 한다. localhost 는 HTTPS 가 아니어도 secure context 로
+    // 쳐 주기 때문에 인증서 없이 서비스 워커와 푸시가 그대로 동작한다.
+    proxy: API_PROXY,
   },
 })
