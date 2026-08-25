@@ -16,6 +16,12 @@ export default defineConfig({
       registerType: 'autoUpdate',
       // 서비스 워커 등록 스크립트는 플러그인이 index.html 에 넣어 준다.
       injectRegister: 'auto',
+      // 푸시 알림을 받으려면 서비스 워커에 push 핸들러가 있어야 하는데, 플러그인이 만들어 주는
+      // 워커에는 그걸 넣을 자리가 없다. 그래서 src/sw.ts 를 직접 쓰고 플러그인은 프리캐시
+      // 목록만 주입하게 한다. filename 이 .ts 면 플러그인이 컴파일해서 dist/sw.js 로 내보낸다.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       // 아이콘은 pwa-assets.config.ts 가 public/logo.svg 로 미리 만들어 둔 것을 쓴다.
       manifest: {
         name: 'NearLy',
@@ -39,13 +45,13 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
+      // strategies 가 injectManifest 면 workbox 옵션은 통째로 무시된다. 예전에 거기 있던
+      // navigateFallbackDenylist 는 src/sw.ts 안에서 NavigationRoute 로 직접 구현했다.
+      // 빼먹으면 오프라인 앱 껍데기가 조용히 사라지므로 둘을 같이 봐야 한다.
+      injectManifest: {
         // 빌드 산출물만 프리캐시한다. 오프라인에서 앱 껍데기가 뜨는 데까지가 목표다.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         // API 응답은 캐시하지 않는다. 오래된 데이터가 화면에 남으면 디버깅이 어려워진다.
-        // 여기에 runtimeCaching 을 넣지 않는 것으로 충분하고, 아래 denylist 는 /api 로 가는
-        // 네비게이션 요청까지 index.html 로 되돌려 보내지 않게 막는 것이다.
-        navigateFallbackDenylist: [/^\/api\//, /^\/health$/],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
       },
     }),
   ],

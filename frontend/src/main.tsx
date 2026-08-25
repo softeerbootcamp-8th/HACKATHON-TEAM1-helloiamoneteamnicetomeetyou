@@ -4,13 +4,14 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 
 import { router } from '@/app/router'
-import { getDeviceId } from '@/store/identity'
+import { getDeviceId, registerDevice } from '@/store/identity'
 import { StoreProvider } from '@/store/StoreProvider'
 
 import './index.css'
 
 // 로그인 없이 기기를 식별한다. 백엔드 인증 방식이 정해지면 이 자리만 바꾼다.
-getDeviceId()
+// 서버 등록은 실패해도 화면을 막지 않는다. 백엔드가 안 떠 있어도 목업 흐름은 돌아야 한다.
+void registerDevice(getDeviceId()).catch(() => {})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
