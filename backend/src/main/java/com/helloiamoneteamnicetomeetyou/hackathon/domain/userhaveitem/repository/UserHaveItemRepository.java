@@ -83,11 +83,25 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
               JOIN exchanges e ON e.id = ep.exchange_id
               WHERE e.status = 'PENDING'
           )
+          AND NOT EXISTS (
+              SELECT 1 FROM exchange_items ei
+              JOIN exchanges e2 ON e2.id = ei.exchange_id
+              WHERE e2.status = 'CANCELLED'
+                AND ei.from_user_id = uhi.user_id
+                AND ei.to_user_id = :myUserId
+                AND ei.item_id = uhi.item_id
+          )
         ORDER BY uhi.created_at ASC
         """, nativeQuery = true)
     List<Object[]> findToMeData(@Param("myUserId") String myUserId);
 
-    // 3인 교환 쿼리: B가 C에게 줄 수 있는 아이템과 수량 (B ∈ bIds, C ∈ cIds)
+    /**
+     * 3인 교환 쿼리: B가 C에게 줄 수 있는 아이템과 수량 (B ∈ bIds, C ∈ cIds)
+     *
+     * <p>같은 (B, 카드, C) 조합이 예전에 거절돼 취소된 적 있으면 뺀다. {@code findToThemData},
+     * {@code findToMeData} 의 거절 이력 필터와 같은 규칙이다 — 사람이 아니라 그 카드 조합만
+     * 막아서, B 나 C 가 다른 카드로는 계속 매칭될 수 있게 한다.
+     */
     @Query(value = """
         SELECT uhi.user_id, uwi.user_id,
                uhi.item_id,
@@ -99,6 +113,14 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
           AND uhi.user_id != uwi.user_id
           AND uhi.status = 'LEFT'
           AND uhi.quantity_left > 0
+          AND NOT EXISTS (
+              SELECT 1 FROM exchange_items ei
+              JOIN exchanges e2 ON e2.id = ei.exchange_id
+              WHERE e2.status = 'CANCELLED'
+                AND ei.from_user_id = uhi.user_id
+                AND ei.to_user_id = uwi.user_id
+                AND ei.item_id = uhi.item_id
+          )
         ORDER BY uhi.created_at ASC
         """, nativeQuery = true)
     List<Object[]> findBToCData(@Param("bIds") Set<String> bIds, @Param("cIds") Set<String> cIds);

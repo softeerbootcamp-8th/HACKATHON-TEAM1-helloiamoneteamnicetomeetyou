@@ -57,6 +57,16 @@ public class Exchange {
         return exchange;
     }
 
+    /** 참가자가 매칭 결과를 확인하고 장소를 잡으러 들어갔다. */
+    public void startProgress() {
+        this.status = ExchangeStatus.IN_PROGRESS;
+    }
+
+    /** 참가자가 거절했다. 취소 자체는 어드민이 끊는 것과 같은 상태 전이라 여기로 모은다. */
+    public void cancel() {
+        this.status = ExchangeStatus.CANCELLED;
+    }
+
     /**
      * 부스 운영자가 막힌 교환을 끊는다.
      *
@@ -65,7 +75,7 @@ public class Exchange {
      * 정리할 수 있게 열어 둔다.
      */
     public void cancelByAdmin() {
-        this.status = ExchangeStatus.CANCELLED;
+        cancel();
     }
 
     /** 실물 교환은 끝났는데 화면에서 완료 처리가 안 된 건을 어드민이 닫는다. */

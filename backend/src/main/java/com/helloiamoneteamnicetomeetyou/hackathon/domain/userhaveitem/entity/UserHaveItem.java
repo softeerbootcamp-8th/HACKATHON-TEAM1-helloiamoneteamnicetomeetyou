@@ -82,8 +82,14 @@ public class UserHaveItem {
         }
     }
 
-    public void cancelReservation(int amount) {
-        this.quantityLeft += amount;
+    /**
+     * 예약을 풀고 다시 매칭 후보로 돌려놓는다.
+     *
+     * <p>{@code quantityLeft} 는 건드리지 않는다. {@link #reserve()} 가 애초에 그 값을 깎지
+     * 않기 때문이다(깎는 시점은 {@link #completeExchange}, 즉 실제 거래 완료 때다). 예약
+     * 시점에 안 깎은 걸 여기서 더해 버리면 수량이 실제보다 부풀려진다.
+     */
+    public void cancelReservation() {
         this.status = ItemStatus.LEFT;
     }
 
