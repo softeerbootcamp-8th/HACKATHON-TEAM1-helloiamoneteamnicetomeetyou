@@ -2,7 +2,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.controlle
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.BDDMockito.willDoNothing;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -38,14 +38,24 @@ class UserHaveItemControllerTest {
     }
 
     @Test
-    @DisplayName("등록하면 201 을 내려준다")
-    void 등록하면_201_이다() throws Exception {
-        willDoNothing().given(userHaveItemService).register(any(UUID.class), anyLong(), any());
+    @DisplayName("새로 등록하면 201 을 내려준다")
+    void 새로_등록하면_201_이다() throws Exception {
+        given(userHaveItemService.register(any(UUID.class), anyLong(), any())).willReturn(true);
 
         mockMvc.perform(post("/api/have-items").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("등록했습니다."));
+    }
+
+    @Test
+    @DisplayName("이미 등록됐으면 200 을 내려준다")
+    void 이미_등록됐으면_200_이다() throws Exception {
+        given(userHaveItemService.register(any(UUID.class), anyLong(), any())).willReturn(false);
+
+        mockMvc.perform(post("/api/have-items").contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test

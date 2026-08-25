@@ -18,14 +18,15 @@ public class UserHaveItemController {
 
     private final UserHaveItemService userHaveItemService;
 
-    /** 등록할 때마다 새 행을 만들기 때문에 항상 201 을 반환한다. 멱등하지 않다. */
+    /** 이미 등록한 카드면 가진 개수를 덮어쓰고 200 으로 답한다. */
     @PostMapping
     public ResponseEntity<CommonResponse<Void>> register(
             @RequestBody HaveItemRegisterRequestDto request) {
 
-        userHaveItemService.register(request.userId(), request.itemId(), request.quantity());
+        boolean created = userHaveItemService.register(
+                request.userId(), request.itemId(), request.quantity());
 
-        return ResponseEntity.status(HttpStatus.CREATED)
+        return ResponseEntity.status(created ? HttpStatus.CREATED : HttpStatus.OK)
                 .body(CommonResponse.ok("등록했습니다."));
     }
 }

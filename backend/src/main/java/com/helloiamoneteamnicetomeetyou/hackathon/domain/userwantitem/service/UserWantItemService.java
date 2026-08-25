@@ -26,9 +26,11 @@ public class UserWantItemService {
     /**
      * 희망 카드를 등록한다. 이미 등록한 카드면 원하는 개수를 덮어쓴다.
      *
-     * <p>(userId, itemId) 로 묶어 한 행만 유지한다 — 같은 카드를 다시 등록하는 것은 "몇 개
-     * 원하는지 바뀌었다" 는 뜻이지 별도 등록 건이 아니기 때문이다. 그래서 여러 번에 나눠 등록할
-     * 수 있는 {@code UserHaveItemService.register} 와 다르게 upsert 로 만든다.
+     * <p>(userId, itemId) 로 묶어 한 행만 유지한다. 등록 화면(`NeedsSelect`)이 아이템마다 수량
+     * 하나를 들고 +/- 로 조절하는 형태라, 요청은 "이번에 몇 개 더" 가 아니라 "지금 몇 개다" 를
+     * 보낸다. 행을 쌓으면 그 화면의 수량 감소와 선택 취소를 서버에 반영할 방법이 없다.
+     *
+     * <p>보유 카드 등록도 같은 화면을 쓰므로 {@code UserHaveItemService.register} 와 동작이 같다.
      *
      * @return 이번 호출로 새로 만들었으면 true, 기존 값을 덮어썼으면 false
      */

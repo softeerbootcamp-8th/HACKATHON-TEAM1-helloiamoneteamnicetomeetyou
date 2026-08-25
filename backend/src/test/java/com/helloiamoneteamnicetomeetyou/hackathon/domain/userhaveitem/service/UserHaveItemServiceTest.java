@@ -23,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,14 +46,18 @@ class UserHaveItemServiceTest {
     private UserHaveItemService userHaveItemService;
 
     @Test
-    @DisplayName("사용자와 카드가 모두 있으면 보유 카드를 등록한다")
-    void 사용자와_카드가_모두_있으면_보유_카드를_등록한다() {
+    @DisplayName("처음 등록하는 카드면 보유 카드를 만든다")
+    void 처음_등록하는_카드면_보유_카드를_만든다() {
         User user = User.of(USER_ID);
-        Item item = mockItem();
+        Item item = Mockito.mock(Item.class);
+        given(userHaveItemRepository.findByUserIdAndItemId(USER_ID, ITEM_ID))
+                .willReturn(Optional.empty());
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
         given(itemRepository.findById(ITEM_ID)).willReturn(Optional.of(item));
 
-        userHaveItemService.register(USER_ID, ITEM_ID, 2);
+        boolean created = userHaveItemService.register(USER_ID, ITEM_ID, 2);
+
+        assertThat(created).isTrue();
 
         ArgumentCaptor<UserHaveItem> captor = ArgumentCaptor.forClass(UserHaveItem.class);
         verify(userHaveItemRepository).save(captor.capture());
@@ -63,20 +68,26 @@ class UserHaveItemServiceTest {
     }
 
     @Test
-    @DisplayName("같은 카드를 다시 등록해도 새 행을 만든다")
-    void 같은_카드를_다시_등록해도_새_행을_만든다() {
-        given(userRepository.findById(USER_ID)).willReturn(Optional.of(User.of(USER_ID)));
-        given(itemRepository.findById(ITEM_ID)).willReturn(Optional.of(mockItem()));
+    @DisplayName("이미 등록된 카드면 가진 개수를 덮어쓰고 새로 만들지 않는다")
+    void 이미_등록된_카드면_개수를_덮어쓴다() {
+        UserHaveItem existing = UserHaveItem.of(User.of(USER_ID), Mockito.mock(Item.class), 1);
+        given(userHaveItemRepository.findByUserIdAndItemId(USER_ID, ITEM_ID))
+                .willReturn(Optional.of(existing));
 
-        userHaveItemService.register(USER_ID, ITEM_ID, 1);
-        userHaveItemService.register(USER_ID, ITEM_ID, 3);
+        boolean created = userHaveItemService.register(USER_ID, ITEM_ID, 5);
 
-        verify(userHaveItemRepository, org.mockito.Mockito.times(2)).save(any(UserHaveItem.class));
+        assertThat(created).isFalse();
+        assertThat(existing.getQuantity()).isEqualTo(5);
+        verify(userHaveItemRepository, never()).save(any(UserHaveItem.class));
+        verify(userRepository, never()).findById(any());
+        verify(itemRepository, never()).findById(any());
     }
 
     @Test
     @DisplayName("등록되지 않은 사용자면 USER_NOT_FOUND 다")
     void 등록되지_않은_사용자면_USER_NOT_FOUND_다() {
+        given(userHaveItemRepository.findByUserIdAndItemId(USER_ID, ITEM_ID))
+                .willReturn(Optional.empty());
         given(userRepository.findById(USER_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> userHaveItemService.register(USER_ID, ITEM_ID, 1))
@@ -90,6 +101,8 @@ class UserHaveItemServiceTest {
     @Test
     @DisplayName("존재하지 않는 카드면 ITEM_NOT_FOUND 다")
     void 존재하지_않는_카드면_ITEM_NOT_FOUND_다() {
+        given(userHaveItemRepository.findByUserIdAndItemId(USER_ID, ITEM_ID))
+                .willReturn(Optional.empty());
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(User.of(USER_ID)));
         given(itemRepository.findById(ITEM_ID)).willReturn(Optional.empty());
 
@@ -121,9 +134,5 @@ class UserHaveItemServiceTest {
                 .isEqualTo(ErrorCode.INVALID_INPUT);
 
         verify(userHaveItemRepository, never()).save(any(UserHaveItem.class));
-    }
-
-    private static Item mockItem() {
-        return org.mockito.Mockito.mock(Item.class);
     }
 }
