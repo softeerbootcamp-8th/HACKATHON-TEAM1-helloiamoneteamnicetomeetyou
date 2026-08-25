@@ -6,6 +6,8 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
+const proxyTarget = process.env.DEV_PROXY_TARGET ?? 'http://localhost:8080'
+
 export default defineConfig({
   plugins: [
     react(),
@@ -61,9 +63,12 @@ export default defineConfig({
     // 개발 중에는 프론트(5173)와 백엔드(8080)의 오리진이 달라 그냥 부르면 CORS 에 막힌다.
     // 서버 쪽에 CORS 설정을 넣는 대신 dev 서버가 같은 오리진인 척 프록시해 준다.
     // 덕분에 코드에서는 배포 환경과 똑같이 상대경로('/api/...')로만 호출하면 된다.
+    //
+    // 백엔드 주소를 DEV_PROXY_TARGET 으로 덮을 수 있게 열어 두었다. 기본값은 그대로 8080 이라
+    // 평소에는 아무것도 달라지지 않고, 워크트리를 하나 더 띄워 다른 포트에서 돌릴 때만 쓴다.
     proxy: {
-      '/api': { target: 'http://localhost:8080', changeOrigin: true },
-      '/health': { target: 'http://localhost:8080', changeOrigin: true },
+      '/api': { target: proxyTarget, changeOrigin: true },
+      '/health': { target: proxyTarget, changeOrigin: true },
     },
   },
 })

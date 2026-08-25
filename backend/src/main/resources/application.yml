@@ -15,6 +15,9 @@ spring:
     url: jdbc:mysql://localhost:3306/hackathon?sslMode=DISABLED&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
     username: ${DB_USERNAME:hackathon}
     password: ${DB_PASSWORD:hackathon}
+  thymeleaf:
+    # 로컬에서 템플릿을 고치면 재시작 없이 반영되게 한다. prod 에서는 다시 켠다.
+    cache: false
   jpa:
     hibernate:
       # 해커톤 기간에는 마이그레이션 도구를 넣지 않는다. 스키마를 바꾸면 팀에 알린다.
@@ -28,6 +31,20 @@ spring:
 
 server:
   port: 8080
+  servlet:
+    session:
+      # 부스가 이틀 내내 열려 있어서, 그사이에 다시 로그인하는 일이 없어야 한다.
+      # 어드민 화면 하나만 쓰는 세션이고 값어치 있는 권한이 붙어 있지 않아서 길게 잡았다.
+      timeout: 7d
+
+# 어드민 화면(/admin) 로그인 계정이다.
+#
+# 기본값은 로컬에서 바로 띄워 보라고 둔 것이고, prod 프로파일에는 일부러 두지 않는다.
+# 값이 빠지면 DB_URL 과 같은 방식으로 부팅 단계에서 죽는 편이, 뻔한 비밀번호로 열려 있는
+# 서버가 조용히 떠 있는 것보다 낫다.
+admin:
+  username: ${ADMIN_USERNAME:admin}
+  password: ${ADMIN_PASSWORD:admin1234}
 
 # 부스 실시간 알림(SSE) 설정이다.
 #
@@ -73,7 +90,15 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+  thymeleaf:
+    cache: true
   jpa:
     properties:
       hibernate:
         format_sql: false
+
+# 기본값을 주지 않는다. 값이 빠지면 부팅이 실패하는 편이,
+# 배포된 서버가 admin/admin1234 로 열려 있는 것보다 낫다.
+admin:
+  username: ${ADMIN_USERNAME}
+  password: ${ADMIN_PASSWORD}

@@ -46,4 +46,13 @@ public class UserWantItem {
         userWantItem.quantity = quantity;
         return userWantItem;
     }
+
+    private UserWantItem(User user, Item item) {
+        this.user = user;
+        this.item = item;
+    }
+
+    public static UserWantItem of(User user, Item item) {
+        return new UserWantItem(user, item);
+    }
 }

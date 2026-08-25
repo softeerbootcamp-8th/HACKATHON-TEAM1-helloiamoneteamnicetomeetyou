@@ -86,4 +86,18 @@ public class UserHaveItem {
         this.quantityLeft += amount;
         this.status = ItemStatus.LEFT;
     }
+
+    private UserHaveItem(User user, Item item, Integer quantity) {
+        this.user = user;
+        this.item = item;
+        this.quantity = quantity;
+    }
+
+    public static UserHaveItem of(User user, Item item, Integer quantity) {
+        return new UserHaveItem(user, item, quantity);
+    }
+
+    public void changeQuantity(Integer quantity) {
+        this.quantity = quantity;
+    }
 }
