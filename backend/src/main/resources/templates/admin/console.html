@@ -226,10 +226,10 @@
                 <b th:text="${i.item.name}">카드</b>
                 <span class="counts">
                   <span th:classappend="${#lists.isEmpty(i.holders)} ? 'zero'">
-                    내놓 <b th:text="${#lists.size(i.holders)}">0</b>
+                    내놓음 <b th:text="${#lists.size(i.holders)}">0</b>
                   </span>
                   <span th:classappend="${#lists.isEmpty(i.seekers)} ? 'zero'">
-                    찾 <b th:text="${#lists.size(i.seekers)}">0</b>
+                    찾음 <b th:text="${#lists.size(i.seekers)}">0</b>
                   </span>
                 </span>
               </span>
