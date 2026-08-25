@@ -7,7 +7,8 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 /**
- * 도메인별로 코드 앞자리를 나눠 쓴다. 1000 공통, 2000 사용자, 3000 부스와 구역, 4000 교환이다.
+ * 도메인별로 코드 앞자리를 나눠 쓴다. 1000 공통, 2000 사용자, 3000 부스와 구역, 4000 교환,
+ * 5000 카드와 보유·희망 등록이다.
  */
 public enum ErrorCode implements ErrorType {
 
@@ -28,7 +29,11 @@ public enum ErrorCode implements ErrorType {
     // Exchange
     EXCHANGE_NOT_FOUND(HttpStatus.NOT_FOUND, 4000, "교환을 찾을 수 없습니다."),
     NOT_EXCHANGE_PARTICIPANT(HttpStatus.FORBIDDEN, 4001, "이 교환의 참가자가 아닙니다."),
-    UNSUPPORTED_MATCHING_SIZE(HttpStatus.BAD_REQUEST, 4006, "2인과 3인 매칭만 지원합니다.");
+    UNSUPPORTED_MATCHING_SIZE(HttpStatus.BAD_REQUEST, 4006, "2인과 3인 매칭만 지원합니다."),
+
+    // Item / UserHaveItem / UserWantItem
+    ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, 5000, "카드를 찾을 수 없습니다."),
+    INVALID_QUANTITY(HttpStatus.BAD_REQUEST, 5001, "수량은 1개 이상이어야 합니다.");
 
     private final HttpStatus httpStatus;
     private final Integer errorCode;
