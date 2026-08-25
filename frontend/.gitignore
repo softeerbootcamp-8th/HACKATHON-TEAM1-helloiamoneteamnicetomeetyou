@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Vercel CLI 가 만드는 링크 정보와 로컬로 내려받은 환경변수.
+# .env 계열은 루트 .gitignore 가 이미 막고 있다.
+.vercel
