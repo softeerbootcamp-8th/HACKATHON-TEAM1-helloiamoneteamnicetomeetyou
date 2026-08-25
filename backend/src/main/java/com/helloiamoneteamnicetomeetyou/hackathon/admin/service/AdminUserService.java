@@ -1,6 +1,7 @@
 package com.helloiamoneteamnicetomeetyou.hackathon.admin.service;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.HoldingView;
+import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ItemDetailView;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ItemView;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.UserView;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
@@ -14,6 +15,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseConnectionManager;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,6 +64,49 @@ public class AdminUserService {
 
     private Map<UUID, Long> toCountMap(List<Object[]> rows) {
         return rows.stream().collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
+    }
+
+    public long countUsers() {
+        return userRepository.count();
+    }
+
+    /** 어드민이 세워 둔 더미 수. 시연 판이 차려져 있는지를 이 숫자로 본다. */
+    public long countDummies() {
+        return userRepository.findAll().stream().filter(User::isAdminManaged).count();
+    }
+
+    /**
+     * 카드 목록. 카드마다 가진 사람과 찾는 사람을 함께 담는다.
+     *
+     * <p>짝이 날 수 없는 카드를 위로 올린다. 부스에서는 목록을 끝까지 훑을 시간이 없어서 손을
+     * 대야 하는 것이 위에 있어야 한다.
+     */
+    public List<ItemDetailView> findItemDetails() {
+        Set<UUID> connected = sseConnectionManager.connectedUserIds();
+
+        return itemRepository.findAll().stream()
+                .map(item -> toItemDetail(item.getId(), ItemView.of(item), connected))
+                .sorted(Comparator
+                        .comparing(ItemDetailView::isDeadEnd).reversed()
+                        .thenComparing(view -> view.item().name()))
+                .toList();
+    }
+
+    public ItemDetailView findItemDetail(Long itemId) {
+        Item item = findItem(itemId);
+        return toItemDetail(itemId, ItemView.of(item), sseConnectionManager.connectedUserIds());
+    }
+
+    private ItemDetailView toItemDetail(Long itemId, ItemView item, Set<UUID> connected) {
+        List<UserView> holders = userHaveItemRepository.findAllByItemId(itemId).stream()
+                .map(have -> UserView.of(have.getUser(), 0, 0, connected.contains(have.getUser().getId())))
+                .toList();
+
+        List<UserView> seekers = userWantItemRepository.findAllByItemId(itemId).stream()
+                .map(want -> UserView.of(want.getUser(), 0, 0, connected.contains(want.getUser().getId())))
+                .toList();
+
+        return new ItemDetailView(item, holders, seekers);
     }
 
     public User findUser(UUID userId) {

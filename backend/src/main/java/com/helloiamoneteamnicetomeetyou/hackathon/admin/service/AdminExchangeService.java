@@ -54,6 +54,13 @@ public class AdminExchangeService {
                 .toList();
     }
 
+    /** 오른쪽 패널에서 "이 사람이 낀 약속" 을 보여 줄 때 쓴다. */
+    public List<ExchangeView> findExchangesOf(java.util.UUID userId) {
+        return findExchanges().stream()
+                .filter(view -> view.participants().stream().anyMatch(p -> p.userId().equals(userId)))
+                .toList();
+    }
+
     private ExchangeView toView(Exchange exchange, List<ExchangeParticipant> participants) {
         return new ExchangeView(
                 exchange.getId(),

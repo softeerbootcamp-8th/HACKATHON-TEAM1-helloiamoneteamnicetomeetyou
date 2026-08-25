@@ -18,6 +18,15 @@ public interface UserWantItemRepository extends JpaRepository<UserWantItem, Long
 
     boolean existsByUserIdAndItemId(UUID userId, Long itemId);
 
+    /** 이 카드를 찾는 사람들. */
+    @Query("""
+            select w from UserWantItem w
+            join fetch w.user
+            where w.item.id = :itemId
+            order by w.id asc
+            """)
+    List<UserWantItem> findAllByItemId(Long itemId);
+
     /** 카드별 희망 등록 수. 수요와 공급 표의 수요 쪽이다. */
     @Query("select w.item.id, count(w) from UserWantItem w group by w.item.id")
     List<Object[]> countSeekersByItem();

@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#2ced90" />
+    <title>NearLy 어드민</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/admin-assets/admin.css" />
+  </head>
+  <body>
+    <!--/*
+      화면이 이 한 장이다. 탭으로 무엇을 다룰지 고르고, 왼쪽에서 대상을 고르면 오른쪽에서
+      바로 고친다. 부스에서는 관람객을 앞에 세워 두고 조작하기 때문에 목록과 상세를 오가는
+      왕복이 그대로 시간이 된다.
+    */-->
+    <header class="top">
+      <div class="brandmark">
+        <span class="dot"></span>
+        <span>NearLy</span>
+        <span class="tag">어드민</span>
+      </div>
+
+      <nav class="tabs">
+        <a href="/admin?tab=users" th:classappend="${tab == 'users'} ? 'on'">사용자</a>
+        <a href="/admin?tab=items" th:classappend="${tab == 'items'} ? 'on'">카드</a>
+        <a href="/admin?tab=zones" th:classappend="${tab == 'zones'} ? 'on'">부스와 구역</a>
+        <a href="/admin?tab=exchanges" th:classappend="${tab == 'exchanges'} ? 'on'">약속</a>
+      </nav>
+
+      <!--/* 부스에서 제일 자주 누르는 둘이라 어느 탭에 있든 손이 닿는 자리에 둔다. */-->
+      <div class="top-actions" th:if="${!#lists.isEmpty(booths)}">
+        <form method="post" th:action="@{/admin/seed}" class="inline-form">
+          <select class="input sm" name="boothId">
+            <option th:each="b : ${booths}" th:value="${b.id}" th:text="${b.name}"></option>
+          </select>
+          <input class="input sm narrow" name="dummyCount" type="number" min="2" max="20" value="6" />
+          <button class="btn brand sm" type="submit">더미 만들기</button>
+        </form>
+
+        <form
+          method="post"
+          th:action="@{/admin/reset}"
+          data-confirm="더미 사용자와 그 더미가 낀 약속을 전부 지웁니다. 부스와 구역, 카드는 그대로 둡니다."
+        >
+          <input type="hidden" name="boothId" th:value="${booths[0].id}" />
+          <button class="btn danger sm" type="submit">더미 전부 삭제</button>
+        </form>
+      </div>
+
+      <a class="btn ghost sm" href="/admin/logout">로그아웃</a>
+    </header>
+
+    <main class="split" th:if="${tab != 'exchanges'}">
+      <!--/* ===================== 사용자 ===================== */-->
+      <th:block th:if="${tab == 'users'}">
+        <aside class="pane-list">
+          <div class="pane-head">
+            사용자 <b th:text="${#lists.size(users)}">0</b>명
+          </div>
+          <div class="pick-list">
+            <a
+              th:each="u : ${users}"
+              class="pick"
+              th:classappend="${user != null and user.id == u.id} ? 'on'"
+              th:href="@{/admin(tab='users', userId=${u.id})}"
+            >
+              <span class="pick-main">
+                <b th:text="${u.username} ?: '이름 없음'">이름</b>
+                <span class="mono" th:text="${u.shortId}">00000000</span>
+              </span>
+              <span class="pick-sub">
+                내놓는 <span th:text="${u.haveCount}">0</span> · 찾는 <span th:text="${u.wantCount}">0</span>
+                <span th:if="${u.dummy}"> · 더미</span>
+              </span>
+              <span class="live-dot" th:if="${u.online}" title="접속 중"></span>
+            </a>
+          </div>
+          <div class="empty sm" th:if="${#lists.isEmpty(users)}">
+            사용자가 없습니다. 위에서 더미를 만드세요.
+          </div>
+        </aside>
+
+        <section class="pane-detail" th:if="${user != null}">
+          <div class="detail-head">
+            <form method="post" th:action="@{'/admin/users/' + ${user.id} + '/rename'}" class="inline-form grow">
+              <input class="input title-input" name="username" th:value="${user.username}" placeholder="이름 없음" />
+              <button class="btn outline sm" type="submit">이름 저장</button>
+            </form>
+            <span class="mono" th:text="${user.id}"></span>
+            <span class="badge brand" th:if="${user.adminManaged}">더미</span>
+            <span class="badge" th:unless="${user.adminManaged}">실제 사용자</span>
+
+            <form
+              th:if="${user.adminManaged}"
+              method="post"
+              th:action="@{'/admin/users/' + ${user.id} + '/delete'}"
+              th:data-confirm="'이 더미를 지웁니다.'"
+            >
+              <button class="btn danger sm" type="submit">삭제</button>
+            </form>
+          </div>
+
+          <div class="grid-2">
+            <div class="box">
+              <div class="box-head">
+                내놓는 카드
+                <form method="post" th:action="@{'/admin/users/' + ${user.id} + '/have'}" class="inline-form">
+                  <select class="input sm" name="itemId" required>
+                    <option th:each="i : ${allItems}" th:value="${i.id}" th:text="${i.name}"></option>
+                  </select>
+                  <input class="input sm narrow" name="quantity" type="number" min="1" value="1" />
+                  <button class="btn sm" type="submit">추가</button>
+                </form>
+              </div>
+
+              <div class="rows">
+                <div class="row" th:each="h : ${haveItems}">
+                  <div class="chip-card">
+                    <img th:if="${h.item.imageUrl}" th:src="${h.item.imageUrl}" th:alt="${h.item.name}" />
+                    <span th:unless="${h.item.imageUrl}" th:text="${h.item.code}">N74</span>
+                  </div>
+                  <div class="grow"><div class="title" th:text="${h.item.name}">카드</div></div>
+
+                  <form
+                    method="post"
+                    th:action="@{'/admin/users/' + ${user.id} + '/have/' + ${h.id} + '/quantity'}"
+                    class="actions"
+                  >
+                    <button class="icon-btn" type="button" data-step="-1" aria-label="하나 빼기">−</button>
+                    <input class="input qty" name="quantity" type="number" min="1" th:value="${h.quantity}" />
+                    <button class="icon-btn" type="button" data-step="1" aria-label="하나 더">+</button>
+                  </form>
+
+                  <form method="post" th:action="@{'/admin/users/' + ${user.id} + '/have/' + ${h.id} + '/delete'}">
+                    <button class="icon-btn danger" type="submit" aria-label="삭제">×</button>
+                  </form>
+                </div>
+              </div>
+              <div class="empty sm" th:if="${#lists.isEmpty(haveItems)}">
+                내놓는 카드가 없어서 이 사람은 매칭 상대가 될 수 없습니다.
+              </div>
+            </div>
+
+            <div class="box">
+              <div class="box-head">
+                찾는 카드
+                <form method="post" th:action="@{'/admin/users/' + ${user.id} + '/want'}" class="inline-form">
+                  <select class="input sm" name="itemId" required>
+                    <option th:each="i : ${allItems}" th:value="${i.id}" th:text="${i.name}"></option>
+                  </select>
+                  <button class="btn sm" type="submit">추가</button>
+                </form>
+              </div>
+
+              <div class="rows">
+                <div class="row" th:each="w : ${wantItems}">
+                  <div class="chip-card">
+                    <img th:if="${w.item.imageUrl}" th:src="${w.item.imageUrl}" th:alt="${w.item.name}" />
+                    <span th:unless="${w.item.imageUrl}" th:text="${w.item.code}">N74</span>
+                  </div>
+                  <div class="grow"><div class="title" th:text="${w.item.name}">카드</div></div>
+                  <form method="post" th:action="@{'/admin/users/' + ${user.id} + '/want/' + ${w.id} + '/delete'}">
+                    <button class="icon-btn danger" type="submit" aria-label="삭제">×</button>
+                  </form>
+                </div>
+              </div>
+              <div class="empty sm" th:if="${#lists.isEmpty(wantItems)}">
+                찾는 카드가 없어서 이 사람에게는 매칭이 제안되지 않습니다.
+              </div>
+            </div>
+          </div>
+
+          <div class="box">
+            <div class="box-head">이 사람의 약속</div>
+            <div class="rows" th:if="${!#lists.isEmpty(userExchanges)}">
+              <div class="row" th:each="ex : ${userExchanges}">
+                <div class="grow">
+                  <div class="title">
+                    <span th:text="'#' + ${ex.id}">#1</span>
+                    <span th:text="${ex.zoneName} ?: '장소 미정'"></span>
+                  </div>
+                  <div class="meta" th:text="${#strings.listJoin(ex.participants.![username ?: shortId], ', ')}"></div>
+                </div>
+                <span class="badge" th:text="${ex.status}">PENDING</span>
+                <a class="btn outline sm" href="/admin?tab=exchanges">약속 탭에서 보기</a>
+              </div>
+            </div>
+            <div class="empty sm" th:if="${#lists.isEmpty(userExchanges)}">진행 중인 약속이 없어요.</div>
+          </div>
+        </section>
+      </th:block>
+
+      <!--/* ===================== 카드 ===================== */-->
+      <th:block th:if="${tab == 'items'}">
+        <aside class="pane-list">
+          <div class="pane-head">
+            카드 <b th:text="${#lists.size(items)}">0</b>종
+          </div>
+          <div class="pick-list">
+            <a
+              th:each="i : ${items}"
+              class="pick"
+              th:classappend="${item != null and item.item.id == i.item.id} ? 'on'"
+              th:href="@{/admin(tab='items', itemId=${i.item.id})}"
+            >
+              <span class="pick-main">
+                <b th:text="${i.item.name}">카드</b>
+                <span class="badge danger" th:if="${i.deadEnd}">매칭 안 됨</span>
+              </span>
+              <span class="pick-sub">
+                내놓는 <span th:text="${#lists.size(i.holders)}">0</span>명 · 찾는
+                <span th:text="${#lists.size(i.seekers)}">0</span>명
+              </span>
+            </a>
+          </div>
+          <div class="empty sm" th:if="${#lists.isEmpty(items)}">
+            카드가 없습니다. 부스와 구역 탭에서 만드세요.
+          </div>
+        </aside>
+
+        <section class="pane-detail" th:if="${item != null}">
+          <div class="detail-head">
+            <div class="chip-card lg">
+              <img th:if="${item.item.imageUrl}" th:src="${item.item.imageUrl}" th:alt="${item.item.name}" />
+              <span th:unless="${item.item.imageUrl}" th:text="${item.item.code}">N74</span>
+            </div>
+            <h1 class="grow" th:text="${item.item.name}">카드</h1>
+            <span class="badge danger" th:if="${item.deadEnd}">매칭 안 됨</span>
+          </div>
+
+          <div class="box">
+            <div class="box-head">카드 정보</div>
+            <div class="box-body">
+              <form method="post" th:action="@{'/admin/items/' + ${item.item.id}}" class="form-row">
+                <div class="field">
+                  <label>이름</label>
+                  <input class="input" name="name" th:value="${item.item.name}" required />
+                </div>
+                <div class="field">
+                  <label>설명</label>
+                  <input class="input" name="description" th:value="${item.item.description}" />
+                </div>
+                <div class="field">
+                  <label>이미지 주소</label>
+                  <input class="input" name="imageUrl" th:value="${item.item.imageUrl}" placeholder="https://..." />
+                </div>
+                <button class="btn" type="submit">저장</button>
+              </form>
+            </div>
+          </div>
+
+          <!--/*
+            누가 가지고 있고 누가 찾는지를 명단으로 둔다. 숫자만 보면 "3명" 까지는 알아도
+            누구인지 몰라서, 카드를 옮기려면 사용자 탭을 따로 뒤져야 한다.
+          */-->
+          <div class="grid-2">
+            <div class="box">
+              <div class="box-head">
+                이 카드를 내놓는 사람
+                <form method="post" th:action="@{'/admin/items/' + ${item.item.id} + '/holders'}" class="inline-form">
+                  <select class="input sm" name="userId" required>
+                    <option
+                      th:each="u : ${allUsers}"
+                      th:value="${u.id}"
+                      th:text="(${u.username} ?: u.shortId)"
+                    ></option>
+                  </select>
+                  <button class="btn sm" type="submit">추가</button>
+                </form>
+              </div>
+              <div class="rows">
+                <a class="row" th:each="u : ${item.holders}" th:href="@{/admin(tab='users', userId=${u.id})}">
+                  <div class="grow">
+                    <div class="title" th:text="${u.username} ?: u.shortId">이름</div>
+                    <div class="meta mono" th:text="${u.shortId}"></div>
+                  </div>
+                  <span class="badge brand" th:if="${u.dummy}">더미</span>
+                  <span class="live-dot" th:if="${u.online}"></span>
+                </a>
+              </div>
+              <div class="empty sm" th:if="${#lists.isEmpty(item.holders)}">
+                아무도 이 카드를 내놓지 않아서 매칭이 나지 않습니다.
+              </div>
+            </div>
+
+            <div class="box">
+              <div class="box-head">
+                이 카드를 찾는 사람
+                <form method="post" th:action="@{'/admin/items/' + ${item.item.id} + '/seekers'}" class="inline-form">
+                  <select class="input sm" name="userId" required>
+                    <option
+                      th:each="u : ${allUsers}"
+                      th:value="${u.id}"
+                      th:text="(${u.username} ?: u.shortId)"
+                    ></option>
+                  </select>
+                  <button class="btn sm" type="submit">추가</button>
+                </form>
+              </div>
+              <div class="rows">
+                <a class="row" th:each="u : ${item.seekers}" th:href="@{/admin(tab='users', userId=${u.id})}">
+                  <div class="grow">
+                    <div class="title" th:text="${u.username} ?: u.shortId">이름</div>
+                    <div class="meta mono" th:text="${u.shortId}"></div>
+                  </div>
+                  <span class="badge brand" th:if="${u.dummy}">더미</span>
+                  <span class="live-dot" th:if="${u.online}"></span>
+                </a>
+              </div>
+              <div class="empty sm" th:if="${#lists.isEmpty(item.seekers)}">
+                아무도 이 카드를 찾지 않아서 매칭이 나지 않습니다.
+              </div>
+            </div>
+          </div>
+
+          <form
+            method="post"
+            th:action="@{'/admin/items/' + ${item.item.id} + '/delete'}"
+            th:data-confirm="'카드 ' + ${item.item.name} + ' 을(를) 지웁니다.'"
+            style="margin-top: 14px"
+          >
+            <button class="btn danger sm" type="submit">이 카드 삭제</button>
+          </form>
+        </section>
+      </th:block>
+
+      <!--/* ===================== 부스와 구역 ===================== */-->
+      <th:block th:if="${tab == 'zones'}">
+        <aside class="pane-list">
+          <div class="pane-head">
+            부스 <b th:text="${#lists.size(booths)}">0</b>개
+          </div>
+          <div class="pick-list">
+            <a
+              th:each="b : ${booths}"
+              class="pick"
+              th:classappend="${booth != null and booth.id == b.id} ? 'on'"
+              th:href="@{/admin(tab='zones', boothId=${b.id})}"
+            >
+              <span class="pick-main"><b th:text="${b.name}">부스</b></span>
+              <span class="pick-sub">
+                구역 <span th:text="${b.zoneCount}">0</span>개 · 카드
+                <span th:text="${b.itemCount}">0</span>종 · 접속
+                <span th:text="${b.connectedCount}">0</span>명
+              </span>
+            </a>
+          </div>
+
+          <div class="pane-foot">
+            <form method="post" th:action="@{/admin/booths}" class="stack">
+              <input class="input sm" name="name" placeholder="새 부스 이름" required />
+              <button class="btn sm wide" type="submit">부스 만들기</button>
+            </form>
+          </div>
+        </aside>
+
+        <section class="pane-detail" th:if="${booth != null}">
+          <div class="detail-head"><h1 class="grow" th:text="${booth.name}">부스</h1></div>
+
+          <div class="box">
+            <div class="box-head">부스 정보</div>
+            <div class="box-body">
+              <form method="post" th:action="@{'/admin/booths/' + ${booth.id}}" class="form-row">
+                <div class="field">
+                  <label>이름</label>
+                  <input class="input" name="name" th:value="${booth.name}" required />
+                </div>
+                <div class="field grow-2">
+                  <label>설명</label>
+                  <input class="input" name="description" th:value="${booth.description}" />
+                </div>
+                <button class="btn" type="submit">저장</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="box">
+            <div class="box-head">
+              구역
+              <form method="post" th:action="@{'/admin/booths/' + ${booth.id} + '/zones'}" class="inline-form">
+                <input class="input sm" name="name" placeholder="A 구역" required />
+                <input class="input sm" name="location" placeholder="부스 입구 왼쪽" />
+                <button class="btn sm" type="submit">추가</button>
+              </form>
+            </div>
+
+            <div class="rows">
+              <div class="row" th:each="z : ${zones}">
+                <form
+                  method="post"
+                  th:action="@{'/admin/booths/' + ${booth.id} + '/zones/' + ${z.id}}"
+                  class="grow inline-form"
+                >
+                  <input class="input sm" name="name" th:value="${z.name}" required style="flex: 1" />
+                  <input class="input sm" name="location" th:value="${z.location}" placeholder="위치" style="flex: 2" />
+                  <button class="btn outline sm" type="submit">저장</button>
+                </form>
+                <form method="post" th:action="@{'/admin/booths/' + ${booth.id} + '/zones/' + ${z.id} + '/delete'}">
+                  <button class="icon-btn danger" type="submit" aria-label="삭제">×</button>
+                </form>
+              </div>
+            </div>
+            <div class="empty sm" th:if="${#lists.isEmpty(zones)}">
+              구역이 없으면 약속 장소를 고르는 화면이 비어 버립니다.
+            </div>
+          </div>
+
+          <div class="box">
+            <div class="box-head">
+              카드 추가
+              <span class="hint">카드를 고치거나 지우는 것은 카드 탭에서 합니다.</span>
+            </div>
+            <div class="box-body">
+              <form method="post" th:action="@{'/admin/booths/' + ${booth.id} + '/items'}" class="form-row">
+                <div class="field">
+                  <label>이름</label>
+                  <input class="input" name="name" placeholder="N Vision 74" required />
+                </div>
+                <div class="field">
+                  <label>설명</label>
+                  <input class="input" name="description" />
+                </div>
+                <div class="field">
+                  <label>이미지 주소</label>
+                  <input class="input" name="imageUrl" placeholder="https://..." />
+                </div>
+                <button class="btn brand" type="submit">추가</button>
+              </form>
+            </div>
+          </div>
+        </section>
+      </th:block>
+    </main>
+
+    <!--/* ===================== 약속 ===================== */-->
+    <main class="wide" th:if="${tab == 'exchanges'}">
+      <div class="box">
+        <div class="box-head">
+          약속 <b th:text="${#lists.size(exchanges)}">0</b>건
+          <span class="hint">더미에게 온 요청은 어드민이 대신 눌러야 흐름이 이어집니다.</span>
+        </div>
+
+        <div class="rows" th:if="${!#lists.isEmpty(exchanges)}">
+          <div class="row" th:each="ex : ${exchanges}" style="align-items: flex-start">
+            <div class="grow">
+              <div class="title">
+                <span th:text="'#' + ${ex.id}">#1</span>
+                <span class="badge brand" th:if="${ex.status.name() == 'IN_PROGRESS'}">진행 중</span>
+                <span class="badge" th:if="${ex.status.name() == 'PENDING'}">시간 고르는 중</span>
+                <span class="badge brand" th:if="${ex.status.name() == 'COMPLETED'}">완료</span>
+                <span class="badge danger" th:if="${ex.status.name() == 'CANCELLED'}">취소됨</span>
+              </div>
+              <div class="meta">
+                <span th:text="${ex.zoneName} ?: '장소 미정'"></span> ·
+                <span
+                  th:text="${ex.exchangeTime != null} ? ${#temporals.format(ex.exchangeTime, 'MM/dd HH:mm')} : '시간 미정'"
+                ></span>
+              </div>
+
+              <div class="party">
+                <div class="party-one" th:each="p : ${ex.participants}">
+                  <a
+                    th:href="@{/admin(tab='users', userId=${p.userId})}"
+                    th:text="${p.username} ?: ${p.shortId}"
+                    >이름</a
+                  >
+                  <span class="badge brand" th:if="${p.status.name() == 'ACCEPTED'}">수락</span>
+                  <span class="badge" th:if="${p.status.name() == 'PENDING'}">답변 기다리는 중</span>
+                  <span class="badge danger" th:if="${p.status.name() == 'REJECTED'}">거절</span>
+
+                  <th:block th:if="${p.dummy and p.status.name() == 'PENDING'}">
+                    <form method="post" th:action="@{'/admin/exchanges/participants/' + ${p.id} + '/accept'}">
+                      <button class="btn brand sm" type="submit">수락</button>
+                    </form>
+                    <form method="post" th:action="@{'/admin/exchanges/participants/' + ${p.id} + '/reject'}">
+                      <button class="btn outline sm" type="submit">거절</button>
+                    </form>
+                  </th:block>
+                </div>
+              </div>
+            </div>
+
+            <div class="actions" th:if="${ex.status.name() != 'COMPLETED' and ex.status.name() != 'CANCELLED'}">
+              <form method="post" th:action="@{'/admin/exchanges/' + ${ex.id} + '/complete'}">
+                <button class="btn outline sm" type="submit">완료로 바꾸기</button>
+              </form>
+              <form
+                method="post"
+                th:action="@{'/admin/exchanges/' + ${ex.id} + '/cancel'}"
+                th:data-confirm="'약속 #' + ${ex.id} + ' 을(를) 취소합니다. 참가자 화면이 바뀝니다.'"
+              >
+                <button class="btn danger sm" type="submit">취소</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="empty" th:if="${#lists.isEmpty(exchanges)}">
+          진행 중인 약속이 없어요.<br />
+          <span class="dim">사용자가 앱에서 상대를 고르면 여기에 나타납니다.</span>
+        </div>
+      </div>
+    </main>
+
+    <div
+      th:if="${toast}"
+      class="toast"
+      th:classappend="${toastTone == 'danger'} ? 'danger'"
+      th:text="${toast}"
+    ></div>
+
+    <dialog class="sheet" id="confirm-dialog">
+      <div class="sheet-body">
+        <h3>진행할까요?</h3>
+        <p data-confirm-message></p>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn" type="button" data-confirm-cancel>아니요</button>
+        <button class="btn outline" type="button" data-confirm-ok>네, 진행할게요</button>
+      </div>
+    </dialog>
+
+    <script src="/admin-assets/admin.js"></script>
+  </body>
+</html>

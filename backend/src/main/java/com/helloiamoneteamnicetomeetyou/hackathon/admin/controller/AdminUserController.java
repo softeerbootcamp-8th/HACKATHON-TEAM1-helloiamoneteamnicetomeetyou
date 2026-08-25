@@ -1,12 +1,9 @@
 package com.helloiamoneteamnicetomeetyou.hackathon.admin.controller;
 
-import com.helloiamoneteamnicetomeetyou.hackathon.admin.service.AdminBoothService;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.service.AdminUserService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,32 +21,17 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequiredArgsConstructor
 public class AdminUserController {
 
+    /** 무엇을 고치든 방금 보던 사람으로 돌아온다. 그래야 바뀐 것이 눈에 바로 보인다. */
+    private static final String CONSOLE = "redirect:/admin?tab=users&userId=";
+
     private final AdminUserService adminUserService;
-    private final AdminBoothService adminBoothService;
-
-    @GetMapping
-    public String users(Model model) {
-        model.addAttribute("nav", "users");
-        model.addAttribute("users", adminUserService.findUsers());
-        return "admin/users";
-    }
-
-    @GetMapping("/{userId}")
-    public String user(@PathVariable UUID userId, Model model) {
-        model.addAttribute("nav", "users");
-        model.addAttribute("user", adminUserService.findUser(userId));
-        model.addAttribute("haveItems", adminUserService.findHaveItems(userId));
-        model.addAttribute("wantItems", adminUserService.findWantItems(userId));
-        model.addAttribute("allItems", adminBoothService.findAllItems());
-        return "admin/user-detail";
-    }
 
     @PostMapping
     public String createDummy(@RequestParam String username, RedirectAttributes redirectAttributes) {
         UUID userId = adminUserService.createDummy(username);
-        redirectAttributes.addFlashAttribute("toast", "더미 사용자를 만들었습니다.");
+        redirectAttributes.addFlashAttribute("toast", "더미를 만들었습니다.");
 
-        return "redirect:/admin/users/" + userId;
+        return CONSOLE + userId;
     }
 
     @PostMapping("/{userId}/rename")
@@ -61,7 +43,7 @@ public class AdminUserController {
         adminUserService.rename(userId, username);
         redirectAttributes.addFlashAttribute("toast", "이름을 고쳤습니다.");
 
-        return "redirect:/admin/users/" + userId;
+        return CONSOLE + userId;
     }
 
     @PostMapping("/{userId}/have")
@@ -72,9 +54,9 @@ public class AdminUserController {
             RedirectAttributes redirectAttributes) {
 
         adminUserService.addHaveItem(userId, itemId, quantity);
-        redirectAttributes.addFlashAttribute("toast", "보유 카드를 붙였습니다.");
+        redirectAttributes.addFlashAttribute("toast", "내놓는 카드에 추가했습니다.");
 
-        return "redirect:/admin/users/" + userId;
+        return CONSOLE + userId;
     }
 
     @PostMapping("/{userId}/have/{haveId}/quantity")
@@ -87,7 +69,7 @@ public class AdminUserController {
         adminUserService.changeHaveQuantity(haveId, quantity);
         redirectAttributes.addFlashAttribute("toast", "수량을 고쳤습니다.");
 
-        return "redirect:/admin/users/" + userId;
+        return CONSOLE + userId;
     }
 
     @PostMapping("/{userId}/have/{haveId}/delete")
@@ -97,9 +79,9 @@ public class AdminUserController {
             RedirectAttributes redirectAttributes) {
 
         adminUserService.removeHaveItem(haveId);
-        redirectAttributes.addFlashAttribute("toast", "보유 카드를 뗐습니다.");
+        redirectAttributes.addFlashAttribute("toast", "내놓는 카드에서 뺐습니다.");
 
-        return "redirect:/admin/users/" + userId;
+        return CONSOLE + userId;
     }
 
     @PostMapping("/{userId}/want")
@@ -109,9 +91,9 @@ public class AdminUserController {
             RedirectAttributes redirectAttributes) {
 
         adminUserService.addWantItem(userId, itemId);
-        redirectAttributes.addFlashAttribute("toast", "희망 카드를 붙였습니다.");
+        redirectAttributes.addFlashAttribute("toast", "찾는 카드에 추가했습니다.");
 
-        return "redirect:/admin/users/" + userId;
+        return CONSOLE + userId;
     }
 
     @PostMapping("/{userId}/want/{wantId}/delete")
@@ -121,16 +103,16 @@ public class AdminUserController {
             RedirectAttributes redirectAttributes) {
 
         adminUserService.removeWantItem(wantId);
-        redirectAttributes.addFlashAttribute("toast", "희망 카드를 뗐습니다.");
+        redirectAttributes.addFlashAttribute("toast", "찾는 카드에서 뺐습니다.");
 
-        return "redirect:/admin/users/" + userId;
+        return CONSOLE + userId;
     }
 
     @PostMapping("/{userId}/delete")
     public String deleteDummy(@PathVariable UUID userId, RedirectAttributes redirectAttributes) {
         adminUserService.deleteDummy(userId);
-        redirectAttributes.addFlashAttribute("toast", "더미 사용자를 지웠습니다.");
+        redirectAttributes.addFlashAttribute("toast", "더미를 지웠습니다.");
 
-        return "redirect:/admin/users";
+        return "redirect:/admin?tab=users";
     }
 }

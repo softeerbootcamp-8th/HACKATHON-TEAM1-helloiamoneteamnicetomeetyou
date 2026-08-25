@@ -3,8 +3,6 @@ package com.helloiamoneteamnicetomeetyou.hackathon.admin.controller;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.service.AdminBoothService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,22 +22,6 @@ public class AdminBoothController {
 
     private final AdminBoothService adminBoothService;
 
-    @GetMapping
-    public String booths(Model model) {
-        model.addAttribute("nav", "booths");
-        model.addAttribute("booths", adminBoothService.findBooths());
-        return "admin/booths";
-    }
-
-    @GetMapping("/{boothId}")
-    public String booth(@PathVariable Long boothId, Model model) {
-        model.addAttribute("nav", "booths");
-        model.addAttribute("booth", adminBoothService.findBooth(boothId));
-        model.addAttribute("zones", adminBoothService.findZones(boothId));
-        model.addAttribute("items", adminBoothService.findItems(boothId));
-        return "admin/booth-detail";
-    }
-
     @PostMapping
     public String createBooth(
             @RequestParam String name,
@@ -49,7 +31,7 @@ public class AdminBoothController {
         Long boothId = adminBoothService.createBooth(name, description);
         redirectAttributes.addFlashAttribute("toast", "부스를 만들었습니다.");
 
-        return "redirect:/admin/booths/" + boothId;
+        return "redirect:/admin?tab=zones&boothId=" + boothId;
     }
 
     @PostMapping("/{boothId}")
@@ -62,7 +44,7 @@ public class AdminBoothController {
         adminBoothService.updateBooth(boothId, name, description);
         redirectAttributes.addFlashAttribute("toast", "부스 정보를 고쳤습니다.");
 
-        return "redirect:/admin/booths/" + boothId;
+        return "redirect:/admin?tab=zones&boothId=" + boothId;
     }
 
     @PostMapping("/{boothId}/zones")
@@ -75,7 +57,7 @@ public class AdminBoothController {
         adminBoothService.createZone(boothId, name, location);
         redirectAttributes.addFlashAttribute("toast", "구역을 추가했습니다.");
 
-        return "redirect:/admin/booths/" + boothId;
+        return "redirect:/admin?tab=zones&boothId=" + boothId;
     }
 
     @PostMapping("/{boothId}/zones/{zoneId}")
@@ -89,7 +71,7 @@ public class AdminBoothController {
         adminBoothService.updateZone(zoneId, name, location);
         redirectAttributes.addFlashAttribute("toast", "구역을 고쳤습니다.");
 
-        return "redirect:/admin/booths/" + boothId;
+        return "redirect:/admin?tab=zones&boothId=" + boothId;
     }
 
     @PostMapping("/{boothId}/zones/{zoneId}/delete")
@@ -101,7 +83,7 @@ public class AdminBoothController {
         adminBoothService.deleteZone(zoneId);
         redirectAttributes.addFlashAttribute("toast", "구역을 지웠습니다.");
 
-        return "redirect:/admin/booths/" + boothId;
+        return "redirect:/admin?tab=zones&boothId=" + boothId;
     }
 
     @PostMapping("/{boothId}/items")
@@ -115,7 +97,7 @@ public class AdminBoothController {
         adminBoothService.createItem(boothId, name, description, imageUrl);
         redirectAttributes.addFlashAttribute("toast", "카드를 추가했습니다.");
 
-        return "redirect:/admin/booths/" + boothId;
+        return "redirect:/admin?tab=zones&boothId=" + boothId;
     }
 
     @PostMapping("/{boothId}/items/{itemId}")
@@ -130,7 +112,7 @@ public class AdminBoothController {
         adminBoothService.updateItem(itemId, name, description, imageUrl);
         redirectAttributes.addFlashAttribute("toast", "카드를 고쳤습니다.");
 
-        return "redirect:/admin/booths/" + boothId;
+        return "redirect:/admin?tab=zones&boothId=" + boothId;
     }
 
     @PostMapping("/{boothId}/items/{itemId}/delete")
@@ -142,6 +124,6 @@ public class AdminBoothController {
         adminBoothService.deleteItem(itemId);
         redirectAttributes.addFlashAttribute("toast", "카드를 지웠습니다.");
 
-        return "redirect:/admin/booths/" + boothId;
+        return "redirect:/admin?tab=zones&boothId=" + boothId;
     }
 }

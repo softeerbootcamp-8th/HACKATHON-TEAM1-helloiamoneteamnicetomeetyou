@@ -1,6 +1,5 @@
 package com.helloiamoneteamnicetomeetyou.hackathon.admin.service;
 
-import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.entity.Booth;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.repository.BoothRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
@@ -44,20 +43,15 @@ public class AdminResetService {
     /**
      * 더미 사용자와 그들이 남긴 흔적을 지운다.
      *
-     * <p>지우는 순서가 정해져 있다. 교환에 딸린 줄(주고받은 카드, 참가자)을 먼저 없애고 교환을
+     * <p>지우는 순서가 정해져 있다. 약속에 딸린 줄(주고받은 카드, 참가자)을 먼저 없애고 약속을
      * 지운 다음에야 사용자를 지울 수 있다. 반대로 하면 외래키에 걸려서 아무것도 못 지운다.
      *
-     * @param confirmName 사용자가 직접 입력한 부스 이름. 실제 이름과 다르면 아무것도 하지 않는다.
      * @return 지운 더미 수
      */
     @Transactional
-    public int resetDummies(Long boothId, String confirmName) {
-        Booth booth = boothRepository.findById(boothId)
+    public int resetDummies(Long boothId) {
+        boothRepository.findById(boothId)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.BOOTH_NOT_FOUND));
-
-        if (!booth.getName().equals(confirmName)) {
-            throw new ApplicationException(ErrorCode.INVALID_INPUT);
-        }
 
         List<User> dummies = userRepository.findAll().stream().filter(User::isAdminManaged).toList();
         if (dummies.isEmpty()) {

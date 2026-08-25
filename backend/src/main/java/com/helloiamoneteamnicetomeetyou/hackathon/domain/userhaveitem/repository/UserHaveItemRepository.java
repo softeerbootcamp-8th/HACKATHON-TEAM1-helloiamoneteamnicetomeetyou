@@ -20,6 +20,20 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
     Optional<UserHaveItem> findByUserIdAndItemId(UUID userId, Long itemId);
 
     /**
+     * 이 카드를 가진 사람들. 카드 화면 오른쪽에 명단 그대로 띄운다.
+     *
+     * <p>숫자만 보여 주면 "3명이 가지고 있다" 까지는 알아도 누구인지 알 수 없어서, 카드를
+     * 옮기려면 사람 목록을 따로 뒤져야 한다.
+     */
+    @Query("""
+            select h from UserHaveItem h
+            join fetch h.user
+            where h.item.id = :itemId
+            order by h.id asc
+            """)
+    List<UserHaveItem> findAllByItemId(Long itemId);
+
+    /**
      * 카드별로 보유 등록이 몇 건인지 센다. 수요와 공급 표의 공급 쪽이다.
      *
      * <p>수량이 아니라 사람 수를 센다. 매칭에서 중요한 것은 그 카드를 내놓을 수 있는 사람이 몇

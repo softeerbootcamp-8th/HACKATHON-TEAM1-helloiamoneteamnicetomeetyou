@@ -2,7 +2,6 @@ package com.helloiamoneteamnicetomeetyou.hackathon.admin.service;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ItemDemandView;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ItemView;
-import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.repository.ItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
@@ -46,7 +45,6 @@ public class AdminDashboardService {
                         seekers.getOrDefault(item.getId(), 0L)))
                 .sorted(Comparator
                         .comparing(ItemDemandView::isDeadEnd).reversed()
-                        .thenComparing(ItemDemandView::isShort, Comparator.reverseOrder())
                         .thenComparing(view -> view.item().name()))
                 .toList();
     }
@@ -58,15 +56,5 @@ public class AdminDashboardService {
 
     private Map<Long, Long> toCountMap(List<Object[]> rows) {
         return rows.stream().collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
-    }
-
-    /** 대시보드 요약 숫자. */
-    public long countItems() {
-        return itemRepository.count();
-    }
-
-    /** 등록된 카드 이름을 한 줄로 보여 줄 때 쓴다. */
-    public List<String> itemNames() {
-        return itemRepository.findAll().stream().map(Item::getName).toList();
     }
 }
