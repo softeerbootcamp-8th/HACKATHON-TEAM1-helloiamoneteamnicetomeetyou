@@ -62,15 +62,25 @@ jobs:
             exit 1
           fi
 
-          if ! account=$(npx --yes vercel@latest whoami 2>&1 | tail -1); then
-            echo "::error::VERCEL_TOKEN 으로 인증하지 못했습니다. 만료되었거나 값이 잘못되었습니다."
+          # 파이프를 거치면 종료 코드가 tail 것이 되어 실패를 놓친다. 출력을 먼저 받고 판정한다.
+          if ! account=$(npx --yes vercel@latest whoami 2>&1); then
+            echo "$account"
+            echo "::error::VERCEL_TOKEN 으로 인증하지 못했습니다. 값이 잘못되었거나 만료되었습니다."
             exit 1
           fi
+          account=$(echo "$account" | tail -1)
+          case "$account" in
+            *Error*|"")
+              echo "::error::VERCEL_TOKEN 이 유효하지 않습니다 ($account). 토큰을 다시 발급해서 시크릿을 갱신하세요."
+              exit 1
+              ;;
+          esac
           echo "인증된 계정: $account"
 
-          echo "이 토큰이 볼 수 있는 스코프:"
-          npx --yes vercel@latest teams ls 2>&1 | tail -n +2
-          echo "찾고 있는 스코프: $VERCEL_ORG_ID"
+          if ! npx --yes vercel@latest teams ls 2>&1 | grep -q "$VERCEL_ORG_ID"; then
+            echo "::error::이 토큰으로는 $VERCEL_ORG_ID 스코프가 보이지 않습니다. 토큰 발급 시 Scope 를 확인하세요."
+            exit 1
+          fi
 
       - name: 배포 대상 결정
         id: target
