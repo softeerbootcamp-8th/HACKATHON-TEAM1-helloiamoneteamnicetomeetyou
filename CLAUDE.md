@@ -102,6 +102,56 @@ API 하나나 화면 하나를 컨벤션대로 만드는 작업을 맡길 때 �
 (`.claude/hooks/format-frontend.sh`). CI 가 `format:check` 를 돌리기 때문에
 포맷이 어긋난 채로 push 하면 빌드가 통과해도 빨개진다.
 
+## 배포
+
+### 백엔드
+
+EC2 한 대에 Docker 컨테이너로 돈다. `deploy-backend.yml` 이 GHCR 이미지를 빌드해서
+EC2 에 `docker run` 한다.
+
+- **`main` push 에서만 돈다.** `dev` 에 머지하는 것만으로는 EC2 에 떠 있는 컨테이너가
+  바뀌지 않는다. 서버에 반영이 필요하면 `main` 까지 올려야 한다.
+- **백엔드 테스트도 이 워크플로 안에서만 돈다.** `dev` 로 가는 PR 에서는 `ci-frontend.yml`
+  만 돌기 때문에, 백엔드를 고쳤으면 로컬에서 `./gradlew test` 를 직접 돌리고 결과를 PR 에 적는다.
+- **EC2 는 ARM(aarch64) 이다.** 서버에 무언가 설치할 때 amd64 바이너리를 받으면 안 붙는다.
+- 메모리가 1GB 라 스왑 2GB 를 `/etc/fstab` 에 등록해 뒀다. 빼면 빌드나 JVM 이 죽는다.
+
+### HTTPS
+
+EC2 앞에 Caddy 가 리버스 프록시로 있고 `https://52-78-131-174.sslip.io` 가 8080 컨테이너로
+넘어간다. 인증서는 Caddy 가 자동으로 갱신한다.
+
+- Vercel 이 HTTPS 라 백엔드도 HTTPS 여야 한다. 그냥 `http://IP:8080` 을 부르면 브라우저가
+  mixed content 로 막는다.
+- sslip.io 는 도메인에 적힌 IP 를 그대로 돌려주는 DNS 라, 인스턴스를 재시작해도 주소가 그대로다.
+- 보안그룹에 22, 80, 443, 8080, 8081 이 열려 있다. 80 은 인증서 발급 챌린지에 필요하다.
+
+### 프론트엔드
+
+Vercel 프로젝트 `hackathon-team1-frontend` 에 배포한다. Root Directory 가 `frontend` 이고
+빌드 설정은 `frontend/vercel.json` 에 있다.
+
+- **API 주소를 코드에 넣지 않는다.** 프론트는 `VITE_API_BASE_URL` 하나만 읽는다. 로컬은 값이
+  없어서 `/api/...` 상대경로로 나가고 `vite.config.ts` 의 proxy 가 8080 으로 넘겨준다.
+  배포는 Vercel 환경변수가 그 자리를 채운다. **저절로 갈리므로 코드에서 환경을 분기하지 않는다.**
+- **`VITE_API_BASE_URL` 은 Production 과 Preview 에만 넣는다.** Development 에도 넣으면
+  `vercel env pull` 을 받은 사람의 로컬이 프록시를 건너뛰고 EC2 로 직접 나가서, 로컬에서만
+  CORS 에 막히는 일이 생긴다.
+- **`.env` 파일은 커밋하지 않는다.** 값은 팀에서 따로 공유한다.
+- **환경변수를 바꾸면 반드시 Redeploy 한다.** 빌드 시점에 번들에 박히는 값이라 재배포하지
+  않으면 옛 주소를 계속 부른다.
+- GitHub 저장소 연결은 아직 안 되어 있다. `softeerbootcamp-8th` 에 Vercel GitHub App 을
+  설치해야 하는데 조직 권한이 필요해서, 지금은 `frontend/` 에서 `vercel deploy --prod` 로 올린다.
+
+### CORS
+
+허용 오리진은 `backend/src/main/resources/application.yml` 의 `cors.allowed-origin-patterns`
+에 있다. Vercel 프리뷰는 커밋마다 도메인이 달라서 `allowedOrigins` 가 아니라
+`allowedOriginPatterns` 로 받아야 한다.
+
+프론트와 백엔드가 붙었는지 확인할 때는 `GET /api/ping` 을 쓴다. `/health` 는 컨테이너
+헬스체크가 쓰는 자리라 응답이 평문 `OK` 이고 팀 응답 형식이 아니다.
+
 ## 금지
 
 - 팀 확인 없는 API 응답 형식, URL, 인증 방식 변경

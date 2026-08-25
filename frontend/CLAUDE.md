@@ -64,6 +64,11 @@ src/
 - 경로는 항상 상대경로(`/api/...`)로 쓴다. dev 서버가 프록시해 주기 때문에
   `http://localhost:8080` 을 코드에 넣을 이유가 없다.
 - URL, 토큰, 환경값을 하드코딩하지 않는다. 환경값은 `import.meta.env.VITE_*` 로 읽는다.
+- **API 오리진은 `VITE_API_BASE_URL` 하나로 갈린다.** 로컬은 값이 없어서 dev 서버 proxy 를
+  타고, 배포는 Vercel 환경변수가 채운다. 저절로 갈리므로 `import.meta.env.DEV` 로 호출
+  주소를 분기하지 않는다. 자세한 것은 루트 `CLAUDE.md` 의 「배포」 절에 있다.
+- 백엔드 공통 응답은 `CommonResponse<T>` 로 감싸여 온다. `api()` 는 이걸 벗겨주지 않으므로
+  호출하는 쪽에서 `res.data` 를 꺼낸다.
 - 백엔드 응답 형식은
   `.claude/skills/oneteam-development/references/contracts.md` 를 따른다.
 
