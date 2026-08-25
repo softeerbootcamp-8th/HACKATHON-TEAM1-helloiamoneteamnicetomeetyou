@@ -31,7 +31,7 @@ export function RadarUser({ user, hovered, pending, burst = false, index }: Prop
       {burst && (
         <span aria-hidden className="pointer-events-none absolute inset-0 z-20">
           {/* 고리 두 개를 살짝 어긋나게 띄워서 물결처럼 퍼지게 한다. */}
-          {[0, 0.13].map((delay) => (
+          {[0, 0.28].map((delay) => (
             <span
               key={delay}
               className="anim-ripple absolute top-1/2 left-1/2 aspect-square w-full rounded-full border-[3px] border-brand"

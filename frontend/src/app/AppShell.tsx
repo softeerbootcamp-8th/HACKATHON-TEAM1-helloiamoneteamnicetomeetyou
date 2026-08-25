@@ -55,7 +55,8 @@ export function AppShell() {
             animate="center"
             exit="exit"
             transition={springPage}
-            className="absolute inset-0 flex flex-col"
+            // 노치 바로 밑에 헤더가 붙어 보이지 않게 위쪽 여백을 여기서 한 번에 준다.
+            className="absolute inset-0 flex flex-col pt-[max(0.75rem,env(safe-area-inset-top))] md:pt-0"
           >
             <Outlet />
           </motion.div>

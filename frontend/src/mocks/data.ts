@@ -28,8 +28,10 @@ export type WaitingUser = {
   nickname: string
   /** 이 사람이 내놓은 카드 */
   itemId: string
-  /** 이 사람이 찾는 카드. 매칭 규칙이 실제로 이 값을 본다. */
-  needsItemId: string
+  /** 이 사람이 찾는 카드들. 매칭 규칙이 실제로 이 값을 본다. */
+  needsItemIds: string[]
+  /** 지금 앱을 켜 두고 있는지. 목록에 "접속 중" 으로 나온다. */
+  online: boolean
 }
 
 export type Zone = {
@@ -64,21 +66,27 @@ export function itemById(id: string): Item {
 
 /** 레이더에 뜨는 상대들. 시안이 최대 5명을 보여준다. */
 export const WAITING_USERS: WaitingUser[] = [
-  { id: 'u1', nickname: '캐스퍼', itemId: 'cas', needsItemId: 'nv74' },
-  { id: 'u2', nickname: '블루N', itemId: 'nv74', needsItemId: 'sf' },
-  { id: 'u3', nickname: '아이오닉러버', itemId: 'i5n', needsItemId: 'pony' },
-  { id: 'u4', nickname: 'N드라이버', itemId: 'avn', needsItemId: 'sf' },
-  { id: 'u5', nickname: '그랜저러버', itemId: 'gra', needsItemId: 'pony' },
+  { id: 'u1', nickname: '캐스퍼', itemId: 'cas', needsItemIds: ['nv74', 'i5n'], online: true },
+  { id: 'u2', nickname: '블루N', itemId: 'nv74', needsItemIds: ['sf', 'pony'], online: true },
+  {
+    id: 'u3',
+    nickname: '아이오닉러버',
+    itemId: 'i5n',
+    needsItemIds: ['pony', 'nv74'],
+    online: true,
+  },
+  { id: 'u4', nickname: 'N드라이버', itemId: 'avn', needsItemIds: ['sf'], online: false },
+  { id: 'u5', nickname: '그랜저러버', itemId: 'gra', needsItemIds: ['pony', 'cas'], online: true },
 ]
 
 /** 바텀시트 전체 리스트용. 레이더에 안 뜨는 사람까지 포함한다. */
 export const ALL_WAITING: WaitingUser[] = [
   ...WAITING_USERS,
-  { id: 'u6', nickname: '포니덕후', itemId: 'pony', needsItemId: 'nv74' },
-  { id: 'u7', nickname: '레몬 16', itemId: 'i5n', needsItemId: 'pony' },
-  { id: 'u8', nickname: '레몬 07', itemId: 'pony', needsItemId: 'nv74' },
-  { id: 'u9', nickname: '싼타페러버', itemId: 'sf', needsItemId: 'avn' },
-  { id: 'u10', nickname: '비전러버', itemId: 'nv74', needsItemId: 'cas' },
+  { id: 'u6', nickname: '포니덕후', itemId: 'pony', needsItemIds: ['nv74', 'avn'], online: true },
+  { id: 'u7', nickname: '레몬 16', itemId: 'i5n', needsItemIds: ['pony', 'sf'], online: false },
+  { id: 'u8', nickname: '레몬 07', itemId: 'pony', needsItemIds: ['nv74', 'gra'], online: true },
+  { id: 'u9', nickname: '싼타페러버', itemId: 'sf', needsItemIds: ['avn', 'i5n'], online: true },
+  { id: 'u10', nickname: '비전러버', itemId: 'nv74', needsItemIds: ['cas'], online: false },
 ]
 
 export const ZONES: Zone[] = [

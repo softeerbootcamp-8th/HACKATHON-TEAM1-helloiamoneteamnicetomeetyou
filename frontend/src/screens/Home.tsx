@@ -12,7 +12,7 @@ import { cn } from '@/lib/cn'
 import { tick } from '@/lib/haptics'
 import { springSheet, springSnap, staggerChild, staggerParent } from '@/lib/motion'
 import { ALL_WAITING, itemById, ZONES } from '@/mocks/data'
-import { radarUsers, sortedWaitingList } from '@/store/matching'
+import { radarUsers, sortedWaitingList, wantedFromMe } from '@/store/matching'
 import { useStore } from '@/store/useStore'
 
 export function Home() {
@@ -39,6 +39,7 @@ export function Home() {
   const radar = useMemo(() => radarUsers(needIds), [needIds])
   const list = useMemo(() => sortedWaitingList(needIds), [needIds])
 
+  const haveIds = state.have.map((h) => h.itemId)
   const topItemId = state.have[0]?.itemId ?? 'sf'
   const haveCount = state.have.reduce((sum, s) => sum + s.qty, 0)
   const pendingTarget =
@@ -82,13 +83,13 @@ export function Home() {
     setHovered(null)
     if (!target) return
     tick([10, 40, 14])
-    // 놓자마자 화면이 바뀌면 무슨 일이 일어났는지 안 보인다. 고리가 한 번 터지는
-    // 동안만 붙잡아 두고 넘어간다.
+    // 놓자마자 화면이 바뀌면 무슨 일이 일어났는지 안 보인다. 물결이 퍼지는 동안
+    // 붙잡아 두고 넘어간다. 끝까지 기다리지는 않는다. 그러면 답답해진다.
     setBurstOn(target)
     window.setTimeout(() => {
       setBurstOn(null)
       navigate(`/poke/confirm?to=${target}`)
-    }, 420)
+    }, 700)
   }
 
   const banner = (() => {
@@ -199,38 +200,62 @@ export function Home() {
     </div>
   )
 
+  /**
+   * 전체리스트 한 줄. 시안대로 굿즈 이름, 내가 줄 수 있는 카드, 접속 여부를 보여준다.
+   * 상대가 원하는 것 중 내가 가진 게 무엇인지가 이 줄에서 바로 보여야 누를지 말지 정한다.
+   */
   const listPanel = (
-    <motion.ul variants={staggerParent} initial="hidden" animate="show" className="space-y-2">
+    <motion.ul
+      variants={staggerParent}
+      initial="hidden"
+      animate="show"
+      className="divide-y divide-neutral-100"
+    >
       {list.map((user) => {
         const item = itemById(user.itemId)
-        const wanted = needIds.includes(user.itemId)
+        const givable = wantedFromMe(user, haveIds)
         return (
           <motion.li key={user.id} variants={staggerChild}>
             <motion.button
               type="button"
               onClick={() => navigate(`/poke/confirm?to=${user.id}`)}
               disabled={pendingTarget === user.id}
-              whileTap={pendingTarget === user.id ? undefined : { scale: 0.97 }}
+              whileTap={pendingTarget === user.id ? undefined : { scale: 0.98 }}
               transition={springSnap}
               className={cn(
-                'flex w-full items-center gap-3 rounded-2xl border border-neutral-100 bg-white p-2.5 text-left',
+                'flex w-full items-center gap-4 py-4 text-left',
                 pendingTarget === user.id && 'opacity-45',
               )}
             >
-              <div className="w-[52px] shrink-0">
-                <GoodsFace item={item} size="sm" />
+              <div className="w-[92px] shrink-0">
+                <GoodsFace item={item} size="lg" />
               </div>
+
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[14px] font-bold text-ink">{item.name}</p>
-                <p className="truncate text-[12px] text-neutral-400">{user.nickname}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-[14px] font-bold text-ink">{item.name}</p>
+                  {user.online ? (
+                    <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-[#57d1fe]">
+                      <span className="size-[5px] rounded-full bg-[#57d1fe]" />
+                      접속 중
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-[11px] text-neutral-300">오프라인</span>
+                  )}
+                </div>
+
+                <p className="mt-0.5 text-[10px] font-medium text-[#aeaeb2]">
+                  내가 줄 수 있는 카드
+                </p>
+                <p className="truncate text-[11px] text-[#8b8b8b]">
+                  {givable.length > 0
+                    ? givable.map((id) => itemById(id).name).join(' · ')
+                    : '아직 없어요'}
+                </p>
               </div>
-              {wanted && (
-                <span className="rounded-full bg-brand/20 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
-                  찾는 굿즈
-                </span>
-              )}
+
               {pendingTarget === user.id && (
-                <span className="text-[11px] font-semibold text-neutral-400">대기 중</span>
+                <span className="shrink-0 text-[11px] font-semibold text-neutral-400">대기 중</span>
               )}
             </motion.button>
           </motion.li>
@@ -241,7 +266,7 @@ export function Home() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex shrink-0 items-center justify-between px-5 pt-2">
+      <header className="flex shrink-0 items-center justify-between px-5 pt-2 md:pt-3">
         <h1 className="text-[23px] font-extrabold tracking-[-0.02em] text-ink">교환 대기장소</h1>
         <div className="flex items-center gap-1">
           {/*
@@ -384,6 +409,7 @@ export function Home() {
         open={notifOpen}
         onClose={() => setNotifOpen(false)}
         notifications={state.notifications}
+        onDismiss={(id) => dispatch({ type: 'read-notification', id })}
         onSelect={(kind) => {
           setNotifOpen(false)
           if (kind === 'poke-received') navigate('/poke/received')
@@ -411,6 +437,69 @@ function DemoButton({ label, onClick }: { label: string; onClick: () => void }) 
 }
 
 /**
+ * 알림 한 줄. 왼쪽으로 밀면 지워진다. 쌓이기만 하고 못 지우면 금방 지저분해진다.
+ */
+function NotificationRow({
+  notification,
+  onSelect,
+  onDismiss,
+}: {
+  notification: { id: string; kind: string; title: string; body: string }
+  onSelect: (kind: string) => void
+  onDismiss: (id: string) => void
+}) {
+  // 밀어서 지운 뒤에도 click 이 뒤따라 와서 알림이 열려 버린다. 끌었으면 그 click 은 버린다.
+  const draggedRef = useRef(false)
+
+  return (
+    <motion.li
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -80, height: 0, marginTop: 0 }}
+      transition={springSnap}
+      className="relative overflow-hidden rounded-2xl"
+    >
+      <span className="absolute inset-y-0 right-0 flex w-24 items-center justify-center rounded-2xl bg-rose-50 text-[12px] font-bold text-rose-500">
+        지우기
+      </span>
+
+      <motion.button
+        type="button"
+        drag="x"
+        dragConstraints={{ left: -110, right: 0 }}
+        dragElastic={{ left: 0.15, right: 0 }}
+        dragMomentum={false}
+        dragSnapToOrigin
+        onDragStart={() => {
+          draggedRef.current = true
+        }}
+        onDragEnd={(_, info) => {
+          if (info.offset.x < -70 || info.velocity.x < -450) {
+            tick(12)
+            onDismiss(notification.id)
+          }
+          // click 이 이 뒤에 한 번 더 온다. 다음 tick 까지만 막아 두면 된다.
+          window.setTimeout(() => {
+            draggedRef.current = false
+          }, 0)
+        }}
+        onClick={() => {
+          if (draggedRef.current) return
+          onSelect(notification.kind)
+        }}
+        whileTap={{ scale: 0.98 }}
+        transition={springSnap}
+        className="relative w-full cursor-grab touch-pan-y rounded-2xl bg-neutral-50 p-3.5 text-left active:cursor-grabbing"
+      >
+        <p className="text-[14px] font-bold text-ink">{notification.title}</p>
+        <p className="text-[12px] text-neutral-400">{notification.body}</p>
+      </motion.button>
+    </motion.li>
+  )
+}
+
+/**
  * 알림. 모바일에서는 아래에서 올라오는 시트, 데스크톱에서는 종 아래에 붙는 판이다.
  * 넓은 화면에서 바텀시트가 올라오는 것은 데스크톱 앱에서 쓰지 않는 방식이라 어색하다.
  */
@@ -419,32 +508,33 @@ function NotificationSheet({
   onClose,
   notifications,
   onSelect,
+  onDismiss,
 }: {
   open: boolean
   onClose: () => void
   notifications: { id: string; kind: string; title: string; body: string }[]
   onSelect: (kind: string) => void
+  onDismiss: (id: string) => void
 }) {
   const body =
     notifications.length === 0 ? (
       <p className="py-10 text-center text-[13px] text-neutral-400">아직 알림이 없어요</p>
     ) : (
-      <ul className="mt-3 space-y-2 overflow-y-auto no-scrollbar">
-        {notifications.map((n) => (
-          <li key={n.id}>
-            <motion.button
-              type="button"
-              onClick={() => onSelect(n.kind)}
-              whileTap={{ scale: 0.97 }}
-              transition={springSnap}
-              className="w-full rounded-2xl bg-neutral-50 p-3.5 text-left"
-            >
-              <p className="text-[14px] font-bold text-ink">{n.title}</p>
-              <p className="text-[12px] text-neutral-400">{n.body}</p>
-            </motion.button>
-          </li>
-        ))}
-      </ul>
+      <>
+        <ul className="mt-3 space-y-2">
+          <AnimatePresence initial={false}>
+            {notifications.map((n) => (
+              <NotificationRow
+                key={n.id}
+                notification={n}
+                onSelect={onSelect}
+                onDismiss={onDismiss}
+              />
+            ))}
+          </AnimatePresence>
+        </ul>
+        <p className="mt-3 text-center text-[11px] text-neutral-300">왼쪽으로 밀면 지워져요</p>
+      </>
     )
 
   return (
@@ -467,17 +557,22 @@ function NotificationSheet({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={springSheet}
-            className="absolute inset-x-0 bottom-0 z-50 max-h-[62%] rounded-t-[26px] bg-white p-5 shadow-2xl md:hidden"
+            data-sheet="notifications"
+            className="absolute inset-x-0 bottom-0 z-50 flex max-h-[62%] flex-col rounded-t-[26px] bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl md:hidden"
           >
-            <span aria-hidden className="mx-auto mb-4 block h-1 w-9 rounded-full bg-neutral-200" />
-            <h2 className="text-[18px] font-extrabold text-ink">알림</h2>
-            {body}
+            <span
+              aria-hidden
+              className="mx-auto mb-4 block h-1 w-9 shrink-0 rounded-full bg-neutral-200"
+            />
+            <h2 className="shrink-0 text-[18px] font-extrabold text-ink">알림</h2>
+            {/* 목록만 굴러가야 한다. 높이를 안 묶으면 시트가 통째로 늘어난다. */}
+            <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">{body}</div>
             <motion.button
               type="button"
               onClick={onClose}
               whileTap={{ scale: 0.97 }}
               transition={springSnap}
-              className="mt-4 w-full rounded-full border border-neutral-200 py-3 text-[14px] font-semibold text-neutral-500"
+              className="mt-4 w-full shrink-0 rounded-full border border-neutral-200 py-3 text-[14px] font-semibold text-neutral-500"
             >
               닫기
             </motion.button>
@@ -491,7 +586,7 @@ function NotificationSheet({
             transition={springSheet}
             className="absolute top-16 right-7 z-50 hidden max-h-[70%] w-[340px] origin-top-right flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-[0_18px_50px_rgba(0,0,0,0.18)] md:flex"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex shrink-0 items-center justify-between">
               <h2 className="text-[17px] font-extrabold text-ink">알림</h2>
               <motion.button
                 type="button"

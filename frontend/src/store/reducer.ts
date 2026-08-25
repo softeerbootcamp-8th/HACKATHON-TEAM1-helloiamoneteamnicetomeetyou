@@ -1,6 +1,6 @@
 import { ALL_WAITING, FIXED_ZONE, itemById } from '@/mocks/data'
 
-import { findMatch, type MatchResult } from './matching'
+import { findMatch, wantedFromMe, type MatchResult } from './matching'
 import type { ActiveMatch, IncomingPoke, State } from './types'
 
 export const initialState: State = {
@@ -178,10 +178,11 @@ export function reducer(state: State, action: Action): State {
       }
 
       // 상대가 내 묶음 중 자기가 원하는 카드를 골랐다고 본다.
-      const giveItemId =
-        state.have.find((s) => s.itemId === target.needsItemId)?.itemId ??
-        state.have[0]?.itemId ??
-        target.needsItemId
+      const wanted = wantedFromMe(
+        target,
+        state.have.map((s) => s.itemId),
+      )
+      const giveItemId = wanted[0] ?? state.have[0]?.itemId ?? target.needsItemIds[0]
 
       const match: ActiveMatch = {
         kind: 'ONE_TO_ONE',
@@ -374,6 +375,7 @@ export function reducer(state: State, action: Action): State {
             middleItemId: 'pony',
             origin: 'auto',
           },
+          notifications: notify(state, 'match', '서로의 니즈가 매칭됐어요!', '탭하여 확인'),
         }
       }
 
@@ -390,6 +392,12 @@ export function reducer(state: State, action: Action): State {
           wantItemId: have[0].itemId,
           offeredItemIds: ['i5n', 'sf', 'cas'],
         },
+        notifications: notify(
+          state,
+          'poke-received',
+          '상대가 교환을 요청했어요',
+          `${from.nickname}님의 찔러보기`,
+        ),
       }
     }
 

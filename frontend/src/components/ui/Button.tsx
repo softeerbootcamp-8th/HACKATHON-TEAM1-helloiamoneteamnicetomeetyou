@@ -16,8 +16,8 @@ type Props = {
 const STYLES: Record<Variant, string> = {
   // 시안의 검정 알약 버튼
   primary: 'bg-ink text-white',
-  // 시안의 초록 알약 버튼. 확정처럼 기분 좋은 자리에만 쓴다.
-  brand: 'bg-brand text-ink',
+  // 시안의 초록 알약 버튼. 확정처럼 기분 좋은 자리에만 쓴다. 글자는 흰색이다.
+  brand: 'bg-brand text-white',
   ghost: 'bg-transparent text-neutral-600',
   outline: 'bg-white text-ink border border-neutral-200',
 }

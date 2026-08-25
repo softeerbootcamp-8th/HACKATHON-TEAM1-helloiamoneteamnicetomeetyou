@@ -28,7 +28,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const timer = window.setTimeout(() => {
       // 상대가 내 묶음에서 원하는 카드를 찾을 수 있으면 수락한다.
       const target = ALL_WAITING.find((u) => u.id === state.outgoingPoke?.targetUserId)
-      const accepted = Boolean(target && state.have.some((s) => s.itemId === target.needsItemId))
+      const accepted = Boolean(
+        target && state.have.some((s) => target.needsItemIds.includes(s.itemId)),
+      )
       dispatch({ type: 'poke-answered', accepted })
     }, 3200)
     return () => window.clearTimeout(timer)
@@ -41,7 +43,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const timer = window.setTimeout(() => {
       const mine = state.have[0].itemId
       const from = ALL_WAITING.find(
-        (u) => u.needsItemId === mine && u.id !== state.outgoingPoke?.targetUserId,
+        (u) => u.needsItemIds.includes(mine) && u.id !== state.outgoingPoke?.targetUserId,
       )
       if (!from) return
       const offered = ALL_WAITING.filter((u) => u.id !== from.id)

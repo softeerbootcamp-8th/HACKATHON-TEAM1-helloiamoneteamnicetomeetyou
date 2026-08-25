@@ -185,7 +185,7 @@ body {
     opacity: 0.85;
   }
   100% {
-    transform: translate(-50%, -50%) scale(2.4);
+    transform: translate(-50%, -50%) scale(2.6);
     opacity: 0;
   }
 }
@@ -246,7 +246,7 @@ body {
   animation: tradit-glow 2.6s ease-in-out infinite;
 }
 @utility anim-ripple {
-  animation: tradit-ripple 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: tradit-ripple 1.25s cubic-bezier(0.25, 0.6, 0.3, 1) both;
 }
 @utility anim-pop {
   animation: tradit-pop 0.5s ease-out;

@@ -1,8 +1,9 @@
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { Dialog } from '@/components/ui/Dialog'
+import { tick } from '@/lib/haptics'
 import { springSnap } from '@/lib/motion'
 import { MY_IDENTITY } from '@/mocks/data'
 import { useStore } from '@/store/useStore'
@@ -15,6 +16,8 @@ export function Identify() {
   const navigate = useNavigate()
   const { dispatch } = useStore()
   const [noShowOpen, setNoShowOpen] = useState(false)
+  // 레몬을 누른 횟수. 누를 때마다 키가 바뀌어서 흔들림이 처음부터 다시 돈다.
+  const [pokes, setPokes] = useState(0)
 
   return (
     <div
@@ -42,14 +45,46 @@ export function Identify() {
           transition={{ ...springSnap, delay: 0.05 }}
           className="relative"
         >
-          {/* Figma 시안의 레몬을 그대로 내보낸 것이다. 빛무리도 이 안에 들어 있다. */}
-          <img
-            src="/lemon.svg"
-            alt=""
-            aria-hidden
-            className="anim-lemon w-[260px] max-w-[70vw] select-none"
-            draggable={false}
-          />
+          {/*
+            누르면 반응한다. 상대를 찾는 동안 화면을 들고 서 있는 시간이 길어서,
+            만질 거리가 하나 있는 편이 낫다.
+          */}
+          <motion.button
+            type="button"
+            aria-label="레몬 흔들기"
+            onClick={() => {
+              tick(12)
+              setPokes((n) => n + 1)
+            }}
+            whileTap={{ scale: 0.9 }}
+            transition={springSnap}
+            className="relative block"
+          >
+            <AnimatePresence>
+              {pokes > 0 && (
+                <motion.span
+                  key={pokes}
+                  aria-hidden
+                  initial={{ opacity: 0.7, scale: 0.5 }}
+                  animate={{ opacity: 0, scale: 1.9 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 1.1, ease: [0.25, 0.6, 0.3, 1] }}
+                  className="pointer-events-none absolute top-1/2 left-1/2 aspect-square w-[70%] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#d6ff4b]"
+                />
+              )}
+            </AnimatePresence>
+
+            <motion.img
+              key={pokes}
+              src="/lemon.svg"
+              alt=""
+              aria-hidden
+              animate={pokes > 0 ? { rotate: [0, -9, 7, -4, 0], scale: [1, 1.08, 0.98, 1] } : {}}
+              transition={{ duration: 0.7, ease: 'easeOut' }}
+              className="anim-lemon w-[260px] max-w-[70vw] select-none"
+              draggable={false}
+            />
+          </motion.button>
         </motion.div>
 
         <motion.h1

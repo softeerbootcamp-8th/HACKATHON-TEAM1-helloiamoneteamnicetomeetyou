@@ -40,23 +40,30 @@ function byPopularity(a: WaitingUser, b: WaitingUser) {
   return itemById(a.itemId).rank - itemById(b.itemId).rank
 }
 
+/** 이 사람이 내 카드 중 하나라도 원하는지. 원하면 그중 가장 인기 있는 것을 돌려준다. */
+export function wantedFromMe(user: WaitingUser, haveIds: string[]): string[] {
+  return haveIds
+    .filter((id) => user.needsItemIds.includes(id))
+    .sort((a, b) => itemById(a).rank - itemById(b).rank)
+}
+
 export function findMatch(haveIds: string[], needIds: string[]): MatchResult | null {
   if (haveIds.length === 0 || needIds.length === 0) return null
 
-  const have = new Set(haveIds)
   const need = new Set(needIds)
 
   // 1. 서로 원하는 것이 정확히 맞는 상대
-  const direct = ALL_WAITING.filter((u) => need.has(u.itemId) && have.has(u.needsItemId)).sort(
-    byPopularity,
-  )
+  const direct = ALL_WAITING.filter(
+    (u) => need.has(u.itemId) && wantedFromMe(u, haveIds).length > 0,
+  ).sort(byPopularity)
 
   if (direct.length > 0) {
     const partner = direct[0]
     return {
       kind: 'ONE_TO_ONE',
       partner,
-      giveItemId: partner.needsItemId,
+      // 인기 많은 아이템을 먼저 내준다는 규칙을 여기서 지킨다.
+      giveItemId: wantedFromMe(partner, haveIds)[0],
       receiveItemId: partner.itemId,
     }
   }
@@ -66,7 +73,10 @@ export function findMatch(haveIds: string[], needIds: string[]): MatchResult | n
   const givers = ALL_WAITING.filter((u) => need.has(u.itemId)).sort(byPopularity)
   for (const giver of givers) {
     const receivers = ALL_WAITING.filter(
-      (u) => u.id !== giver.id && u.itemId === giver.needsItemId && have.has(u.needsItemId),
+      (u) =>
+        u.id !== giver.id &&
+        giver.needsItemIds.includes(u.itemId) &&
+        wantedFromMe(u, haveIds).length > 0,
     ).sort(byPopularity)
     if (receivers.length > 0) {
       const receiver = receivers[0]
@@ -74,7 +84,7 @@ export function findMatch(haveIds: string[], needIds: string[]): MatchResult | n
         kind: 'THREE_WAY',
         giver,
         receiver,
-        giveItemId: receiver.needsItemId,
+        giveItemId: wantedFromMe(receiver, haveIds)[0],
         receiveItemId: giver.itemId,
         middleItemId: receiver.itemId,
       }
