@@ -1,20 +1,17 @@
 /**
- * 부스, 교환 장소, 교환 약속 API.
+ * 교환 장소와 교환 약속 API.
  *
  * 백엔드의 `domain/booth` 와 `domain/exchange` 에 대응한다. 응답 형식이 바뀌면 양쪽을 같이 고친다.
+ *
+ * 부스 목록과 카드 목록, 사용자 등록은 `features/catalog/api.ts` 에 있다. 앱을 열 때 한 번 맞추는
+ * 것들이라 그쪽이 먼저 부르고, 여기서는 그 결과로 받은 `boothId` 를 쓴다.
  */
-import { api, type CommonResponse } from './api'
+import { api, apiData } from './api'
 
 export type Zone = {
   id: number
   name: string
   location: string
-}
-
-export type Booth = {
-  id: number
-  name: string
-  description: string | null
 }
 
 export type ExchangeType = 'ONE_TO_ONE' | 'MULTI_WAY'
@@ -62,28 +59,8 @@ export type Exchange = {
   confirmedTime: string | null
 }
 
-/** 응답 껍데기를 벗긴다. `api()` 는 이걸 대신해 주지 않는다. */
-function unwrap<T>(res: CommonResponse<T>): T {
-  if (!res.success || res.data === undefined) {
-    throw new Error(res.message ?? '요청에 실패했어요')
-  }
-  return res.data
-}
-
-export async function fetchBooths(): Promise<Booth[]> {
-  return unwrap(await api<CommonResponse<Booth[]>>('/api/booths'))
-}
-
-export async function fetchZones(boothId: number): Promise<Zone[]> {
-  return unwrap(await api<CommonResponse<Zone[]>>(`/api/booths/${boothId}/zones`))
-}
-
-/** 앱을 열 때마다 불러도 되는 멱등 등록이다. 이름은 상대 화면에 보여줄 라벨이다. */
-export async function registerUser(userId: string, username: string): Promise<void> {
-  await api<CommonResponse<void>>('/api/users', {
-    method: 'POST',
-    body: JSON.stringify({ userId, username }),
-  })
+export function fetchZones(boothId: number): Promise<Zone[]> {
+  return apiData<Zone[]>(`/api/booths/${boothId}/zones`)
 }
 
 /**
@@ -92,17 +69,15 @@ export async function registerUser(userId: string, username: string): Promise<vo
  * 매칭이 아직 화면 쪽 목업이라 프론트가 부르는 임시 엔드포인트다. 서버가 매칭을 하게 되면
  * 이 호출은 사라지고, 교환은 매칭 결과 알림으로 내려온다.
  */
-export async function createExchange(input: {
+export function createExchange(input: {
   boothId: number
   type: ExchangeType
   participantUserIds: string[]
 }): Promise<Exchange> {
-  return unwrap(
-    await api<CommonResponse<Exchange>>('/api/exchanges', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-  )
+  return apiData<Exchange>('/api/exchanges', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
 }
 
 /**
@@ -113,50 +88,52 @@ export async function createExchange(input: {
  * 끊겨 있던 동안 온 알림은 다시 오지 않기 때문이다.
  */
 export async function fetchActiveExchange(userId: string): Promise<Exchange | null> {
-  const res = await api<CommonResponse<Exchange> | undefined>(
+  // 진행 중인 약속이 없으면 서버가 204 로 답하고, api() 는 그때 undefined 를 준다.
+  const res = await api<{ data?: Exchange } | undefined>(
     `/api/exchanges/active?userId=${encodeURIComponent(userId)}`,
   )
 
-  // 진행 중인 약속이 없으면 서버가 204 로 답하고, api() 는 그때 undefined 를 준다.
   return res?.data ?? null
 }
 
-export async function fetchExchange(exchangeId: number): Promise<Exchange> {
-  return unwrap(await api<CommonResponse<Exchange>>(`/api/exchanges/${exchangeId}`))
+export function fetchExchange(exchangeId: number): Promise<Exchange> {
+  return apiData<Exchange>(`/api/exchanges/${exchangeId}`)
 }
 
 /** 고른 칸을 통째로 덮어쓴다. 칸 하나를 켜고 끄는 것이 아니라 항상 전체를 보낸다. */
-export async function updateTimeSlots(
+export function updateTimeSlots(
   exchangeId: number,
   userId: string,
   slots: number[],
 ): Promise<Exchange> {
-  return unwrap(
-    await api<CommonResponse<Exchange>>(`/api/exchanges/${exchangeId}/time-slots`, {
-      method: 'PUT',
-      body: JSON.stringify({ userId, slots }),
-    }),
-  )
+  return apiData<Exchange>(`/api/exchanges/${exchangeId}/time-slots`, {
+    method: 'PUT',
+    body: JSON.stringify({ userId, slots }),
+  })
 }
 
 /** "시간 조율 요청하기". 참가자 전원의 선택을 비운다. */
-export async function resetTimeSlots(exchangeId: number, userId: string): Promise<Exchange> {
-  return unwrap(
-    await api<CommonResponse<Exchange>>(`/api/exchanges/${exchangeId}/time-slots/reset`, {
-      method: 'POST',
-      body: JSON.stringify({ userId }),
-    }),
-  )
+export function resetTimeSlots(exchangeId: number, userId: string): Promise<Exchange> {
+  return apiData<Exchange>(`/api/exchanges/${exchangeId}/time-slots/reset`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  })
+}
+
+/** "약속 확정하기". 겹치는 가장 빠른 칸으로 정한다. 참가자 중 한 명만 누르면 된다. */
+export function confirmExchangeTime(exchangeId: number, userId: string): Promise<Exchange> {
+  return apiData<Exchange>(`/api/exchanges/${exchangeId}/confirm-time`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  })
 }
 
 /** "도착했어요". 상대 화면의 배지가 이동중에서 도착으로 바뀐다. */
-export async function arriveAtExchange(exchangeId: number, userId: string): Promise<Exchange> {
-  return unwrap(
-    await api<CommonResponse<Exchange>>(`/api/exchanges/${exchangeId}/arrive`, {
-      method: 'POST',
-      body: JSON.stringify({ userId }),
-    }),
-  )
+export function arriveAtExchange(exchangeId: number, userId: string): Promise<Exchange> {
+  return apiData<Exchange>(`/api/exchanges/${exchangeId}/arrive`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  })
 }
 
 /**
@@ -167,31 +144,17 @@ export async function arriveAtExchange(exchangeId: number, userId: string): Prom
  *
  * 카드 주인이 바뀌는 것은 아직 여기 없다. 무엇을 주고받는지는 매칭이 정하는 값이다.
  */
-export async function completeExchange(exchangeId: number, userId: string): Promise<Exchange> {
-  return unwrap(
-    await api<CommonResponse<Exchange>>(`/api/exchanges/${exchangeId}/complete`, {
-      method: 'POST',
-      body: JSON.stringify({ userId }),
-    }),
-  )
+export function completeExchange(exchangeId: number, userId: string): Promise<Exchange> {
+  return apiData<Exchange>(`/api/exchanges/${exchangeId}/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  })
 }
 
 /** 거래 취소. 상대 화면에도 취소됐다는 것이 실시간으로 전해진다. */
-export async function cancelExchange(exchangeId: number, userId: string): Promise<Exchange> {
-  return unwrap(
-    await api<CommonResponse<Exchange>>(`/api/exchanges/${exchangeId}/cancel`, {
-      method: 'POST',
-      body: JSON.stringify({ userId }),
-    }),
-  )
-}
-
-/** "약속 확정하기". 겹치는 가장 빠른 칸으로 정한다. 참가자 중 한 명만 누르면 된다. */
-export async function confirmExchangeTime(exchangeId: number, userId: string): Promise<Exchange> {
-  return unwrap(
-    await api<CommonResponse<Exchange>>(`/api/exchanges/${exchangeId}/confirm-time`, {
-      method: 'POST',
-      body: JSON.stringify({ userId }),
-    }),
-  )
+export function cancelExchange(exchangeId: number, userId: string): Promise<Exchange> {
+  return apiData<Exchange>(`/api/exchanges/${exchangeId}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  })
 }

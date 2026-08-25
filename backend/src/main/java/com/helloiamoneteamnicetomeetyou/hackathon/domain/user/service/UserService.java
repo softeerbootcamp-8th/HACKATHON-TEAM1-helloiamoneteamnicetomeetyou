@@ -35,7 +35,7 @@ public class UserService {
         // SELECT 를 한 번 더 쏜다. 여기서 미리 갈라내므로 그 경로를 타지 않는다.
         return userRepository.findById(userId)
                 .map(user -> {
-                    user.changeUsername(username);
+                    user.rename(username);
                     return false;
                 })
                 .orElseGet(() -> {

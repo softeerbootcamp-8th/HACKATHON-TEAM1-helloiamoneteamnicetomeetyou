@@ -34,4 +34,10 @@ public class Booth {
     public static Booth of(String name, String description) {
         return new Booth(name, description);
     }
+
+    /** 어드민 화면에서 이름과 설명을 고친다. */
+    public void update(String name, String description) {
+        this.name = name;
+        this.description = description;
+    }
 }

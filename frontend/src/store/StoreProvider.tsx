@@ -1,52 +1,44 @@
 import { useCallback, useEffect, useMemo, useReducer, type ReactNode } from 'react'
 
-import {
-  fetchActiveExchange,
-  fetchBooths,
-  fetchExchange,
-  fetchZones,
-  registerUser,
-} from '@/lib/exchange'
+import { useCatalog } from '@/features/catalog/useCatalog'
+import { fetchActiveExchange, fetchExchange, fetchZones } from '@/lib/exchange'
 import { useBoothEvents } from '@/lib/use-booth-events'
-import { ALL_WAITING, myUsername } from '@/mocks/data'
+
+import { ALL_WAITING } from '@/mocks/data'
 
 import { StoreContext } from './context'
-import { getDeviceId } from './identity'
 import { initialState, reducer } from './reducer'
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState)
-  const myUserId = useMemo(() => getDeviceId(), [])
+  const { state: catalog, userId: myUserId } = useCatalog()
 
   /*
-    앱을 열면 나를 등록하고 부스를 읽는다. 등록은 멱등이라 매번 불러도 되고, 부스 id 가 있어야
-    실시간 알림을 구독할 수 있다.
+    부스는 CatalogProvider 가 이미 골라 놨다. 그 부스의 교환 장소를 받아 두고, 진행 중인 약속이
+    있으면 그 자리로 돌아온다. 새로고침하면 화면 상태가 통째로 사라지기 때문에 필요하다.
 
-    실패해도 화면은 그대로 돈다. 서버가 없어도 목업 흐름은 볼 수 있어야 해서, 여기서 막지 않고
-    붙는 화면들이 각자 처리한다.
+    카탈로그가 준비되기 전에는 아무것도 하지 않는다. 서버에 못 닿았으면 약속 화면만 막히고
+    나머지는 목업으로 계속 돈다.
   */
+  const boothId = catalog.status === 'ready' ? catalog.boothId : null
+
   useEffect(() => {
+    if (boothId === null) return
+
     let cancelled = false
 
     const load = async () => {
       try {
-        await registerUser(myUserId, myUsername(myUserId))
-        const booths = await fetchBooths()
-        const booth = booths[0]
-        if (!booth || cancelled) return
-
-        const zones = await fetchZones(booth.id)
+        const zones = await fetchZones(boothId)
         if (cancelled) return
+        dispatch({ type: 'booth-loaded', boothId, zones })
 
-        dispatch({ type: 'booth-loaded', boothId: booth.id, zones })
-
-        // 앱을 다시 열었거나 새로고침한 경우다. 진행 중인 약속이 있으면 그 자리로 돌아온다.
         const active = await fetchActiveExchange(myUserId)
         if (active && !cancelled) {
-          dispatch({ type: 'exchange-synced', exchange: active, myUserId })
+          dispatch({ type: 'exchange-synced', exchange: active, myUserId, activate: true })
         }
       } catch {
-        // 서버가 아직 없거나 꺼져 있는 경우다. 약속 화면에서 다시 알린다.
+        // 약속 화면에서 다시 알린다. 여기서 앱을 세우지 않는다.
       }
     }
 
@@ -54,30 +46,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [myUserId])
+  }, [boothId, myUserId])
 
   /**
    * 실시간 알림을 받으면 약속을 서버에서 다시 읽는다.
    *
-   * 이벤트에 담긴 상태를 그대로 쓰지 않는 것이 중요하다. 끊겼던 동안의 이벤트는 다시 오지 않아서,
-   * 매번 현재 상태를 읽어야 재연결 뒤에도 화면이 확실히 맞는다. 이벤트에서 꺼내 쓰는 것은
+   * 이벤트에 담긴 상태를 그대로 쓰지 않는다. 끊겼던 동안의 이벤트는 다시 오지 않아서, 매번
+   * 현재 상태를 읽어야 재연결 뒤에도 화면이 확실히 맞는다. 이벤트에서 꺼내 쓰는 것은
    * "어느 약속을 읽어야 하는지" 하나뿐이다.
    *
-   * **그 id 가 꼭 필요하다.** 상대가 교환을 만들면 내 화면에는 아직 약속이 없어서, 이벤트가 없으면
-   * 무엇을 읽어야 할지 알 수 없다. `CONNECTED` 처럼 id 가 없는 알림일 때만 들고 있던 약속을 쓴다.
+   * **그 id 가 꼭 필요하다.** 상대가 교환을 만들면 내 화면에는 아직 약속이 없어서, 이벤트가
+   * 없으면 무엇을 읽어야 할지 알 수 없다. `CONNECTED` 처럼 id 가 없는 알림일 때는 내가 지금
+   * 잡고 있는 약속을 물어본다.
    */
   const syncExchange = useCallback(
     async (data?: unknown) => {
-      const exchangeId = exchangeIdOf(data) ?? state.appointment?.exchangeId
-
       try {
-        /*
-          알림에 id 가 실려 있으면 그것을 읽고, 없으면 들고 있던 약속을 읽는다. 둘 다 없으면
-          내가 어느 약속에 속했는지 물어본다.
-
-          마지막 경우가 중요하다. 연결이 붙기 전에 만들어진 약속은 EXCHANGE_CREATED 를 들을
-          사람이 없어서 화면이 그 존재를 모른다. 새로고침한 직후도 마찬가지다.
-        */
+        const exchangeId = exchangeIdOf(data)
         const exchange =
           exchangeId === undefined
             ? await fetchActiveExchange(myUserId)
@@ -90,7 +75,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // 잠깐 실패한 것이면 다음 알림이나 heartbeat 재연결 때 다시 맞는다.
       }
     },
-    [state.appointment?.exchangeId, myUserId],
+    [myUserId],
   )
 
   /*
@@ -100,7 +85,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     연결은 사람당 하나면 된다. 서버가 연결을 부스별과 사용자별 두 벌로 색인해 두고, 약속 알림은
     그 교환의 참가자에게만 보내기 때문에 약속마다 따로 연결할 이유가 없다.
   */
-  useBoothEvents(state.boothId, myUserId, {
+  useBoothEvents(boothId, myUserId, {
     CONNECTED: () => void syncExchange(),
     EXCHANGE_CREATED: (data) => void syncExchange(data),
     EXCHANGE_TIME_UPDATED: (data) => void syncExchange(data),
@@ -108,6 +93,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     EXCHANGE_COMPLETED: (data) => void syncExchange(data),
     EXCHANGE_CANCELLED: (data) => void syncExchange(data),
   })
+
+  // 지금 다루고 있는 약속. 아래 효과들이 이것만 보고 돌면 되므로 밖에서 한 번 꺼내 둔다.
 
   // 자동 매칭. 켜져 있는 동안 짧은 간격으로 상대를 찾는다.
   useEffect(() => {
@@ -136,39 +123,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }, 3200)
     return () => window.clearTimeout(timer)
   }, [state.outgoingPoke, state.have])
-
-  // 남이 나에게 보내는 찔러보기. 내놓은 카드가 있어야 들어온다.
-  useEffect(() => {
-    if (state.have.length === 0) return
-    if (state.incomingPoke || state.heldIncoming || state.match || state.appointment) return
-    const timer = window.setTimeout(() => {
-      const mine = state.have[0].itemId
-      const from = ALL_WAITING.find(
-        (u) => u.needsItemIds.includes(mine) && u.id !== state.outgoingPoke?.targetUserId,
-      )
-      if (!from) return
-      const offered = ALL_WAITING.filter((u) => u.id !== from.id)
-        .map((u) => u.itemId)
-        .filter((id, i, arr) => arr.indexOf(id) === i)
-        .slice(0, 3)
-      dispatch({
-        type: 'receive-poke',
-        poke: {
-          fromUserId: from.id,
-          wantItemId: mine,
-          offeredItemIds: [from.itemId, ...offered].slice(0, 3),
-        },
-      })
-    }, 9000)
-    return () => window.clearTimeout(timer)
-  }, [
-    state.have,
-    state.incomingPoke,
-    state.heldIncoming,
-    state.match,
-    state.appointment,
-    state.outgoingPoke,
-  ])
 
   // 토스트는 스스로 사라진다.
   useEffect(() => {

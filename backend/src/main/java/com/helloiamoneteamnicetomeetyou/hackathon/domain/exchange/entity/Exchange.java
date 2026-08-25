@@ -149,6 +149,25 @@ public class Exchange {
     }
 
     /**
+     * 부스 운영자가 막힌 교환을 끊는다.
+     *
+     * <p>시연 중에 한쪽 사람이 자리를 뜨거나 화면이 죽어서 약속이 어중간하게 남는 일이 생긴다.
+     * 그 교환이 남아 있으면 같은 사람으로 다음 시연을 시작할 수 없어서, 어드민이 상태만 바꿔
+     * 정리할 수 있게 열어 둔다.
+     *
+     * <p>참가자가 부르는 {@link #cancel()} 과 달리 이미 끝난 교환도 건드린다. 막힌 것을 치우는
+     * 것이 목적이라 상태를 따지면 정작 치워야 할 건을 못 치운다.
+     */
+    public void cancelByAdmin() {
+        this.status = ExchangeStatus.CANCELLED;
+    }
+
+    /** 실물 교환은 끝났는데 화면에서 완료 처리가 안 된 건을 어드민이 닫는다. */
+    public void completeByAdmin() {
+        this.status = ExchangeStatus.COMPLETED;
+    }
+
+    /**
      * 이미 끝난 약속은 다시 끝내거나 취소할 수 없다.
      *
      * <p><b>두 사람이 서로 다른 버튼을 누를 수 있어서 필요하다.</b> 한 명이 "만났어요" 를 누르고

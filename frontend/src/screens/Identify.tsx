@@ -2,13 +2,14 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { Dialog } from '@/components/ui/Dialog'
+import { BreakupDialog } from '@/components/domain/ConfirmDialogs'
 import { completeExchange } from '@/lib/exchange'
 import { tick } from '@/lib/haptics'
 import { springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
 import { getDeviceId } from '@/store/identity'
 import { identityLabel, identityMarkAt } from '@/store/identity-mark'
+import { activeAppointment } from '@/store/reducer'
 import { useCancelAppointment } from '@/store/use-cancel-appointment'
 import { useStore } from '@/store/useStore'
 
@@ -20,10 +21,24 @@ export function Identify() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
   const cancelAppointment = useCancelAppointment()
-  const appt = useLastDefined(state.appointment)
-  const myUserId = useMemo(() => getDeviceId(), [])
   const [noShowOpen, setNoShowOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  // 레몬을 누른 횟수. 누를 때마다 키가 바뀌어서 흔들림이 처음부터 다시 돈다.
+  const [pokes, setPokes] = useState(0)
+
+  const myUserId = useMemo(() => getDeviceId(), [])
+  const appt = useLastDefined(activeAppointment(state))
+  const active = activeAppointment(state)
+
+  /*
+    식별자는 교환 하나에 하나이고 참가자 전원이 같은 값을 든다. 그래서 같은 화면을 든 사람이
+    곧 내 교환 상대다. 진행 중인 다른 교환과 겹치지 않게 서버가 골라 준다.
+
+    약속 없이 주소로 바로 들어온 경우에는 첫 표시로 보여준다. 화면이 비면 무엇을 보는 자리인지
+    알 수 없기 때문이다.
+  */
+  const mark = identityMarkAt(appt?.identityMark ?? 0)
+  const label = appt ? identityLabel(appt.identityMark, appt.identityNumber) : mark.name
 
   /*
     상대가 먼저 "만났어요" 를 눌렀을 때 내 화면도 따라간다. 서버가 EXCHANGE_COMPLETED 를 보내면
@@ -33,8 +48,8 @@ export function Identify() {
     "상대가 오지 않아요" 를 누르면, 먼저 도착한 쪽만 반영되고 늦은 쪽은 그 결과를 따라야 한다.
   */
   useEffect(() => {
-    if (state.appointment?.stage === 'completed') navigate('/complete')
-  }, [state.appointment?.stage, navigate])
+    if (active?.stage === 'completed') navigate('/complete')
+  }, [active?.stage, navigate])
 
   /**
    * "만났어요". 서버에 끝났다고 남긴 다음 완료 화면으로 간다.
@@ -59,33 +74,28 @@ export function Identify() {
       setBusy(false)
     }
   }
-  // 레몬을 누른 횟수. 누를 때마다 키가 바뀌어서 흔들림이 처음부터 다시 돈다.
-  const [pokes, setPokes] = useState(0)
-
-  /*
-    식별자는 교환 하나에 하나이고 참가자 전원이 같은 값을 든다. 그래서 같은 화면을 든 사람이
-    곧 내 교환 상대다. 진행 중인 다른 교환과 겹치지 않게 서버가 골라 준다.
-
-    약속 없이 주소로 바로 들어온 경우에는 첫 표시로 보여준다. 화면이 비면 무엇을 보는 자리인지
-    알 수 없기 때문이다.
-  */
-  const mark = identityMarkAt(appt?.identityMark ?? 0)
-  const label = appt ? identityLabel(appt.identityMark, appt.identityNumber) : mark.name
 
   return (
-    <div
-      className="relative flex h-full flex-col text-white"
-      style={{
-        background: 'linear-gradient(160deg, #3dd2ff8c 0%, #0a1a33 35%, #050d1c 100%), #050d1c',
-      }}
-    >
-      {/* 배경은 화면을 다 덮고, 내용 폭만 다른 화면과 같이 맞춘다. */}
-      <div className="mx-auto flex h-full w-full flex-col md:max-w-[900px] md:px-10">
+    <div className="relative flex h-full flex-col text-white">
+      {/*
+        배경은 화면을 다 덮는다. 판이 노치 밑에 주는 여백까지 끌어올리지 않으면
+        어두운 화면 위쪽에 흰 띠가 남는다.
+      */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 -top-[max(0.75rem,env(safe-area-inset-top))] bottom-0"
+        style={{
+          background: 'linear-gradient(160deg, #3dd2ff8c 0%, #0a1a33 35%, #050d1c 100%), #050d1c',
+        }}
+      />
+
+      {/* 내용 폭만 다른 화면과 같이 맞춘다. */}
+      <div className="relative mx-auto flex h-full w-full flex-col md:max-w-[900px] md:px-10">
         <div className="flex h-14 shrink-0 items-center justify-end px-4">
           <motion.button
             type="button"
             aria-label="닫기"
-            onClick={() => navigate('/appointment')}
+            onClick={() => navigate('/home')}
             whileTap={{ scale: 0.88 }}
             className="flex size-10 items-center justify-center text-[26px] font-light text-white/80"
           >
@@ -132,12 +142,12 @@ export function Identify() {
               <motion.img
                 key={pokes}
                 src="/lemon.svg"
+                style={{ filter: `hue-rotate(${mark.hueRotate}deg)` }}
                 alt=""
                 aria-hidden
                 animate={pokes > 0 ? { rotate: [0, -9, 7, -4, 0], scale: [1, 1.08, 0.98, 1] } : {}}
                 transition={{ duration: 0.7, ease: 'easeOut' }}
                 className="anim-lemon w-[260px] max-w-[70vw] select-none"
-                style={{ filter: `hue-rotate(${mark.hueRotate}deg)` }}
                 draggable={false}
               />
             </motion.button>
@@ -179,18 +189,12 @@ export function Identify() {
         </div>
       </div>
 
-      <Dialog
+      <BreakupDialog
         open={noShowOpen}
-        title="거래를 취소할까요?"
-        description="상대가 오지 않으면 약속을 접고 다시 상대를 찾습니다."
-        cancelLabel="조금 더 기다릴게요"
-        confirmLabel="취소할게요"
-        onCancel={() => setNoShowOpen(false)}
-        onConfirm={() => {
+        onKeep={() => setNoShowOpen(false)}
+        onFindNew={() => {
           setNoShowOpen(false)
           void cancelAppointment().then((cancelled) => {
-            // 상대가 먼저 교환을 마쳤으면 취소가 안 된다. 그때는 화면이 그 결과를 따라간다.
-
             if (cancelled) navigate('/home')
           })
         }}

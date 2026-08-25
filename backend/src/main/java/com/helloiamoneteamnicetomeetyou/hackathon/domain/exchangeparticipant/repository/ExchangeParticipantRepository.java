@@ -2,6 +2,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.re
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -20,4 +21,18 @@ public interface ExchangeParticipantRepository extends JpaRepository<ExchangePar
             order by p.id asc
             """)
     List<ExchangeParticipant> findAllByExchangeId(Long exchangeId);
+
+    /** 어드민 목록에서 교환 여러 건의 참가자를 한 번에 읽는다. */
+    @Query("""
+            select p from ExchangeParticipant p
+            join fetch p.user
+            where p.exchange.id in :exchangeIds
+            order by p.id asc
+            """)
+    List<ExchangeParticipant> findAllByExchangeIdIn(List<Long> exchangeIds);
+
+    List<ExchangeParticipant> findByUserId(UUID userId);
+
+    /** 부스 초기화에서 쓴다. 교환을 지우기 전에 참가자 줄부터 없애야 FK 에 걸리지 않는다. */
+    void deleteByExchangeIdIn(List<Long> exchangeIds);
 }

@@ -77,7 +77,7 @@ public class DemoDataSeeder implements ApplicationRunner {
 
             userHaveItemRepository.save(UserHaveItem.of(user, items.get(holding[0]), 1));
             for (int w = 1; w < holding.length; w++) {
-                userWantItemRepository.save(UserWantItem.of(user, items.get(holding[w])));
+                userWantItemRepository.save(UserWantItem.of(user, items.get(holding[w]), 1));
             }
 
             created++;

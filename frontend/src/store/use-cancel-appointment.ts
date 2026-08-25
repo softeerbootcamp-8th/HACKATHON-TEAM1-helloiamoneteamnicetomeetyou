@@ -3,6 +3,7 @@ import { useCallback } from 'react'
 import { cancelExchange, fetchExchange } from '@/lib/exchange'
 
 import { getDeviceId } from './identity'
+import { activeAppointment } from './reducer'
 import { useStore } from './useStore'
 
 /**
@@ -17,7 +18,7 @@ import { useStore } from './useStore'
  */
 export function useCancelAppointment() {
   const { state, dispatch } = useStore()
-  const exchangeId = state.appointment?.exchangeId
+  const exchangeId = activeAppointment(state)?.exchangeId
 
   return useCallback(async (): Promise<boolean> => {
     if (exchangeId === undefined) {

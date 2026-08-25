@@ -9,6 +9,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -31,10 +32,10 @@ public class User {
     private UUID id;
 
     /**
-     * 화면에 보여 줄 이름이다. 약속 화면에서 상대 줄의 라벨이 된다.
+     * 화면에 보여 줄 이름이다. 지금은 채우지 않는다.
      *
-     * <p>등록할 때 클라이언트가 함께 보낸다. 아직 안 보낸 사용자가 있을 수 있어서 null 을 허용하고,
-     * 화면은 비어 있으면 "상대" 로 대신 보여 준다.
+     * <p>목업이 나오면 사용자를 무엇으로 표시할지 정해질 텐데, 그때까지 자리만 비워 둔다.
+     * 컬럼을 지웠다 다시 만드는 것보다 제약만 푸는 쪽이 변경이 작다.
      */
     @Column(length = 50)
     private String username;
@@ -42,23 +43,55 @@ public class User {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    private User(UUID id, String username) {
+    /**
+     * 어드민이 만든 사용자인지. 부스 시연에 세워 두는 더미다.
+     *
+     * <p><b>어드민이 대신 조작해도 되는 사람인지를 가르는 경계다.</b> 실제 참가자의 수락이나
+     * 시간 선택을 운영자가 대신 눌러 버리면 그 사람이 하지 않은 일이 그 사람 이름으로 남는다.
+     * 대리 조작은 이 값이 참인 사용자에게만 열어 둔다.
+     *
+     * <p><b>DB 기본값을 함께 박아 둔다.</b> 이 컬럼을 모르는 코드가 사용자를 넣을 때
+     * (이 브랜치를 아직 받지 않은 다른 작업 브랜치, 손으로 쓰는 INSERT) 컬럼을 빼고 보내는데,
+     * 기본값이 없으면 MySQL 이 "Field 'admin_managed' doesn't have a default value" 로 거절한다.
+     * 컬럼 하나 늘렸다고 남의 브랜치가 안 도는 일은 없어야 한다.
+     */
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    private boolean adminManaged = false;
+
+    private User(UUID id, String username, boolean adminManaged) {
         this.id = id;
         this.username = username;
+        this.adminManaged = adminManaged;
         this.createdAt = LocalDateTime.now();
     }
 
-    public static User of(UUID id, String username) {
-        return new User(id, username);
+    public static User of(UUID id) {
+        return new User(id, null, false);
     }
 
     /**
-     * 이름을 고친다. 빈 값이면 무시한다.
+     * 어드민이 만드는 사용자다. 화면에서 등록하는 사람과 달리 이름을 함께 받는다.
      *
-     * <p>등록 API 가 멱등이라 앱을 열 때마다 불리는데, 그때 이름을 안 보낸 요청이 이미 있던 이름을
-     * 지워 버리면 상대 화면에서 이름이 사라진다.
+     * <p>부스 운영자가 목록에서 누가 누군지 알아봐야 매칭에 손을 댈 수 있는데, 이름이 없으면
+     * UUID 앞자리로 구분해야 해서 실수하기 쉽다.
      */
-    public void changeUsername(String username) {
+    public static User of(UUID id, String username) {
+        return new User(id, username, false);
+    }
+
+    /** 어드민이 부스에 세워 두는 더미 사용자를 만든다. */
+    public static User dummy(UUID id, String username) {
+        return new User(id, username, true);
+    }
+
+    /**
+     * 표시 이름을 고친다. 빈 값이면 무시한다.
+     *
+     * <p>어드민 화면에서도 쓰고, 사용자 등록에서도 쓴다. 등록이 멱등이라 앱을 열 때마다 불리는데,
+     * 그때 이름을 안 보낸 요청이 이미 있던 이름을 지워 버리면 상대 화면에서 이름이 사라진다.
+     */
+    public void rename(String username) {
         if (username == null || username.isBlank()) {
             return;
         }

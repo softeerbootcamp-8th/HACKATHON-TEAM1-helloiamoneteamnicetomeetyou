@@ -43,4 +43,10 @@ public class Zone {
     public static Zone of(Booth booth, String name, String location) {
         return new Zone(booth, name, location);
     }
+
+    /** 어드민 화면에서 이름과 위치를 고친다. 소속 부스는 바꾸지 않는다. */
+    public void update(String name, String location) {
+        this.name = name;
+        this.location = location;
+    }
 }

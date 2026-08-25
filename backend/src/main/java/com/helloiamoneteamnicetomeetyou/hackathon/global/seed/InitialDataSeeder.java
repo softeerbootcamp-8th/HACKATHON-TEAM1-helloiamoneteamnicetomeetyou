@@ -38,14 +38,20 @@ public class InitialDataSeeder implements ApplicationRunner {
             new String[]{"에스컬레이터", "1층 에스컬레이터 앞"},
             new String[]{"라운지", "휴게 라운지"});
 
+    /**
+     * 프론트 목업의 카드와 <b>이름이 같아야 한다.</b> 화면이 목업 카드와 서버 카드를 이름으로
+     * 잇기 때문에(`features/catalog/match-by-name.ts`), 하나라도 어긋나면 그 카드는 등록이 안 된다.
+     */
     private static final List<String[]> ITEMS = List.of(
-            new String[]{"N Vision 74", "N 비전 74"},
             new String[]{"IONIQ 5 N", "아이오닉 5 N"},
-            new String[]{"PONY", "포니"},
             new String[]{"AVANTE N", "아반떼 N"},
-            new String[]{"GRANDEUR", "그랜저"},
-            new String[]{"SANTA FE", "싼타페"},
-            new String[]{"CASPER", "캐스퍼"});
+            new String[]{"VELOSTER N", "벨로스터 N"},
+            new String[]{"KONA N", "코나 N"},
+            new String[]{"i30 N", "i30 N"},
+            new String[]{"i30 Fastback", "i30 패스트백"},
+            new String[]{"i20 N", "i20 N"},
+            new String[]{"AVANTE N Facelift", "아반떼 N 페이스리프트"},
+            new String[]{"i20 N Rally1", "i20 N 랠리1"});
 
     private final BoothRepository boothRepository;
     private final ZoneRepository zoneRepository;

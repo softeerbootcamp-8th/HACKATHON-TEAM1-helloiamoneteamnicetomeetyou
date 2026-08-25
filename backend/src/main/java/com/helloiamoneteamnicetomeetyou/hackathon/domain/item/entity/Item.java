@@ -45,4 +45,23 @@ public class Item {
     public static Item of(Booth booth, String name, String description) {
         return new Item(booth, name, description);
     }
+
+    /**
+     * 어드민 화면에서 카드를 추가할 때 쓴다.
+     *
+     * <p>이미지가 아직 없는 카드가 대부분이라 {@code imageUrl} 은 비어 있을 수 있고, 화면은
+     * 그때 프론트와 같은 그라데이션 썸네일을 그린다.
+     */
+    public static Item of(Booth booth, String name, String description, String imageUrl) {
+        Item item = new Item(booth, name, description);
+        item.imageUrl = imageUrl;
+        return item;
+    }
+
+    /** 어드민 화면에서 카드 정보를 고친다. 소속 부스는 바꾸지 않는다. */
+    public void update(String name, String description, String imageUrl) {
+        this.name = name;
+        this.description = description;
+        this.imageUrl = imageUrl;
+    }
 }

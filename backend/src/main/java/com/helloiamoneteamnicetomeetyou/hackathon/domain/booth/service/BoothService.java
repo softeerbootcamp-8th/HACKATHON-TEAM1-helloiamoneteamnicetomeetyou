@@ -19,10 +19,22 @@ public class BoothService {
     private final BoothRepository boothRepository;
     private final ZoneRepository zoneRepository;
 
+    /**
+     * 열린 부스를 전부 준다. 만든 순서대로다.
+     *
+     * <p>페이징을 두지 않는다. 행사에서 부스는 한 자리 수라 나눠 받을 이유가 없다.
+     */
     public List<BoothResponseDto> findAll() {
-        return boothRepository.findAll().stream().map(BoothResponseDto::from).toList();
+        return boothRepository.findAllByOrderByIdAsc().stream()
+                .map(BoothResponseDto::from)
+                .toList();
     }
 
+    /**
+     * 부스 안의 교환 장소를 만든 순서대로 준다.
+     *
+     * <p>화면이 지도 위 핀 좌표를 이 순서에 얹기 때문에 정렬이 고정돼 있어야 한다.
+     */
     public List<ZoneResponseDto> findZones(Long boothId) {
         if (!boothRepository.existsById(boothId)) {
             throw new ApplicationException(ErrorCode.BOOTH_NOT_FOUND);

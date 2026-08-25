@@ -1,13 +1,6 @@
 /**
  * 시간 선택 격자. 시안이 "지금" 칸 하나에 15분 간격 7칸을 붙여서 8칸을 보여주고,
  * 안내 문구도 "오늘 지금부터 2시간까지만 고를 수 있어요" 라 그 폭에 맞췄다.
- *
- * **격자의 시작점은 서버가 정한다.** 화면이 각자 `new Date()` 로 만들면 14:03 에 연 사람의
- * 0번 칸은 14:15 이고 14:20 에 연 사람의 0번 칸은 14:30 이라, 같은 칸 번호가 사람마다 다른
- * 시각을 뜻하게 된다. 교환을 만들 때 서버가 한 번 정한 `slotBaseTime` 을 모두가 함께 쓴다.
- *
- * 여기 있는 `SLOT_COUNT` 와 `SLOT_MINUTES` 는 백엔드 `TimeSlotGrid` 와 같은 값이어야 한다.
- * 한쪽만 고치면 마지막 칸을 누른 사람만 400 을 받는 식으로 조용히 깨진다.
  */
 
 export type Slot = {
@@ -36,10 +29,18 @@ export function parseSlotBaseTime(iso: string): Date {
   return new Date(iso)
 }
 
-/** 시작점에서 15분씩 떨어진 8칸을 만든다. 시작점은 이미 15분 경계라 반올림하지 않는다. */
+/**
+ * 시작점에서 15분씩 떨어진 8칸을 만든다.
+ *
+ * **시작점은 서버가 정한다.** 화면이 각자 `new Date()` 로 만들면 14:03 에 연 사람의 0번 칸은
+ * 14:15 이고 14:20 에 연 사람의 0번 칸은 14:30 이라, 같은 칸 번호가 사람마다 다른 시각을 뜻하게
+ * 된다. 이미 15분 경계라 여기서 반올림하지 않는다.
+ */
 export function buildSlots(baseTime: Date): Slot[] {
+  const base = baseTime
+
   return Array.from({ length: SLOT_COUNT }, (_, index) => {
-    const at = new Date(baseTime.getTime() + index * SLOT_MINUTES * 60_000)
+    const at = new Date(base.getTime() + index * SLOT_MINUTES * 60_000)
     return {
       index,
       label: index === 0 ? '지금' : `${at.getHours()}:${pad(at.getMinutes())}`,
@@ -52,6 +53,19 @@ export function buildSlots(baseTime: Date): Slot[] {
 export function slotTimeLabel(baseTime: Date, index: number): string {
   const at = new Date(baseTime.getTime() + index * SLOT_MINUTES * 60_000)
   return `${at.getHours()}:${pad(at.getMinutes())}`
+}
+
+/** 모두가 되는 칸 전부. 시안이 이 칸들 아래에 밑줄을 긋는다. */
+export function overlappingSlots(rows: number[][]): number[] {
+  if (rows.length === 0) return []
+  return Array.from({ length: SLOT_COUNT }, (_, i) => i).filter((i) =>
+    rows.every((row) => row.includes(i)),
+  )
+}
+
+/** 모두가 되는 가장 빠른 칸을 찾는다. 없으면 -1 이다. */
+export function earliestOverlap(rows: number[][]): number {
+  return overlappingSlots(rows)[0] ?? -1
 }
 
 /** 서버가 확정해 준 시각(`2026-08-25T14:15:00`)을 화면 라벨로 바꾼다. */

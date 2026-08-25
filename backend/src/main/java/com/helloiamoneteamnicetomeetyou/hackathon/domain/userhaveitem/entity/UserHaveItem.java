@@ -45,4 +45,8 @@ public class UserHaveItem {
     public static UserHaveItem of(User user, Item item, Integer quantity) {
         return new UserHaveItem(user, item, quantity);
     }
+
+    public void changeQuantity(Integer quantity) {
+        this.quantity = quantity;
+    }
 }

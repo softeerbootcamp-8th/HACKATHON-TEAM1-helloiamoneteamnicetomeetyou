@@ -1,194 +1,176 @@
 import { motion } from 'motion/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { GoodsFace } from '@/components/domain/GoodsCard'
+import { BreakupDialog } from '@/components/domain/ConfirmDialogs'
+import { EmptyState } from '@/components/domain/EmptyState'
+import { MoveStatusBadge, OneToOneView, ThreeWayView } from '@/components/domain/ExchangeCards'
 import { Button, TextButton } from '@/components/ui/Button'
-import { PinIcon } from '@/components/ui/icons'
-import { cn } from '@/lib/cn'
+import { ClockIcon, PinIcon } from '@/components/ui/icons'
+import { TopBar } from '@/components/ui/TopBar'
 import { arriveAtExchange } from '@/lib/exchange'
 import { springSnap } from '@/lib/motion'
-import { itemById } from '@/mocks/data'
 import { useLastDefined } from '@/lib/useLastDefined'
+import { identityMarkAt } from '@/store/identity-mark'
+import { useCancelAppointment } from '@/store/use-cancel-appointment'
 import { getDeviceId } from '@/store/identity'
+import { activeAppointment } from '@/store/reducer'
 import { useStore } from '@/store/useStore'
 
-/** 확정된 약속. 시간과 장소, 주고받을 카드를 다시 보여준다. */
+/**
+ * 확정된 약속. 남은 시간과 장소, 주고받을 카드를 다시 보여준다.
+ * 닫기는 약속을 그대로 둔 채 교환 대기장소로 돌아간다. 약속까지 시간이 남았을 때
+ * 다른 카드를 더 찔러볼 수 있어야 하기 때문이다.
+ */
 export function Appointment() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
-  const appt = useLastDefined(state.appointment)
-  const match = useLastDefined(state.match)
-  const myUserId = useMemo(() => getDeviceId(), [])
+  const [cancelOpen, setCancelOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const cancelAppointment = useCancelAppointment()
+  const appt = useLastDefined(activeAppointment(state))
 
-  // 남은 시간을 1분마다 다시 센다. 화면을 열어 둔 채로 시간이 흘러도 숫자가 따라간다.
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30_000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  /*
-    주고받을 카드는 프론트 목업의 매칭 결과에서 온다. 매칭이 서버로 오기 전까지는 이 화면에
-    들어오는 경로에 따라 그 값이 없을 수 있어서, 없으면 카드만 빼고 나머지를 보여준다.
-
-    카드가 없다고 화면을 통째로 막으면 확정된 약속을 가진 사람이 시각도 장소도 못 본다.
-  */
   if (!appt || (appt.stage !== 'confirmed' && appt.stage !== 'arrived')) {
     return (
-      <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-          <p className="text-[15px] text-neutral-500">확정된 약속이 없어요.</p>
-          <Button onClick={() => navigate('/home')}>홈으로</Button>
-        </div>
-      </div>
+      <EmptyState
+        title="확정된 약속이 없어요"
+        description={'장소와 시간을 정하면\n여기에서 다시 볼 수 있어요.'}
+        icon={<ClockIcon className="size-9" />}
+        onAction={() => navigate('/home')}
+      />
     )
   }
 
-  const isThreeWay = match?.kind === 'THREE_WAY'
-  const headline = countdownLabel(appt.confirmedTime, now)
+  const { zone, match } = appt
+  const arrived = appt.myArrived
   const partnersArrived = appt.partners.every((p) => p.arrived)
+  const myUserId = getDeviceId()
 
-  const goArrive = async () => {
+  /**
+   * "도착했어요". 서버에 남기면 상대 화면의 배지가 이동중에서 도착으로 바뀐다.
+   *
+   * 실패해도 식별 화면으로는 보낸다. 상대를 찾는 것을 서버 응답 때문에 막을 이유가 없다.
+   */
+  const goIdentify = async () => {
     setBusy(true)
     try {
       const exchange = await arriveAtExchange(appt.exchangeId, myUserId)
       dispatch({ type: 'exchange-synced', exchange, myUserId })
-      navigate('/identify')
     } catch {
-      dispatch({ type: 'toast', message: '잠시 후 다시 시도해주세요' })
+      dispatch({ type: 'toast', message: '도착을 알리지 못했어요' })
     } finally {
       setBusy(false)
+      navigate('/identify')
     }
   }
 
   return (
     <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
-      <div className="flex-1 overflow-y-auto px-6 pt-8 no-scrollbar">
+      <TopBar onClose={() => navigate('/home')} />
+
+      <div className="flex-1 overflow-y-auto px-6 no-scrollbar">
         <motion.h1
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={springSnap}
           className="text-[26px] font-extrabold tracking-[-0.02em] text-ink"
         >
-          {headline}
+          {remainingLabel(appt.confirmedLabel)}
         </motion.h1>
-        <p className="mt-2 text-[13px] text-neutral-400">약속정보</p>
 
         <motion.div
           initial={{ opacity: 0, y: 14, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ ...springSnap, delay: 0.06 }}
-          className="mt-3 flex items-center gap-3 rounded-2xl border-2 border-ink p-3.5"
+          className="mt-4 flex items-center gap-3 rounded-2xl border-2 border-ink p-3.5"
         >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand text-ink">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand text-white">
             <PinIcon className="size-5" />
           </span>
           <div>
             <p className="text-[16px] font-bold text-ink">
-              {appt.confirmedLabel} {appt.zone.name}
+              {appt.confirmedLabel} {zone.name}
             </p>
-            <p className="text-[12px] text-neutral-400">{appt.zone.location}</p>
+            <p className="text-[12px] text-neutral-400">{zone.location}</p>
           </div>
         </motion.div>
 
-        {match ? (
-          <div className="mt-10 flex items-start justify-center gap-4">
-            <ArrivalCard itemId={match.giveItemId} caption="내가 줄 것" arrived={appt.myArrived} />
-            <span className="anim-breathe mt-16 text-[20px] text-ink">⇄</span>
-            <ArrivalCard
-              itemId={match.receiveItemId}
-              caption="내가 받을 것"
-              arrived={partnersArrived}
+        <div className="mt-10">
+          {/* 무엇을 주고받는지는 아직 화면 목업이 아는 값이라, 없으면 도착 여부만 보여준다. */}
+          {!match ? (
+            <div className="flex items-center justify-center gap-6">
+              <div className="text-center">
+                <MoveStatusBadge arrived={arrived} />
+                <p className="mt-2.5 text-[12px] text-neutral-500">나</p>
+              </div>
+              <span className="anim-breathe text-[20px] text-ink">⇄</span>
+              <div className="text-center">
+                <MoveStatusBadge arrived={partnersArrived} />
+                <p className="mt-2.5 text-[12px] text-neutral-500">
+                  {appt.partners.map((p) => p.name).join(', ') || '상대'}
+                </p>
+              </div>
+            </div>
+          ) : match.kind === 'ONE_TO_ONE' ? (
+            <OneToOneView
+              pairs={match.pairs}
+              giveBadge={<MoveStatusBadge arrived={arrived} />}
+              receiveBadge={<MoveStatusBadge arrived={partnersArrived} />}
             />
-          </div>
-        ) : (
-          <div className="mt-10 flex items-center justify-center gap-4">
-            <ArrivalBadge label="나" arrived={appt.myArrived} />
-            <span className="anim-breathe text-[20px] text-ink">⇄</span>
-            <ArrivalBadge label="상대" arrived={partnersArrived} />
-          </div>
-        )}
-
-        {/* 상대가 여럿이면 누가 왔는지 한 줄로 보여준다. 배지만으로는 셋 중 누구인지 알 수 없다. */}
-        {appt.partners.length > 0 && (
-          <p className="mt-8 text-center text-[12px] text-neutral-400">
-            {appt.partners.map((p) => `${p.name} ${p.arrived ? '도착' : '이동중'}`).join(' · ')}
-            {isThreeWay && ' · 셋이서 교환해요'}
-          </p>
-        )}
+          ) : (
+            <ThreeWayView
+              myItemId={match.giveItemId}
+              giverNickname={match.giver.nickname}
+              giverItemId={match.receiveItemId}
+              receiverNickname={match.receiver.nickname}
+              receiverItemId={match.middleItemId}
+              myBadge={<MoveStatusBadge arrived={arrived} />}
+              giverBadge={<MoveStatusBadge arrived={appt.partners[0]?.arrived ?? false} />}
+              receiverBadge={<MoveStatusBadge arrived={appt.partners[1]?.arrived ?? false} />}
+            />
+          )}
+        </div>
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
-        <Button disabled={busy} onClick={() => void goArrive()}>
-          {appt.myArrived ? '상대 찾으러 가기' : '도착했어요'}
+        <Button disabled={busy} onClick={() => void goIdentify()}>
+          ‘{identityMarkAt(appt.identityMark).name}’을 찾아볼까요
         </Button>
-        <TextButton onClick={() => navigate('/home')}>홈으로</TextButton>
+        <TextButton onClick={() => setCancelOpen(true)}>약속 취소하기</TextButton>
       </div>
+
+      <BreakupDialog
+        open={cancelOpen}
+        onKeep={() => setCancelOpen(false)}
+        onFindNew={() => {
+          setCancelOpen(false)
+          void cancelAppointment().then((cancelled) => {
+            // 상대가 먼저 교환을 마쳤으면 취소가 안 된다. 그때는 화면이 그 결과를 따라간다.
+            if (cancelled) navigate('/home')
+          })
+        }}
+      />
     </div>
   )
 }
 
 /**
- * "15분 뒤 만나요!" 자리. 서버가 확정해 준 시각에서 실제로 남은 시간을 센다.
- *
- * 시안이 15분으로 그려져 있는데 그건 예시라, 고정 문구로 두면 30분 뒤 약속에도 15분이라고 나온다.
- * 약속 시각이 지난 뒤에도 화면이 열려 있을 수 있어서 그 경우를 따로 둔다.
+ * 약속까지 남은 시간. 시안이 30분을 기준으로 문구를 가른다.
+ * 30분보다 가까우면 몇 분 남았는지 적고, 그보다 멀면 "잠시 뒤에 만나요" 로 뭉뚱그린다.
  */
-function countdownLabel(confirmedTime: string | null, now: number): string {
-  if (!confirmedTime) return '곧 만나요!'
-
-  const minutes = Math.round((new Date(confirmedTime).getTime() - now) / 60_000)
-
-  if (minutes <= 0) return '지금 만나요!'
-  if (minutes < 60) return `${minutes}분 뒤 만나요!`
-
-  const hours = Math.floor(minutes / 60)
-  const rest = minutes % 60
-  return rest === 0 ? `${hours}시간 뒤 만나요!` : `${hours}시간 ${rest}분 뒤 만나요!`
+function remainingLabel(confirmedLabel: string | null): string {
+  const minutes = minutesUntil(confirmedLabel)
+  if (minutes === null || minutes >= 30) return '잠시 뒤에 만나요'
+  return `${Math.max(minutes, 1)}분 뒤에 만나요`
 }
 
-/** 주고받을 카드를 모를 때 쓰는 자리. 도착 여부만 보여준다. */
-function ArrivalBadge({ label, arrived }: { label: string; arrived: boolean }) {
-  return (
-    <div className="text-center">
-      <motion.span
-        animate={{ backgroundColor: arrived ? '#111111' : '#d4d4d4' }}
-        transition={springSnap}
-        className="inline-block rounded-full px-4 py-1.5 text-[12px] font-bold text-white"
-      >
-        {arrived ? '도착' : '이동중'}
-      </motion.span>
-      <p className="mt-2.5 text-[12px] text-neutral-500">{label}</p>
-    </div>
-  )
-}
+/** "2:45" 같은 라벨을 오늘 그 시각으로 읽고 지금까지 몇 분 남았는지 센다. */
+function minutesUntil(confirmedLabel: string | null): number | null {
+  if (!confirmedLabel) return null
+  const [hour, minute] = confirmedLabel.split(':').map(Number)
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null
 
-function ArrivalCard({
-  itemId,
-  caption,
-  arrived,
-}: {
-  itemId: string
-  caption: string
-  arrived: boolean
-}) {
-  const item = itemById(itemId)
-  return (
-    <div className="text-center">
-      <motion.span
-        animate={{ backgroundColor: arrived ? '#111111' : '#d4d4d4' }}
-        transition={springSnap}
-        className={cn('mb-3 inline-block rounded-full px-3 py-1 text-[11px] font-bold text-white')}
-      >
-        {arrived ? '도착' : '이동중'}
-      </motion.span>
-      <div className="w-[118px] rounded-2xl bg-white p-3 shadow-[0_6px_22px_rgba(0,0,0,0.10)]">
-        <GoodsFace item={item} size="lg" />
-        <p className="mt-2.5 text-center text-[12px] font-bold text-ink">{item.name}</p>
-      </div>
-      <p className="mt-2.5 text-[12px] text-neutral-500">{caption}</p>
-    </div>
-  )
+  const at = new Date()
+  at.setHours(hour, minute, 0, 0)
+  return Math.round((at.getTime() - Date.now()) / 60_000)
 }

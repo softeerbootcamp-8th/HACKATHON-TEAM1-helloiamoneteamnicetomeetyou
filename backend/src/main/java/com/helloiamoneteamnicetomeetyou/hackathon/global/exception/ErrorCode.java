@@ -5,7 +5,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
 /**
- * 도메인별로 코드 앞자리를 나눠 쓴다. 1000 공통, 2000 사용자, 3000 부스와 구역, 4000 교환이다.
+ * 도메인별로 코드 앞자리를 나눠 쓴다. 1000 공통, 2000 사용자, 3000 부스와 구역, 4000 교환,
+ * 5000 카드다.
  */
 @Getter
 @RequiredArgsConstructor
@@ -32,8 +33,13 @@ public enum ErrorCode implements ErrorType {
     NO_OVERLAPPING_TIME(HttpStatus.CONFLICT, 4003, "모두가 되는 시간이 아직 없습니다."),
     EXCHANGE_TIME_ALREADY_CONFIRMED(HttpStatus.CONFLICT, 4004, "이미 시간이 정해진 약속입니다."),
     INVALID_EXCHANGE_PARTICIPANTS(HttpStatus.BAD_REQUEST, 4005, "교환 참가자 구성이 올바르지 않습니다."),
-    EXCHANGE_TIME_NOT_CONFIRMED(HttpStatus.CONFLICT, 4006, "아직 만날 시간이 정해지지 않았습니다."),
-    EXCHANGE_ALREADY_FINISHED(HttpStatus.CONFLICT, 4007, "이미 끝난 약속입니다.");
+    UNSUPPORTED_MATCHING_SIZE(HttpStatus.BAD_REQUEST, 4006, "2인과 3인 매칭만 지원합니다."),
+    EXCHANGE_TIME_NOT_CONFIRMED(HttpStatus.CONFLICT, 4007, "아직 만날 시간이 정해지지 않았습니다."),
+    EXCHANGE_ALREADY_FINISHED(HttpStatus.CONFLICT, 4008, "이미 끝난 약속입니다."),
+
+    // Item / UserHaveItem / UserWantItem
+    ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, 5000, "카드를 찾을 수 없습니다."),
+    INVALID_QUANTITY(HttpStatus.BAD_REQUEST, 5001, "수량은 1개 이상이어야 합니다.");
 
     private final HttpStatus httpStatus;
     private final Integer errorCode;
