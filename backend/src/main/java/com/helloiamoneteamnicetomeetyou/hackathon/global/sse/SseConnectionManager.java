@@ -1,0 +1,201 @@
+package com.helloiamoneteamnicetomeetyou.hackathon.global.sse;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+/**
+ * 열려 있는 SSE 연결을 서버 메모리에 들고 있으면서, 대기장소나 사용자 단위로 찾아서 내보낸다.
+ *
+ * <p>연결을 메모리에 두기 때문에 <b>이 서버에 붙은 연결만</b> 안다. 지금은 EC2 한 대라 그것이
+ * 전부라서 문제가 없지만, 서버를 늘리면 다른 인스턴스에 붙은 사람은 이벤트를 못 받는다. 그때는
+ * 인스턴스 사이에 이벤트를 퍼뜨릴 방법을 팀에서 정해야 한다.
+ *
+ * <p>대기장소와 사용자 두 벌의 색인을 유지한다. 매칭 제안처럼 특정 사용자에게만 보내야 하는
+ * 이벤트가 있는데, 그때 전체 연결을 훑지 않으려면 사용자 색인이 필요하다.
+ */
+@Slf4j
+@Component
+public class SseConnectionManager {
+
+    private final Map<Long, Set<SseConnection>> zoneConnections = new ConcurrentHashMap<>();
+    private final Map<UUID, Set<SseConnection>> userConnections = new ConcurrentHashMap<>();
+
+    private final ExecutorService sseExecutor;
+    private final long emitterTimeoutMs;
+
+    public SseConnectionManager(
+            @Qualifier("sseExecutor") ExecutorService sseExecutor,
+            @Value("${sse.emitter-timeout-ms}") long emitterTimeoutMs) {
+        this.sseExecutor = sseExecutor;
+        this.emitterTimeoutMs = emitterTimeoutMs;
+    }
+
+    /**
+     * 대기장소를 구독한다.
+     *
+     * <p><b>순서가 중요하다.</b> 색인에 넣고 생명주기 콜백을 건 다음에 {@code CONNECTED} 를
+     * 보낸다. 콜백을 걸기 전에 전송하다 실패하면 그 연결이 색인에 남은 채로 아무도 치우지
+     * 않는다.
+     *
+     * <p>{@code CONNECTED} 는 이 자리에서 바로 보낸다. 첫 바이트가 나가야 브라우저가 연결이
+     * 열린 것으로 보기 때문에, 이걸 미루면 화면이 한동안 연결 중 상태에 머문다.
+     */
+    public SseEmitter subscribe(Long zoneId, UUID userId) {
+        SseConnection connection = new SseConnection(zoneId, userId, new SseEmitter(emitterTimeoutMs));
+
+        register(connection);
+
+        SseEmitter emitter = connection.getEmitter();
+        emitter.onCompletion(() -> disconnect(connection, "완료"));
+        emitter.onTimeout(() -> disconnect(connection, "타임아웃"));
+        emitter.onError(e -> disconnect(connection, "전송 오류"));
+
+        try {
+            connection.send(SseEventType.CONNECTED, Map.of("zoneId", zoneId, "userId", userId.toString()));
+        } catch (Exception e) {
+            log.debug("sse 연결 직후 전송 실패: zoneId={}, userId={}", zoneId, userId, e);
+            drop(connection, "연결 직후 전송 실패");
+        }
+
+        log.info("sse 연결: zoneId={}, userId={}, 이 대기장소 연결 수={}", zoneId, userId, countByZone(zoneId));
+
+        return emitter;
+    }
+
+    /** 대기장소에 붙어 있는 연결. 없으면 빈 목록이다. */
+    Collection<SseConnection> findByZone(Long zoneId) {
+        return zoneConnections.getOrDefault(zoneId, Set.of());
+    }
+
+    /** 한 사용자가 열어 둔 연결. 탭을 여러 개 열었으면 여러 개다. */
+    Collection<SseConnection> findByUser(UUID userId) {
+        return userConnections.getOrDefault(userId, Set.of());
+    }
+
+    public int countByZone(Long zoneId) {
+        return findByZone(zoneId).size();
+    }
+
+    /**
+     * 연결마다 전송을 {@code sseExecutor} 에 넘긴다. 부르는 스레드는 바로 돌아온다.
+     *
+     * <p><b>여기서 직접 write 하면 안 된다.</b> 전파가 안 되는 곳에 있는 사람 한 명이 소켓
+     * write 에서 멈추면, 같은 대기장소의 나머지 전송이 전부 그 뒤에 줄을 서게 된다.
+     *
+     * <p>연결마다 스레드가 달라 두 이벤트의 도착 순서는 보장하지 않는다. 화면이 이벤트 순서에
+     * 기대지 않고 알림을 받으면 현재 상태를 다시 읽는 방식이라 문제가 되지 않는다. 같은 연결에
+     * 두 전송이 겹쳐 바이트가 섞이는 것은 {@link SseConnection} 의 락이 막는다.
+     */
+    void dispatch(Collection<SseConnection> targets, SseEventType type, Object data) {
+        for (SseConnection connection : targets) {
+            sseExecutor.execute(() -> {
+                try {
+                    connection.send(type, data);
+                } catch (Exception e) {
+                    log.debug("sse 전송 실패, 연결을 정리한다: zoneId={}, type={}",
+                            connection.getZoneId(), type, e);
+                    drop(connection, "전송 실패");
+                }
+            });
+        }
+    }
+
+    /**
+     * 살아 있는 연결에 주기적으로 주석 줄을 보낸다.
+     *
+     * <p>끊긴 연결은 write 를 시도할 때만 드러나기 때문에, 이게 없으면 브라우저를 닫고 간 사람의
+     * 연결이 emitter 타임아웃까지 색인에 남는다. 전송 실패는 {@link #dispatch} 와 같은 경로로
+     * 정리된다.
+     */
+    @Scheduled(fixedRateString = "${sse.heartbeat-interval-ms}")
+    void sendHeartbeat() {
+        List<SseConnection> all = zoneConnections.values().stream().flatMap(Set::stream).toList();
+
+        for (SseConnection connection : all) {
+            sseExecutor.execute(() -> {
+                try {
+                    connection.ping();
+                } catch (Exception e) {
+                    log.debug("sse heartbeat 실패, 연결을 정리한다: zoneId={}", connection.getZoneId(), e);
+                    drop(connection, "heartbeat 실패");
+                }
+            });
+        }
+    }
+
+    private void register(SseConnection connection) {
+        zoneConnections
+                .computeIfAbsent(connection.getZoneId(), id -> ConcurrentHashMap.newKeySet())
+                .add(connection);
+        userConnections
+                .computeIfAbsent(connection.getUserId(), id -> ConcurrentHashMap.newKeySet())
+                .add(connection);
+    }
+
+    /**
+     * 색인에서 걷어내고, 그 대기장소나 사용자의 마지막 연결이었으면 항목 자체를 지운다.
+     *
+     * <p><b>{@code get} 으로 꺼내 비었는지 보고 {@code remove} 하면 안 된다.</b> 비었는지 확인한
+     * 뒤 지우기 전에 다른 스레드가 그 대기장소에 새로 붙으면, 그 연결이 든 Set 을 통째로 버려서
+     * 방금 들어온 사람이 아무 이벤트도 못 받는다. {@code compute} 는 키 하나에 대해 원자적이라
+     * 그 틈이 없다.
+     *
+     * <p>실제로 뭔가를 지웠을 때만 {@code true} 다. 같은 연결에 {@code onError} 와
+     * {@code onCompletion} 이 겹쳐 불려도 로그가 두 번 찍히지 않는다.
+     */
+    private boolean unregister(SseConnection connection) {
+        AtomicBoolean removed = new AtomicBoolean();
+
+        zoneConnections.compute(connection.getZoneId(), (id, connections) -> {
+            if (connections == null) {
+                return null;
+            }
+            removed.set(connections.remove(connection));
+            return connections.isEmpty() ? null : connections;
+        });
+
+        userConnections.compute(connection.getUserId(), (id, connections) -> {
+            if (connections == null) {
+                return null;
+            }
+            connections.remove(connection);
+            return connections.isEmpty() ? null : connections;
+        });
+
+        return removed.get();
+    }
+
+    /** emitter 콜백이 알려준 종료. 이미 닫힌 뒤라 {@code complete()} 를 부르지 않는다. */
+    private void disconnect(SseConnection connection, String reason) {
+        if (unregister(connection)) {
+            log.info("sse 연결 종료: zoneId={}, userId={}, 사유={}",
+                    connection.getZoneId(), connection.getUserId(), reason);
+        }
+    }
+
+    /**
+     * 전송이 실패해서 우리 쪽에서 걷어내는 경우다.
+     *
+     * <p>색인에서 빼는 것만으로는 부족하다. HTTP 연결은 아직 살아 있고 브라우저의
+     * {@code EventSource} 가 자동으로 다시 붙기 때문에, 명시적으로 닫아 줘야 재연결이 돈다.
+     * {@code complete()} 는 {@code onCompletion} 을 부르고 그쪽에서 {@code disconnect} 가 한 번
+     * 더 돌지만, 이미 지운 뒤라 아무 일도 하지 않는다. 종료 로그가 두 번 찍히지 않도록 여기서
+     * 먼저 {@code disconnect} 를 부른다.
+     */
+    private void drop(SseConnection connection, String reason) {
+        disconnect(connection, reason);
+        connection.completeQuietly();
+    }
+}

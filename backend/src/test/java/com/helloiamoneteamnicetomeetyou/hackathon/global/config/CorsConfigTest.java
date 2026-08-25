@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.helloiamoneteamnicetomeetyou.hackathon.global.common.PingController;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +15,11 @@ import org.springframework.test.web.servlet.MockMvc;
 
 // JPA 가 들어온 뒤로 @SpringBootTest 는 실제 MySQL 을 찾는다. CORS 는 웹 계층 설정이라
 // 웹 슬라이스만 띄운다. @WebMvcTest 는 WebMvcConfigurer 를 그대로 집어 온다.
-@WebMvcTest
+//
+// 대상을 PingController 하나로 좁힌 것은, 인자 없이 쓰면 모든 Controller 를 슬라이스에 올려서
+// 그 Controller 가 의존하는 빈까지 전부 있어야 하기 때문이다. 여기서 확인하는 것은 /api/ping
+// 하나에 붙는 CORS 헤더라, 컨트롤러가 새로 생길 때마다 이 테스트가 깨질 이유가 없다.
+@WebMvcTest(PingController.class)
 @DisplayName("CORS 설정")
 class CorsConfigTest {
 
