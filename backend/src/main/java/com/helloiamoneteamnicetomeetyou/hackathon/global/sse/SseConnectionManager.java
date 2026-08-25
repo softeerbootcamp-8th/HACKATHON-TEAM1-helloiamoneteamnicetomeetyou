@@ -106,6 +106,16 @@ public class SseConnectionManager {
     }
 
     /**
+     * 지금 앱을 켜 두고 있는 사용자들이다. 어드민 화면이 "접속 중" 을 표시하는 데 쓴다.
+     *
+     * <p>부스에서 화면이 안 바뀔 때 폰이 끊긴 것인지 서버가 이벤트를 안 보낸 것인지 가려야
+     * 하는데, 연결 목록을 볼 수 없으면 둘 다 짐작으로 판단하게 된다.
+     */
+    public Set<UUID> connectedUserIds() {
+        return Set.copyOf(userConnections.keySet());
+    }
+
+    /**
      * 연결마다 전송을 {@code sseExecutor} 에 넘긴다. 부르는 스레드는 바로 돌아온다.
      *
      * <p><b>여기서 직접 write 하면 안 된다.</b> 전파가 안 되는 곳에 있는 사람 한 명이 소켓

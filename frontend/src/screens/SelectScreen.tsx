@@ -17,6 +17,12 @@ type Props = {
   disabledItemIds?: string[]
   disabledNote?: string
   selections: Selection[]
+  /** 서버에 보내는 중. 두 번 눌려 두 번 등록되는 것을 막는다. */
+  submitting?: boolean
+  /** 등록에 실패한 이유. 버튼 위에 그대로 띄운다. */
+  submitError?: string
+  /** 서버 준비 상태 안내. 아직 등록할 수 없을 때 이유를 알려 준다. */
+  notice?: string
   onBack: () => void
   onToggle: (itemId: string) => void
   onChangeQty: (itemId: string, qty: number) => void
@@ -36,6 +42,9 @@ export function SelectScreen({
   disabledItemIds = [],
   disabledNote,
   selections,
+  submitting = false,
+  submitError,
+  notice,
   onBack,
   onToggle,
   onChangeQty,
@@ -43,7 +52,7 @@ export function SelectScreen({
   onSubmit,
 }: Props) {
   const total = selections.reduce((sum, s) => sum + s.qty, 0)
-  const disabled = !allowEmpty && total === 0
+  const disabled = submitting || (!allowEmpty && total === 0)
 
   return (
     <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
@@ -101,8 +110,18 @@ export function SelectScreen({
       </div>
 
       <div className="shrink-0 px-5 pt-3 pb-8">
+        {notice && (
+          <p className="mb-2 text-center text-[12px] text-neutral-400" role="status">
+            {notice}
+          </p>
+        )}
+        {submitError && (
+          <p className="mb-2 text-center text-[12px] text-rose-500" role="alert">
+            {submitError}
+          </p>
+        )}
         <Button onClick={onSubmit} disabled={disabled}>
-          {ctaLabel}
+          {submitting ? '등록하는 중…' : ctaLabel}
         </Button>
       </div>
     </div>

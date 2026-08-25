@@ -2,6 +2,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.entity;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -31,4 +32,23 @@ public class UserWantItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "item_id", nullable = false)
     private Item item;
+
+    /** 몇 장을 찾는지. 보유 카드와 마찬가지로 1 이상이다. */
+    @Column(nullable = false)
+    private Integer quantity;
+
+    private UserWantItem(User user, Item item, Integer quantity) {
+        this.user = user;
+        this.item = item;
+        this.quantity = quantity;
+    }
+
+    public static UserWantItem of(User user, Item item, Integer quantity) {
+        return new UserWantItem(user, item, quantity);
+    }
+
+    /** 같은 (user, item) 으로 다시 등록하면 찾는 개수를 이 값으로 덮어쓴다. */
+    public void changeQuantity(Integer quantity) {
+        this.quantity = quantity;
+    }
 }

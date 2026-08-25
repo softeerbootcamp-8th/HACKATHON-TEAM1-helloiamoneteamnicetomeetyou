@@ -5,13 +5,18 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// 백엔드 주소를 DEV_PROXY_TARGET 으로 덮을 수 있게 열어 두었다. 기본값은 그대로 8080 이라
+// 평소에는 아무것도 달라지지 않고, 워크트리를 하나 더 띄워 다른 포트에서 돌릴 때만 쓴다.
+const proxyTarget = process.env.DEV_PROXY_TARGET ?? 'http://localhost:8080'
+
 // dev 서버와 preview 서버가 같이 쓴다. 한쪽만 고치면 둘 중 하나에서만 백엔드가 붙는다.
 const API_PROXY = {
-  '/api': { target: 'http://localhost:8080', changeOrigin: true },
-  '/health': { target: 'http://localhost:8080', changeOrigin: true },
+  '/api': { target: proxyTarget, changeOrigin: true },
+  '/health': { target: proxyTarget, changeOrigin: true },
 }
 
 // https://vite.dev/config/
+
 export default defineConfig({
   plugins: [
     react(),

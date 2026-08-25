@@ -9,6 +9,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -42,12 +43,50 @@ public class User {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    private User(UUID id) {
+    /**
+     * 어드민이 만든 사용자인지. 부스 시연에 세워 두는 더미다.
+     *
+     * <p><b>어드민이 대신 조작해도 되는 사람인지를 가르는 경계다.</b> 실제 참가자의 수락이나
+     * 시간 선택을 운영자가 대신 눌러 버리면 그 사람이 하지 않은 일이 그 사람 이름으로 남는다.
+     * 대리 조작은 이 값이 참인 사용자에게만 열어 둔다.
+     *
+     * <p><b>DB 기본값을 함께 박아 둔다.</b> 이 컬럼을 모르는 코드가 사용자를 넣을 때
+     * (이 브랜치를 아직 받지 않은 다른 작업 브랜치, 손으로 쓰는 INSERT) 컬럼을 빼고 보내는데,
+     * 기본값이 없으면 MySQL 이 "Field 'admin_managed' doesn't have a default value" 로 거절한다.
+     * 컬럼 하나 늘렸다고 남의 브랜치가 안 도는 일은 없어야 한다.
+     */
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    private boolean adminManaged = false;
+
+    private User(UUID id, String username, boolean adminManaged) {
         this.id = id;
+        this.username = username;
+        this.adminManaged = adminManaged;
         this.createdAt = LocalDateTime.now();
     }
 
     public static User of(UUID id) {
-        return new User(id);
+        return new User(id, null, false);
+    }
+
+    /**
+     * 어드민이 만드는 사용자다. 화면에서 등록하는 사람과 달리 이름을 함께 받는다.
+     *
+     * <p>부스 운영자가 목록에서 누가 누군지 알아봐야 매칭에 손을 댈 수 있는데, 이름이 없으면
+     * UUID 앞자리로 구분해야 해서 실수하기 쉽다.
+     */
+    public static User of(UUID id, String username) {
+        return new User(id, username, false);
+    }
+
+    /** 어드민이 부스에 세워 두는 더미 사용자를 만든다. */
+    public static User dummy(UUID id, String username) {
+        return new User(id, username, true);
+    }
+
+    /** 어드민 화면에서 표시 이름을 고친다. */
+    public void rename(String username) {
+        this.username = username;
     }
 }

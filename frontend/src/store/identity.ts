@@ -1,5 +1,3 @@
-import { api, type CommonResponse } from '@/lib/api'
-
 /**
  * 로그인 없이 기기마다 고정된 식별자를 만든다. 백엔드 인증 방식이 정해지기 전까지의
  * 자리표시자이고, 정해지면 이 파일만 바꾸면 된다.
@@ -31,19 +29,4 @@ export function getDeviceId(): string {
     memoryFallback ??= crypto.randomUUID()
     return memoryFallback
   }
-}
-
-/**
- * 이 기기의 식별자를 서버에 등록한다. 이미 있으면 서버가 아무것도 하지 않는다(멱등).
- *
- * 앱을 열 때 한 번 부른다. 이게 없으면 서버에 사용자 행이 없어서, 푸시 구독처럼 사용자를
- * 참조하는 것들이 저장되지 않는다.
- *
- * 실패해도 화면을 막지 않는다. 백엔드가 안 떠 있어도 목업 흐름은 그대로 돌아야 한다.
- */
-export async function registerDevice(userId: string): Promise<void> {
-  await api<CommonResponse<void>>('/api/users', {
-    method: 'POST',
-    body: JSON.stringify({ userId }),
-  })
 }
