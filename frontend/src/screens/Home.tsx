@@ -12,7 +12,8 @@ import { RadarUser } from '@/components/domain/RadarUser'
 import { BellIcon, ClockIcon, MenuIcon, SparkleIcon } from '@/components/ui/icons'
 import { StatusBar } from '@/components/ui/StatusBar'
 import { cn } from '@/lib/cn'
-import { springSheet, springSnap, staggerChild, staggerParent } from '@/lib/motion'
+import { tick } from '@/lib/haptics'
+import { easeOut, springSheet, springSnap, staggerChild, staggerParent } from '@/lib/motion'
 import { ALL_WAITING, itemById, ZONES } from '@/mocks/data'
 import { radarUsers, sortedWaitingList } from '@/store/matching'
 import { useStore } from '@/store/useStore'
@@ -71,7 +72,10 @@ export function Home() {
     const found = hitTest(info.point)
     // 이미 답을 기다리는 상대에게는 다시 보낼 수 없다. 끌어놓는 동작 자체는 되지만
     // 강조 표시가 붙지 않아서 보낼 수 없다는 것이 손끝으로 전해진다.
-    setHovered(found && found !== pendingTarget ? found : null)
+    const next = found && found !== pendingTarget ? found : null
+    // 대상에 처음 올라탄 순간에만 울린다. 매 프레임 울리면 손이 얼얼해진다.
+    if (next && next !== hovered) tick(8)
+    setHovered(next)
   }
 
   const onDragEnd = () => {
@@ -79,6 +83,7 @@ export function Home() {
     const target = hovered
     setHovered(null)
     if (!target) return
+    tick([10, 40, 14])
     navigate(`/poke/confirm?to=${target}`)
   }
 
@@ -153,8 +158,9 @@ export function Home() {
         <motion.div
           drag
           dragSnapToOrigin
-          dragElastic={0.9}
           dragMomentum={false}
+          dragTransition={{ bounceStiffness: 480, bounceDamping: 30 }}
+          transition={springSnap}
           onDragStart={() => setDragging(true)}
           onDrag={onDrag}
           onDragEnd={onDragEnd}
@@ -180,10 +186,12 @@ export function Home() {
         const wanted = needIds.includes(user.itemId)
         return (
           <motion.li key={user.id} variants={staggerChild}>
-            <button
+            <motion.button
               type="button"
               onClick={() => navigate(`/poke/confirm?to=${user.id}`)}
               disabled={pendingTarget === user.id}
+              whileTap={pendingTarget === user.id ? undefined : { scale: 0.97 }}
+              transition={springSnap}
               className={cn(
                 'flex w-full items-center gap-3 rounded-2xl border border-neutral-100 bg-white p-2.5 text-left',
                 pendingTarget === user.id && 'opacity-45',
@@ -204,7 +212,7 @@ export function Home() {
               {pendingTarget === user.id && (
                 <span className="text-[11px] font-semibold text-neutral-400">대기 중</span>
               )}
-            </button>
+            </motion.button>
           </motion.li>
         )
       })}
@@ -253,11 +261,7 @@ export function Home() {
               transition={springSnap}
               className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-1.5 text-[12px] font-bold text-ink"
             >
-              <motion.span
-                className="size-1.5 rounded-full bg-ink"
-                animate={{ opacity: [1, 0.25, 1] }}
-                transition={{ duration: 1.2, repeat: Infinity }}
-              />
+              <span className="anim-blink size-1.5 rounded-full bg-ink" />
               자동 매칭 중
             </motion.span>
           )}
@@ -318,6 +322,20 @@ export function Home() {
       {/* 모바일: 레이더 위 + 바텀시트. 데스크톱: 왼쪽 레이더 + 오른쪽 목록. */}
       <div className="relative flex min-h-0 flex-1 md:hidden">
         {radarPanel}
+        <AnimatePresence>
+          {sheetOpen && (
+            <motion.button
+              type="button"
+              aria-label="목록 접기"
+              onClick={() => setSheetOpen(false)}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={easeOut}
+              className="absolute inset-0 z-20 bg-black/25"
+            />
+          )}
+        </AnimatePresence>
         <BottomSheet
           open={sheetOpen}
           onOpenChange={setSheetOpen}
@@ -414,25 +432,29 @@ function NotificationSheet({
               <ul className="mt-3 space-y-2 overflow-y-auto no-scrollbar">
                 {notifications.map((n) => (
                   <li key={n.id}>
-                    <button
+                    <motion.button
                       type="button"
                       onClick={() => onSelect(n.kind)}
+                      whileTap={{ scale: 0.97 }}
+                      transition={springSnap}
                       className="w-full rounded-2xl bg-neutral-50 p-3.5 text-left"
                     >
                       <p className="text-[14px] font-bold text-ink">{n.title}</p>
                       <p className="text-[12px] text-neutral-400">{n.body}</p>
-                    </button>
+                    </motion.button>
                   </li>
                 ))}
               </ul>
             )}
-            <button
+            <motion.button
               type="button"
               onClick={onClose}
+              whileTap={{ scale: 0.97 }}
+              transition={springSnap}
               className="mt-4 w-full rounded-full border border-neutral-200 py-3 text-[14px] font-semibold text-neutral-500"
             >
               닫기
-            </button>
+            </motion.button>
           </motion.div>
         </>
       )}

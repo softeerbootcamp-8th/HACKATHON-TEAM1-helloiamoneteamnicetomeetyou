@@ -37,16 +37,15 @@ export function RadarUser({ user, hovered, pending, index }: Props) {
         </motion.span>
       )}
 
+      {/* 떠다니는 것은 CSS 가 맡고, 손가락이 올라왔을 때의 확대만 motion 이 맡는다.
+          둘을 한 요소에 겹치면 transform 이 서로를 덮어써서 하나가 죽는다. */}
       <motion.div
-        animate={{
-          scale: hovered ? 1.08 : 1,
-          y: pending ? 0 : [0, -3, 0],
-        }}
-        transition={
-          hovered ? springSnap : { duration: 3 + index * 0.4, repeat: Infinity, ease: 'easeInOut' }
-        }
+        animate={{ scale: hovered ? 1.08 : 1 }}
+        transition={springSnap}
+        style={{ animationDelay: `${index * 0.4}s` }}
         className={cn(
           'rounded-2xl bg-white p-2 shadow-[0_4px_16px_rgba(0,0,0,0.10)]',
+          !hovered && !pending && 'anim-float-sm',
           hovered && 'ring-2 ring-ink',
           pending && 'opacity-45 grayscale',
         )}

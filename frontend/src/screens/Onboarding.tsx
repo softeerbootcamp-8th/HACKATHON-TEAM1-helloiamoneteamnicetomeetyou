@@ -64,12 +64,9 @@ export function Onboarding() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ ...springSnap, delay: 0.24 }}
           >
-            <motion.div
-              animate={{ y: [0, -8, 0] }}
-              transition={{ duration: 3.6, repeat: Infinity, ease: 'easeInOut' }}
-            >
+            <div className="anim-float">
               <CardStack topItemId="sf" count={3} className="w-[150px]" />
-            </motion.div>
+            </div>
           </motion.div>
         </div>
 

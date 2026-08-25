@@ -58,11 +58,143 @@ body {
   background: radial-gradient(circle at 70% 45%, #2ced9033 0%, #2ced9000 60%);
 }
 
-/* 버튼과 카드를 누를 때 시스템 하이라이트가 겹쳐 보이지 않게 한다. */
-button,
-[role='button'] {
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+/* 버튼과 카드를 누를 때 시스템 하이라이트가 겹쳐 보이지 않게 한다.
+   @layer base 밖에 두면 layer 가 없는 규칙이 되어 Tailwind 유틸리티(@layer utilities)를
+   이겨 버린다. 그러면 `touch-none` 을 붙여도 여기 적힌 manipulation 이 남아서
+   끌기 제스처를 브라우저가 가로챈다. */
+@layer base {
+  button,
+  [role='button'] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+}
+
+/* ---------------------------------------------------------------
+   상시 도는 애니메이션은 CSS 로 둔다.
+   motion 의 `repeat: Infinity` 가 이 버전에서 제대로 돌지 않았고, 어차피 이런
+   장식용 루프는 CSS 가 더 가볍고 아래 prefers-reduced-motion 규칙에도 확실히 걸린다.
+   손가락에 반응하는 모션만 motion 이 맡는다.
+   --------------------------------------------------------------- */
+
+@keyframes tradit-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes tradit-float-sm {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes tradit-ring {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes tradit-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes tradit-nudge-x {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(6px);
+  }
+}
+
+@keyframes tradit-nudge-x-back {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-5px);
+  }
+}
+
+@keyframes tradit-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.16);
+  }
+}
+
+@keyframes tradit-glow {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.16);
+    opacity: 1;
+  }
+}
+
+@keyframes tradit-lemon {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(3deg);
+  }
+}
+
+@utility anim-float {
+  animation: tradit-float 3.6s ease-in-out infinite;
+}
+@utility anim-float-sm {
+  animation: tradit-float-sm 3.2s ease-in-out infinite;
+}
+@utility anim-ring {
+  animation: tradit-ring 3.4s ease-in-out infinite;
+}
+@utility anim-blink {
+  animation: tradit-blink 1.2s ease-in-out infinite;
+}
+@utility anim-nudge-x {
+  animation: tradit-nudge-x 1.6s ease-in-out infinite;
+}
+@utility anim-nudge-x-back {
+  animation: tradit-nudge-x-back 1.6s ease-in-out infinite;
+}
+@utility anim-breathe {
+  animation: tradit-breathe 1.8s ease-in-out infinite;
+}
+@utility anim-glow {
+  animation: tradit-glow 2.6s ease-in-out infinite;
+}
+@utility anim-lemon {
+  animation: tradit-lemon 5s ease-in-out infinite;
 }
 
 /* 모션을 줄이겠다고 한 사용자에게는 전환을 걷어낸다. */

@@ -55,13 +55,9 @@ export function Complete() {
           transition={{ ...springSnap, delay: 0.16 }}
           className="mt-14"
         >
-          <motion.div
-            animate={{ y: [0, -9, 0] }}
-            transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
-            className="w-[190px] rounded-[22px] bg-white p-4 shadow-[0_16px_44px_rgba(0,0,0,0.16)]"
-          >
+          <div className="anim-float w-[190px] rounded-[22px] bg-white p-4 shadow-[0_16px_44px_rgba(0,0,0,0.16)]">
             <div className="card-face h-[190px] w-full rounded-2xl" />
-          </motion.div>
+          </div>
         </motion.div>
 
         {item && (

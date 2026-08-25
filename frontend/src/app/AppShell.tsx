@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
-import { Outlet, useLocation } from 'react-router'
+import { Outlet, useLocation, useNavigate } from 'react-router'
 
 import { Toast } from '@/components/ui/Toast'
 import { cn } from '@/lib/cn'
@@ -8,6 +8,7 @@ import { pageVariants, springPage } from '@/lib/motion'
 import { useStore } from '@/store/useStore'
 
 import { routeIndex, WIDE_ROUTES } from './routes'
+import { SwipeBackEdge } from './SwipeBackEdge'
 
 /**
  * 모든 화면이 이 껍데기 안에서 돈다.
@@ -17,6 +18,7 @@ import { routeIndex, WIDE_ROUTES } from './routes'
  */
 export function AppShell() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { state } = useStore()
   const index = routeIndex(location.pathname)
 
@@ -30,6 +32,8 @@ export function AppShell() {
   }
 
   const wide = WIDE_ROUTES.has(location.pathname)
+  // 첫 화면과 홈은 뒤로 갈 곳이 없다. 여기서 밀리면 앱이 꺼진 것처럼 보인다.
+  const canSwipeBack = location.pathname !== '/' && location.pathname !== '/home'
 
   return (
     <div className="flex min-h-full items-center justify-center bg-neutral-100 md:p-6">
@@ -54,6 +58,8 @@ export function AppShell() {
             <Outlet />
           </motion.div>
         </AnimatePresence>
+
+        {canSwipeBack && <SwipeBackEdge onBack={() => navigate(-1)} />}
 
         <Toast message={state.toast} />
       </div>

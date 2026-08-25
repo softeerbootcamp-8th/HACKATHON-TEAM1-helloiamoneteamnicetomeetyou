@@ -8,12 +8,18 @@ import { ClockIcon } from '@/components/ui/icons'
 import { StatusBar } from '@/components/ui/StatusBar'
 import { TopBar } from '@/components/ui/TopBar'
 import { cn } from '@/lib/cn'
+import { tick } from '@/lib/haptics'
 import { springSheet, springSnap } from '@/lib/motion'
 import { buildSlots, earliestOverlap, slotTimeLabel, SLOT_COUNT } from '@/store/time'
 import { useStore } from '@/store/useStore'
 
-/** 상대별 색. 시안이 사람마다 다른 색으로 칠해 둔다. */
-const ROW_COLORS = ['bg-brand', 'bg-violet-300', 'bg-yellow-300']
+/**
+ * 상대별 색. 시안이 사람마다 다른 색으로 칠해 둔다.
+ * 클래스 대신 값으로 두는 이유는 색이 바뀔 때 툭 튀지 않고 이어지게 하기 위해서다.
+ */
+const ROW_COLORS = ['#2ced90', '#c4b5fd', '#fde047']
+const EMPTY_COLOR = '#f5f5f5'
+const OVERLAP_COLOR = '#111111'
 
 export function TimeSelect() {
   const navigate = useNavigate()
@@ -228,26 +234,34 @@ function TimeRow({
       </span>
       {Array.from({ length: SLOT_COUNT }, (_, i) => {
         const picked = slots.includes(i)
-        const isOverlap = overlap === i
-        const Tag = interactive ? motion.button : motion.div
+        const isOverlap = overlap === i && picked
+        const background = isOverlap ? OVERLAP_COLOR : picked ? color : EMPTY_COLOR
+
+        if (!interactive) {
+          return (
+            <motion.div
+              key={i}
+              animate={{ backgroundColor: background }}
+              transition={springSnap}
+              className="h-[30px] rounded-[7px]"
+            />
+          )
+        }
+
         return (
-          <Tag
+          <motion.button
             key={i}
-            {...(interactive
-              ? {
-                  type: 'button' as const,
-                  onClick: () => onToggle?.(i),
-                  whileTap: { scale: 0.86 },
-                  'aria-pressed': picked,
-                  'aria-label': `${label} ${i + 1}번째 시간`,
-                }
-              : {})}
-            layout
+            type="button"
+            onClick={() => {
+              tick(6)
+              onToggle?.(i)
+            }}
+            aria-pressed={picked}
+            aria-label={`${label} ${i + 1}번째 시간`}
+            whileTap={{ scale: 0.86 }}
+            animate={{ backgroundColor: background }}
             transition={springSnap}
-            className={cn(
-              'h-[30px] rounded-[7px]',
-              isOverlap && picked ? 'bg-ink' : picked ? color : 'bg-neutral-100',
-            )}
+            className="h-[30px] rounded-[7px]"
           />
         )
       })}

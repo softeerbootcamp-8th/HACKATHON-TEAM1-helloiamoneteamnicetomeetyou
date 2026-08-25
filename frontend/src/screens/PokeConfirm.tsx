@@ -54,13 +54,7 @@ export function PokeConfirm() {
             )}
           </div>
 
-          <motion.span
-            animate={{ x: [0, 6, 0] }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-            className="text-[22px] text-neutral-300"
-          >
-            →
-          </motion.span>
+          <span className="anim-nudge-x text-[22px] text-neutral-300">→</span>
 
           <div className="text-center">
             <p className="mb-3 text-[12px] font-semibold text-neutral-400">상대 카드</p>

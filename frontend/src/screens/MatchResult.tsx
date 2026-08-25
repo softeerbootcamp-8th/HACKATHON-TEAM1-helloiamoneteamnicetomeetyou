@@ -130,13 +130,7 @@ function OneToOneView({
   return (
     <div className="mt-10 flex items-center justify-center gap-3">
       <ExchangeCard itemId={giveItemId} label="내가 주는 카드" />
-      <motion.span
-        animate={{ scale: [1, 1.18, 1] }}
-        transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-        className="mt-6 text-[20px] text-ink"
-      >
-        ⇄
-      </motion.span>
+      <span className="anim-breathe mt-6 text-[20px] text-ink">⇄</span>
       <ExchangeCard itemId={receiveItemId} label="내가 받는 카드" />
     </div>
   )
@@ -162,23 +156,15 @@ function ThreeWayView({
       </div>
 
       <div className="mt-3 flex items-center justify-center gap-24 text-[18px] text-brand">
-        <motion.span animate={{ y: [0, -4, 0] }} transition={{ duration: 1.6, repeat: Infinity }}>
-          ↗
-        </motion.span>
-        <motion.span animate={{ y: [0, 4, 0] }} transition={{ duration: 1.6, repeat: Infinity }}>
+        <span className="anim-float-sm">↗</span>
+        <span className="anim-float-sm" style={{ animationDelay: '0.8s' }}>
           ↘
-        </motion.span>
+        </span>
       </div>
 
       <div className="mt-3 flex items-start justify-center gap-3">
         <ExchangeCard itemId={giverItemId} label={giverNickname} />
-        <motion.span
-          animate={{ x: [0, -5, 0] }}
-          transition={{ duration: 1.6, repeat: Infinity }}
-          className="mt-16 text-[18px] text-brand"
-        >
-          ←
-        </motion.span>
+        <span className="anim-nudge-x-back mt-16 text-[18px] text-brand">←</span>
         <ExchangeCard itemId={receiverItemId} label={receiverNickname} />
       </div>
     </div>

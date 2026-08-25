@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 
-import { easeOut, springSheet } from '@/lib/motion'
+import { easeOut, springSheet, springSnap } from '@/lib/motion'
 import { itemById } from '@/mocks/data'
 import type { Selection } from '@/store/types'
 
@@ -39,14 +39,16 @@ export function Drawer({ open, onClose, have, needs, onEditHave, onEditNeeds, on
           >
             <div className="flex h-14 items-center justify-between px-5">
               <h2 className="text-[17px] font-bold text-ink">내 카드</h2>
-              <button
+              <motion.button
                 type="button"
                 aria-label="닫기"
                 onClick={onClose}
+                whileTap={{ scale: 0.85 }}
+                transition={springSnap}
                 className="text-[24px] font-light text-ink"
               >
                 ✕
-              </button>
+              </motion.button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 no-scrollbar">
@@ -55,13 +57,15 @@ export function Drawer({ open, onClose, have, needs, onEditHave, onEditNeeds, on
             </div>
 
             <div className="px-5 pb-8">
-              <button
+              <motion.button
                 type="button"
                 onClick={onReset}
+                whileTap={{ scale: 0.97 }}
+                transition={springSnap}
                 className="w-full rounded-2xl border border-neutral-200 py-3 text-[14px] font-semibold text-neutral-500"
               >
                 처음부터 다시 하기
-              </button>
+              </motion.button>
             </div>
           </motion.aside>
         </>

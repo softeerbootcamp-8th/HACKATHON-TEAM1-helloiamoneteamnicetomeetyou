@@ -42,20 +42,12 @@ export function Identify() {
           transition={{ ...springSnap, delay: 0.05 }}
           className="relative"
         >
-          <motion.span
+          <span
             aria-hidden
-            className="absolute inset-[-35%] rounded-full blur-3xl"
+            className="anim-glow absolute inset-[-35%] rounded-full blur-3xl"
             style={{ background: 'radial-gradient(circle, #d6ff4bcc 0%, #d6ff4b00 70%)' }}
-            animate={{ scale: [1, 1.16, 1], opacity: [0.7, 1, 0.7] }}
-            transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
           />
-          <motion.div
-            animate={{ y: [0, -10, 0], rotate: [-3, 3, -3] }}
-            transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-            className="relative text-[150px] leading-none"
-          >
-            🍋
-          </motion.div>
+          <div className="anim-lemon relative text-[150px] leading-none">🍋</div>
         </motion.div>
 
         <motion.h1

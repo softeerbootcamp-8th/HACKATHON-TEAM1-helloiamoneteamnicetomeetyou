@@ -71,13 +71,7 @@ export function Appointment() {
             status="이동중"
             arrived={appt.stage === 'arrived'}
           />
-          <motion.span
-            animate={{ scale: [1, 1.16, 1] }}
-            transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-            className="mt-16 text-[20px] text-ink"
-          >
-            ⇄
-          </motion.span>
+          <span className="anim-breathe mt-16 text-[20px] text-ink">⇄</span>
           <ArrivalCard itemId={match.receiveItemId} caption="내가 받을 것" status="도착" arrived />
         </div>
 
