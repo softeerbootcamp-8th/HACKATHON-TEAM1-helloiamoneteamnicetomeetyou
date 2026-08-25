@@ -1,7 +1,7 @@
 /**
- * 대기장소 실시간 알림(SSE) 의 타입과 주소를 모아 둔다.
+ * 부스 실시간 알림(SSE) 의 타입과 주소를 모아 둔다.
  *
- * 화면에 붙이는 것은 `useZoneEvents` 훅이고, 여기에는 백엔드와 맞춰야 하는 것만 둔다.
+ * 화면에 붙이는 것은 `useBoothEvents` 훅이고, 여기에는 백엔드와 맞춰야 하는 것만 둔다.
  */
 import { BASE_URL } from './api'
 
@@ -12,7 +12,7 @@ export const SSE_EVENT_TYPES = [
   // 연결이 열렸다는 신호. 최초 연결과 재연결을 구분하지 않는다.
   'CONNECTED',
 
-  // 대기장소 참여자
+  // 부스 참여자
   'USER_JOINED',
   'USER_LEFT',
 
@@ -21,7 +21,7 @@ export const SSE_EVENT_TYPES = [
   'MATCH_ACCEPTED',
   'MATCH_REJECTED',
 
-  // 교환 약속
+  // 교환 약속. 만나는 자리(구역)가 정해지거나 바뀌면 EXCHANGE_PLACE_UPDATED 로 온다.
   'EXCHANGE_CREATED',
   'EXCHANGE_TIME_UPDATED',
   'EXCHANGE_PLACE_UPDATED',
@@ -41,8 +41,14 @@ export type SseEventHandlers = Partial<Record<SseEventType, (data: unknown) => v
 
 export type SseStatus = 'connecting' | 'open' | 'error'
 
-export function zoneEventStreamUrl(zoneId: number, userId: string): string {
-  return `${BASE_URL}/api/zones/${zoneId}/subscribe?userId=${encodeURIComponent(userId)}`
+/**
+ * 구독 단위는 부스다. 지도에서 고르는 구역(zone)이 아니다.
+ *
+ * 구역은 만나는 자리라 사용자가 옮겨 다니는데, 그때마다 연결을 끊었다 다시 맺으면 그 사이
+ * 이벤트를 놓친다. 어떤 구역 이야기인지는 이벤트 데이터에 담겨 온다.
+ */
+export function boothEventStreamUrl(boothId: number, userId: string): string {
+  return `${BASE_URL}/api/booths/${boothId}/subscribe?userId=${encodeURIComponent(userId)}`
 }
 
 /**
@@ -62,15 +68,15 @@ function parseEventData(raw: string): unknown {
 /**
  * `EventSource` 를 열고 이벤트 이름별 리스너를 건다. 반환하는 함수를 부르면 연결을 닫는다.
  *
- * React 밖에서도 쓸 수 있게 훅과 분리해 뒀다. 화면에서는 `useZoneEvents` 를 쓰면 된다.
+ * React 밖에서도 쓸 수 있게 훅과 분리해 뒀다. 화면에서는 `useBoothEvents` 를 쓰면 된다.
  */
-export function openZoneEventStream(
-  zoneId: number,
+export function openBoothEventStream(
+  boothId: number,
   userId: string,
   handlers: SseEventHandlers,
   onStatusChange?: (status: SseStatus) => void,
 ): () => void {
-  const source = new EventSource(zoneEventStreamUrl(zoneId, userId))
+  const source = new EventSource(boothEventStreamUrl(boothId, userId))
 
   onStatusChange?.('connecting')
   source.onopen = () => onStatusChange?.('open')

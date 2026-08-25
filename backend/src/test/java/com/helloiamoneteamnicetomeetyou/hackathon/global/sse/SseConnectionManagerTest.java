@@ -30,19 +30,19 @@ class SseConnectionManagerTest {
         connectionManager.subscribe(1L, userId);
         connectionManager.subscribe(1L, userId);
 
-        assertThat(connectionManager.countByZone(1L)).isEqualTo(2);
+        assertThat(connectionManager.countByBooth(1L)).isEqualTo(2);
         assertThat(connectionManager.findByUser(userId)).hasSize(2);
     }
 
     @Test
-    @DisplayName("대기장소가 다르면 서로의 연결을 보지 않는다")
-    void 대기장소별로_나뉜다() {
+    @DisplayName("부스가 다르면 서로의 연결을 보지 않는다")
+    void 부스별로_나뉜다() {
         connectionManager.subscribe(1L, UUID.randomUUID());
         connectionManager.subscribe(2L, UUID.randomUUID());
 
-        assertThat(connectionManager.countByZone(1L)).isEqualTo(1);
-        assertThat(connectionManager.countByZone(2L)).isEqualTo(1);
-        assertThat(connectionManager.findByZone(3L)).isEmpty();
+        assertThat(connectionManager.countByBooth(1L)).isEqualTo(1);
+        assertThat(connectionManager.countByBooth(2L)).isEqualTo(1);
+        assertThat(connectionManager.findByBooth(3L)).isEmpty();
     }
 
     /**
@@ -58,7 +58,7 @@ class SseConnectionManagerTest {
 
         connectionManager.closeAllOnShutdown();
 
-        assertThat(connectionManager.countByZone(1L)).isZero();
-        assertThat(connectionManager.countByZone(2L)).isZero();
+        assertThat(connectionManager.countByBooth(1L)).isZero();
+        assertThat(connectionManager.countByBooth(2L)).isZero();
     }
 }

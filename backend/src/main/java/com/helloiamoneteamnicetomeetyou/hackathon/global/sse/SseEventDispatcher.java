@@ -27,16 +27,16 @@ public class SseEventDispatcher {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onSseEvent(SseEvent event) {
-        Collection<SseConnection> targets = event.zoneId() != null
-                ? connectionManager.findByZone(event.zoneId())
+        Collection<SseConnection> targets = event.boothId() != null
+                ? connectionManager.findByBooth(event.boothId())
                 : connectionManager.findByUser(event.userId());
 
         if (targets.isEmpty()) {
             return;
         }
 
-        log.debug("sse 발행: type={}, zoneId={}, userId={}, 대상={}",
-                event.type(), event.zoneId(), event.userId(), targets.size());
+        log.debug("sse 발행: type={}, boothId={}, userId={}, 대상={}",
+                event.type(), event.boothId(), event.userId(), targets.size());
 
         connectionManager.dispatch(targets, event.type(), event.data());
     }

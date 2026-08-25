@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * 열려 있는 SSE 연결 하나다. 누가 어느 대기장소에 붙어 있는지와 실제로 바이트를 내보내는
+ * 열려 있는 SSE 연결 하나다. 누가 어느 부스에 붙어 있는지와 실제로 바이트를 내보내는
  * {@link SseEmitter} 를 함께 들고 있다.
  *
  * <p>{@code equals} 를 재정의하지 않는다. 같은 사용자가 탭을 두 개 열면 연결도 두 개고, 그 둘은
@@ -18,7 +18,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Getter
 public class SseConnection {
 
-    private final Long zoneId;
+    private final Long boothId;
     private final UUID userId;
     private final SseEmitter emitter;
 
@@ -36,8 +36,8 @@ public class SseConnection {
      */
     private final ReentrantLock sendLock = new ReentrantLock();
 
-    public SseConnection(Long zoneId, UUID userId, SseEmitter emitter) {
-        this.zoneId = zoneId;
+    public SseConnection(Long boothId, UUID userId, SseEmitter emitter) {
+        this.boothId = boothId;
         this.userId = userId;
         this.emitter = emitter;
     }

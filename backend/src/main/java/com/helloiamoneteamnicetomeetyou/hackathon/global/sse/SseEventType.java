@@ -18,7 +18,7 @@ public enum SseEventType {
      */
     CONNECTED,
 
-    // 대기장소 참여자
+    // 부스 참여자
     USER_JOINED,
     USER_LEFT,
 
@@ -27,7 +27,7 @@ public enum SseEventType {
     MATCH_ACCEPTED,
     MATCH_REJECTED,
 
-    // 교환 약속
+    // 교환 약속. 만나는 자리(구역)가 정해지거나 바뀌면 EXCHANGE_PLACE_UPDATED 로 알린다.
     EXCHANGE_CREATED,
     EXCHANGE_TIME_UPDATED,
     EXCHANGE_PLACE_UPDATED,

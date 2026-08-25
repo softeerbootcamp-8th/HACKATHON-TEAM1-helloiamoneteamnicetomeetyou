@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
  * 있는지, 어떤 스레드에서 나가는지는 이 아래에서 처리한다.
  *
  * <pre>
- * sseEventPublisher.toZone(zoneId, SseEventType.USER_JOINED, dto);
+ * sseEventPublisher.toBooth(boothId, SseEventType.USER_JOINED, dto);
  * sseEventPublisher.toUser(userId, SseEventType.MATCH_SUGGESTED, dto);
  * </pre>
  *
@@ -26,9 +26,15 @@ public class SseEventPublisher {
 
     private final ApplicationEventPublisher applicationEventPublisher;
 
-    /** 대기장소에 접속한 모두에게 보낸다. */
-    public void toZone(Long zoneId, SseEventType type, Object data) {
-        applicationEventPublisher.publishEvent(SseEvent.toZone(zoneId, type, data));
+    /**
+     * 부스에 접속한 모두에게 보낸다.
+     *
+     * <p>구역({@code Zone})이 아니라 부스가 단위인 것에 주의한다. 구역은 지도에서 고르는 만나는
+     * 자리라 사람이 옮겨 다니고, 구역 이야기를 담은 이벤트도 결국 같은 부스 사람들이 봐야 한다.
+     * 특정 구역에 대한 이벤트면 그 구역 정보를 {@code data} 에 담아 보내면 된다.
+     */
+    public void toBooth(Long boothId, SseEventType type, Object data) {
+        applicationEventPublisher.publishEvent(SseEvent.toBooth(boothId, type, data));
     }
 
     /** 특정 사용자에게만 보낸다. 그 사용자가 여러 탭을 열어 뒀으면 전부 받는다. */

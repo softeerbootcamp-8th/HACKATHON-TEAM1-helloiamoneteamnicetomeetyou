@@ -29,7 +29,7 @@ spring:
 server:
   port: 8080
 
-# 대기장소 실시간 알림(SSE) 설정이다.
+# 부스 실시간 알림(SSE) 설정이다.
 #
 # emitter-timeout-ms: 이 시간이 지나면 서버가 연결을 끊는다. 브라우저의 EventSource 가 곧바로
 #   다시 붙고, 재연결되면 CONNECTED 를 다시 받아 화면이 현재 상태를 읽으므로 사용자는 모른다.

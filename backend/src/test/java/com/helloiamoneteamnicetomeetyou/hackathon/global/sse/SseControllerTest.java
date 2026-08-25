@@ -30,7 +30,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @WebMvcTest(SseController.class)
 @Import({SseConfig.class, SseConnectionManager.class, SseEventPublisher.class, SseEventDispatcher.class})
 @TestPropertySource(properties = {"sse.emitter-timeout-ms=60000", "sse.heartbeat-interval-ms=60000"})
-@DisplayName("대기장소 SSE 구독")
+@DisplayName("부스 SSE 구독")
 class SseControllerTest {
 
     private static final long WAIT_TIMEOUT_MS = 2000;
@@ -49,13 +49,14 @@ class SseControllerTest {
     void 구독하면_CONNECTED_를_먼저_받는다() throws Exception {
         MvcResult result = subscribe(1L, UUID.randomUUID());
 
-        assertThat(result.getResponse().getContentAsString(StandardCharsets.UTF_8)).contains("event:CONNECTED");
+        assertThat(result.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .contains("event:CONNECTED");
     }
 
     @Test
     @DisplayName("앞단 프록시가 스트림을 버퍼에 모으지 않도록 X-Accel-Buffering 을 붙인다")
     void 버퍼링_차단_헤더를_붙인다() throws Exception {
-        mockMvc.perform(get("/api/zones/1/subscribe").param("userId", UUID.randomUUID().toString()))
+        mockMvc.perform(get("/api/booths/1/subscribe").param("userId", UUID.randomUUID().toString()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("X-Accel-Buffering", "no"))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
@@ -64,31 +65,32 @@ class SseControllerTest {
     @Test
     @DisplayName("userId 를 빠뜨리면 팀 공통 형식의 400 으로 알려준다")
     void userId_가_없으면_400() throws Exception {
-        mockMvc.perform(get("/api/zones/1/subscribe"))
+        mockMvc.perform(get("/api/booths/1/subscribe"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.errors[0].field").value("userId"));
     }
 
     @Test
-    @DisplayName("같은 대기장소에 발행한 이벤트가 구독 중인 연결로 나간다")
-    void 대기장소로_발행하면_받는다() throws Exception {
+    @DisplayName("같은 부스에 발행한 이벤트가 구독 중인 연결로 나간다")
+    void 부스로_발행하면_받는다() throws Exception {
         MvcResult result = subscribe(1L, UUID.randomUUID());
 
-        sseEventPublisher.toZone(1L, SseEventType.USER_JOINED, Map.of("username", "홍길동"));
+        sseEventPublisher.toBooth(1L, SseEventType.USER_JOINED, Map.of("username", "홍길동"));
 
         assertThat(waitForContent(result, "event:USER_JOINED")).contains("홍길동");
     }
 
     @Test
-    @DisplayName("다른 대기장소에 발행한 이벤트는 받지 않는다")
-    void 다른_대기장소_이벤트는_받지_않는다() throws Exception {
+    @DisplayName("다른 부스에 발행한 이벤트는 받지 않는다")
+    void 다른_부스_이벤트는_받지_않는다() throws Exception {
         MvcResult result = subscribe(1L, UUID.randomUUID());
 
-        sseEventPublisher.toZone(2L, SseEventType.USER_JOINED, Map.of("username", "홍길동"));
+        sseEventPublisher.toBooth(2L, SseEventType.USER_JOINED, Map.of("username", "홍길동"));
 
         assertThat(waitQuietly()).isTrue();
-        assertThat(result.getResponse().getContentAsString(StandardCharsets.UTF_8)).doesNotContain("USER_JOINED");
+        assertThat(result.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .doesNotContain("USER_JOINED");
     }
 
     @Test
@@ -103,12 +105,14 @@ class SseControllerTest {
         sseEventPublisher.toUser(받는사람, SseEventType.MATCH_SUGGESTED, Map.of("exchangeId", 7));
 
         assertThat(waitForContent(받는연결, "event:MATCH_SUGGESTED")).contains("7");
-        assertThat(안받는연결.getResponse().getContentAsString()).doesNotContain("MATCH_SUGGESTED");
+        assertThat(안받는연결.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .doesNotContain("MATCH_SUGGESTED");
     }
 
-    private MvcResult subscribe(Long zoneId, UUID userId) throws Exception {
+    private MvcResult subscribe(Long boothId, UUID userId) throws Exception {
         return mockMvc
-                .perform(get("/api/zones/{zoneId}/subscribe", zoneId).param("userId", userId.toString()))
+                .perform(get("/api/booths/{boothId}/subscribe", boothId)
+                        .param("userId", userId.toString()))
                 .andExpect(status().isOk())
                 .andReturn();
     }
