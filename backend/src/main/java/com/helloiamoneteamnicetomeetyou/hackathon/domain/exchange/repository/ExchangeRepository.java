@@ -3,6 +3,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeStatus;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -22,4 +23,21 @@ public interface ExchangeRepository extends JpaRepository<Exchange, Long> {
             where e.status in :statuses
             """)
     List<Integer> findIdentityCodesByStatuses(List<ExchangeStatus> statuses);
+
+    /**
+     * 이 사람이 참가 중인 아직 안 끝난 교환.
+     *
+     * <p><b>앱을 다시 열었을 때 약속을 되찾는 유일한 길이다.</b> 화면 상태는 메모리에만 있어서
+     * 새로고침 한 번에 사라지는데, 그때 어느 교환에 속해 있는지 물어볼 곳이 없으면 진행 중인
+     * 약속이 통째로 없던 일이 된다.
+     *
+     * <p>한 사람이 동시에 여러 교환에 들어가지 않는 것이 지금 규칙이지만, 취소가 어긋나 두 개가
+     * 남는 경우까지 막지는 않으므로 최신 것을 먼저 준다.
+     */
+    @Query("""
+            select p.exchange from ExchangeParticipant p
+            where p.user.id = :userId and p.exchange.status in :statuses
+            order by p.exchange.id desc
+            """)
+    List<Exchange> findActiveByUserId(UUID userId, List<ExchangeStatus> statuses);
 }

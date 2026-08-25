@@ -138,8 +138,11 @@ export function PlaceSelect() {
         onCancel={() => setCancelOpen(false)}
         onConfirm={() => {
           setCancelOpen(false)
-          void cancelAppointment()
-          navigate('/home')
+          void cancelAppointment().then((cancelled) => {
+            // 상대가 먼저 교환을 마쳤으면 취소가 안 된다. 그때는 화면이 그 결과를 따라간다.
+
+            if (cancelled) navigate('/home')
+          })
         }}
       />
     </div>

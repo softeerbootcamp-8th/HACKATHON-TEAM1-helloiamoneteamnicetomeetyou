@@ -105,6 +105,22 @@ export async function createExchange(input: {
   )
 }
 
+/**
+ * 내가 지금 잡고 있는 약속. 없으면 null 이다.
+ *
+ * 앱을 열 때와 실시간 연결이 붙을 때 부른다. 화면 상태가 메모리에만 있어서 새로고침 한 번에
+ * 사라지는데, 이게 없으면 진행 중인 약속으로 돌아올 방법이 없다. 알림만으로는 부족한 것이,
+ * 끊겨 있던 동안 온 알림은 다시 오지 않기 때문이다.
+ */
+export async function fetchActiveExchange(userId: string): Promise<Exchange | null> {
+  const res = await api<CommonResponse<Exchange> | undefined>(
+    `/api/exchanges/active?userId=${encodeURIComponent(userId)}`,
+  )
+
+  // 진행 중인 약속이 없으면 서버가 204 로 답하고, api() 는 그때 undefined 를 준다.
+  return res?.data ?? null
+}
+
 export async function fetchExchange(exchangeId: number): Promise<Exchange> {
   return unwrap(await api<CommonResponse<Exchange>>(`/api/exchanges/${exchangeId}`))
 }
@@ -137,6 +153,23 @@ export async function resetTimeSlots(exchangeId: number, userId: string): Promis
 export async function arriveAtExchange(exchangeId: number, userId: string): Promise<Exchange> {
   return unwrap(
     await api<CommonResponse<Exchange>>(`/api/exchanges/${exchangeId}/arrive`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+  )
+}
+
+/**
+ * "만났어요". 교환이 끝났다는 것을 서버에 남긴다.
+ *
+ * 한 명이 이걸 누르고 다른 한 명이 취소를 누를 수 있어서, 먼저 도착한 한 번만 반영된다.
+ * 늦은 쪽은 실패를 받고 화면을 현재 상태로 맞춘다.
+ *
+ * 카드 주인이 바뀌는 것은 아직 여기 없다. 무엇을 주고받는지는 매칭이 정하는 값이다.
+ */
+export async function completeExchange(exchangeId: number, userId: string): Promise<Exchange> {
+  return unwrap(
+    await api<CommonResponse<Exchange>>(`/api/exchanges/${exchangeId}/complete`, {
       method: 'POST',
       body: JSON.stringify({ userId }),
     }),

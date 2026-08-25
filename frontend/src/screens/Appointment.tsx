@@ -29,7 +29,13 @@ export function Appointment() {
     return () => window.clearInterval(timer)
   }, [])
 
-  if (!appt || !match || (appt.stage !== 'confirmed' && appt.stage !== 'arrived')) {
+  /*
+    주고받을 카드는 프론트 목업의 매칭 결과에서 온다. 매칭이 서버로 오기 전까지는 이 화면에
+    들어오는 경로에 따라 그 값이 없을 수 있어서, 없으면 카드만 빼고 나머지를 보여준다.
+
+    카드가 없다고 화면을 통째로 막으면 확정된 약속을 가진 사람이 시각도 장소도 못 본다.
+  */
+  if (!appt || (appt.stage !== 'confirmed' && appt.stage !== 'arrived')) {
     return (
       <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
@@ -40,8 +46,9 @@ export function Appointment() {
     )
   }
 
-  const isThreeWay = match.kind === 'THREE_WAY'
+  const isThreeWay = match?.kind === 'THREE_WAY'
   const headline = countdownLabel(appt.confirmedTime, now)
+  const partnersArrived = appt.partners.every((p) => p.arrived)
 
   const goArrive = async () => {
     setBusy(true)
@@ -86,15 +93,23 @@ export function Appointment() {
           </div>
         </motion.div>
 
-        <div className="mt-10 flex items-start justify-center gap-4">
-          <ArrivalCard itemId={match.giveItemId} caption="내가 줄 것" arrived={appt.myArrived} />
-          <span className="anim-breathe mt-16 text-[20px] text-ink">⇄</span>
-          <ArrivalCard
-            itemId={match.receiveItemId}
-            caption="내가 받을 것"
-            arrived={appt.partners.every((p) => p.arrived)}
-          />
-        </div>
+        {match ? (
+          <div className="mt-10 flex items-start justify-center gap-4">
+            <ArrivalCard itemId={match.giveItemId} caption="내가 줄 것" arrived={appt.myArrived} />
+            <span className="anim-breathe mt-16 text-[20px] text-ink">⇄</span>
+            <ArrivalCard
+              itemId={match.receiveItemId}
+              caption="내가 받을 것"
+              arrived={partnersArrived}
+            />
+          </div>
+        ) : (
+          <div className="mt-10 flex items-center justify-center gap-4">
+            <ArrivalBadge label="나" arrived={appt.myArrived} />
+            <span className="anim-breathe text-[20px] text-ink">⇄</span>
+            <ArrivalBadge label="상대" arrived={partnersArrived} />
+          </div>
+        )}
 
         {/* 상대가 여럿이면 누가 왔는지 한 줄로 보여준다. 배지만으로는 셋 중 누구인지 알 수 없다. */}
         {appt.partners.length > 0 && (
@@ -132,6 +147,22 @@ function countdownLabel(confirmedTime: string | null, now: number): string {
   const hours = Math.floor(minutes / 60)
   const rest = minutes % 60
   return rest === 0 ? `${hours}시간 뒤 만나요!` : `${hours}시간 ${rest}분 뒤 만나요!`
+}
+
+/** 주고받을 카드를 모를 때 쓰는 자리. 도착 여부만 보여준다. */
+function ArrivalBadge({ label, arrived }: { label: string; arrived: boolean }) {
+  return (
+    <div className="text-center">
+      <motion.span
+        animate={{ backgroundColor: arrived ? '#111111' : '#d4d4d4' }}
+        transition={springSnap}
+        className="inline-block rounded-full px-4 py-1.5 text-[12px] font-bold text-white"
+      >
+        {arrived ? '도착' : '이동중'}
+      </motion.span>
+      <p className="mt-2.5 text-[12px] text-neutral-500">{label}</p>
+    </div>
+  )
 }
 
 function ArrivalCard({

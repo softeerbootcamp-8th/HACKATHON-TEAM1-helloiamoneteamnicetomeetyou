@@ -241,6 +241,40 @@ class ExchangeServiceTest {
     }
 
     @Test
+    @DisplayName("한 명이 만났다고 하면 다른 한 명은 취소할 수 없다")
+    void 먼저_누른_한_번만_반영된다() {
+        exchange.confirmTime(1);
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        assertThatThrownBy(() -> exchangeService.cancel(EXCHANGE_ID, PARTNER))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(e -> ((ApplicationException) e).getErrorType())
+                .isEqualTo(ErrorCode.EXCHANGE_ALREADY_FINISHED);
+    }
+
+    @Test
+    @DisplayName("한 명이 취소하면 다른 한 명은 만났다고 할 수 없다")
+    void 취소된_약속은_끝낼_수_없다() {
+        exchangeService.cancel(EXCHANGE_ID, ME);
+
+        assertThatThrownBy(() -> exchangeService.complete(EXCHANGE_ID, PARTNER))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(e -> ((ApplicationException) e).getErrorType())
+                .isEqualTo(ErrorCode.EXCHANGE_ALREADY_FINISHED);
+    }
+
+    @Test
+    @DisplayName("교환을 마치면 참가자 전원에게 알린다")
+    void 교환을_마치면_전원에게_알린다() {
+        exchange.confirmTime(1);
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_COMPLETED), any());
+    }
+
+    @Test
     @DisplayName("시간 조율을 요청하면 전원의 선택을 비운다")
     void 시간_조율은_전원의_선택을_비운다() {
         exchangeService.resetTimeSlots(EXCHANGE_ID, ME);

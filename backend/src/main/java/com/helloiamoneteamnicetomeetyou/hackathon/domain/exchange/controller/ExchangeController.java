@@ -5,6 +5,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeRe
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.TimeSlotUpdateRequestDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service.ExchangeService;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.response.CommonResponse;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -32,6 +34,26 @@ import org.springframework.web.bind.annotation.RestController;
 public class ExchangeController {
 
     private final ExchangeService exchangeService;
+
+    /**
+     * 내가 지금 잡고 있는 약속. 없으면 204 다.
+     *
+     * <p>앱을 열 때와 실시간 연결이 붙을 때 부른다. 화면 상태가 메모리에만 있어서 새로고침 한 번에
+     * 사라지는데, 이게 없으면 진행 중인 약속으로 돌아올 방법이 없다.
+     *
+     * <p>{@code /{exchangeId}} 보다 먼저 선언한다. 뒤에 두면 "active" 를 경로 변수로 읽으려다
+     * 타입이 안 맞아 400 이 난다.
+     */
+    @GetMapping("/active")
+    public ResponseEntity<CommonResponse<ExchangeResponseDto>> findActive(@RequestParam UUID userId) {
+        ExchangeResponseDto exchange = exchangeService.findActiveOf(userId);
+
+        if (exchange == null) {
+            return ResponseEntity.noContent().build();
+        }
+
+        return ResponseEntity.ok(CommonResponse.ok(exchange, "진행 중인 약속입니다."));
+    }
 
     @GetMapping("/{exchangeId}")
     public ResponseEntity<CommonResponse<ExchangeResponseDto>> find(@PathVariable Long exchangeId) {
@@ -70,6 +92,22 @@ public class ExchangeController {
         ExchangeResponseDto exchange = exchangeService.arrive(exchangeId, request.userId());
 
         return ResponseEntity.ok(CommonResponse.ok(exchange, "도착을 알렸습니다."));
+    }
+
+    /**
+     * "만났어요". 교환이 끝났다는 것을 남긴다.
+     *
+     * <p>한 명이 이걸 누르고 다른 한 명이 취소를 누를 수 있어서, 먼저 도착한 한 번만 반영된다.
+     * 늦은 쪽은 409 를 받고 화면을 현재 상태로 맞춘다.
+     */
+    @PostMapping("/{exchangeId}/complete")
+    public ResponseEntity<CommonResponse<ExchangeResponseDto>> complete(
+            @PathVariable Long exchangeId,
+            @RequestBody ExchangeActorRequestDto request) {
+
+        ExchangeResponseDto exchange = exchangeService.complete(exchangeId, request.userId());
+
+        return ResponseEntity.ok(CommonResponse.ok(exchange, "교환을 마쳤습니다."));
     }
 
     /** 거래 취소. 상대 화면에도 취소됐다는 것이 실시간으로 전해진다. */

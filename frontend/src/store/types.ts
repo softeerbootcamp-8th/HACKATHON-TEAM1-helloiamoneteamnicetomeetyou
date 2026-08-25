@@ -29,7 +29,8 @@ export type IncomingPoke = {
   offeredItemIds: string[]
 }
 
-export type AppointmentStage = 'time-waiting' | 'time-conflict' | 'confirmed' | 'arrived'
+export type AppointmentStage =
+  'time-waiting' | 'time-conflict' | 'confirmed' | 'arrived' | 'completed'
 
 /** 약속 화면의 상대 한 명. */
 export type AppointmentPartner = {

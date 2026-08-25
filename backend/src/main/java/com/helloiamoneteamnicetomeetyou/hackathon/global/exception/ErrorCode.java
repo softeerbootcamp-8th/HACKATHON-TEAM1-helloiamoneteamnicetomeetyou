@@ -32,7 +32,8 @@ public enum ErrorCode implements ErrorType {
     NO_OVERLAPPING_TIME(HttpStatus.CONFLICT, 4003, "모두가 되는 시간이 아직 없습니다."),
     EXCHANGE_TIME_ALREADY_CONFIRMED(HttpStatus.CONFLICT, 4004, "이미 시간이 정해진 약속입니다."),
     INVALID_EXCHANGE_PARTICIPANTS(HttpStatus.BAD_REQUEST, 4005, "교환 참가자 구성이 올바르지 않습니다."),
-    EXCHANGE_TIME_NOT_CONFIRMED(HttpStatus.CONFLICT, 4006, "아직 만날 시간이 정해지지 않았습니다.");
+    EXCHANGE_TIME_NOT_CONFIRMED(HttpStatus.CONFLICT, 4006, "아직 만날 시간이 정해지지 않았습니다."),
+    EXCHANGE_ALREADY_FINISHED(HttpStatus.CONFLICT, 4007, "이미 끝난 약속입니다.");
 
     private final HttpStatus httpStatus;
     private final Integer errorCode;

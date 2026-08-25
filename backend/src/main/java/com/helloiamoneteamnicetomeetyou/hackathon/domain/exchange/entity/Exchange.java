@@ -124,14 +124,41 @@ public class Exchange {
     }
 
     /**
-     * 약속을 취소한다. 이미 취소됐으면 아무 일도 하지 않는다.
+     * 약속을 취소한다.
      *
      * <p>지우지 않고 상태만 바꾸는 것은, 상대 화면이 "취소됐다"를 읽을 수 있어야 하기 때문이다.
      * 행이 사라지면 상대는 404 만 받고 왜 없어졌는지 알 수 없다.
      */
     public void cancel() {
+        requireActive();
+
         this.status = ExchangeStatus.CANCELLED;
         this.exchangeTime = null;
+    }
+
+    /**
+     * 만나서 교환을 끝냈다.
+     *
+     * <p><b>카드 주인은 아직 여기서 바꾸지 않는다.</b> 누가 무엇을 주고받는지는 매칭(이슈 #20)이
+     * 정하는 값이라 서버가 모른다. 지금은 "이 약속은 끝났다"만 남긴다.
+     */
+    public void complete() {
+        requireActive();
+
+        this.status = ExchangeStatus.COMPLETED;
+    }
+
+    /**
+     * 이미 끝난 약속은 다시 끝내거나 취소할 수 없다.
+     *
+     * <p><b>두 사람이 서로 다른 버튼을 누를 수 있어서 필요하다.</b> 한 명이 "만났어요" 를 누르고
+     * 다른 한 명이 "상대가 오지 않아요" 를 누르면 둘 중 먼저 도착한 것만 반영돼야 하고, 늦은
+     * 쪽은 이미 정해진 결과를 받아 화면을 맞춰야 한다.
+     */
+    private void requireActive() {
+        if (!isActive()) {
+            throw new ApplicationException(ErrorCode.EXCHANGE_ALREADY_FINISHED);
+        }
     }
 
     /**

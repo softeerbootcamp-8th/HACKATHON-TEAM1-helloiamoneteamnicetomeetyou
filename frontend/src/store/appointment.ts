@@ -54,6 +54,8 @@ function stageOf(
 ): AppointmentStage {
   const me = exchange.participants.find((p) => p.userId === myUserId)
 
+  // 상대가 먼저 "만났어요" 를 눌렀을 수 있다. 그때 내 화면도 완료로 따라가야 한다.
+  if (exchange.status === 'COMPLETED') return 'completed'
   if (me?.arrived) return 'arrived'
   if (previousStage === 'arrived') return 'arrived'
   if (exchange.confirmedTime) return 'confirmed'

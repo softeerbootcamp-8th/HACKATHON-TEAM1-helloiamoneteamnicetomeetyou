@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useReducer, type ReactNode } from 'react'
 
-import { fetchBooths, fetchExchange, fetchZones, registerUser } from '@/lib/exchange'
+import {
+  fetchActiveExchange,
+  fetchBooths,
+  fetchExchange,
+  fetchZones,
+  registerUser,
+} from '@/lib/exchange'
 import { useBoothEvents } from '@/lib/use-booth-events'
 import { ALL_WAITING, myUsername } from '@/mocks/data'
 
@@ -33,6 +39,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (cancelled) return
 
         dispatch({ type: 'booth-loaded', boothId: booth.id, zones })
+
+        // 앱을 다시 열었거나 새로고침한 경우다. 진행 중인 약속이 있으면 그 자리로 돌아온다.
+        const active = await fetchActiveExchange(myUserId)
+        if (active && !cancelled) {
+          dispatch({ type: 'exchange-synced', exchange: active, myUserId })
+        }
       } catch {
         // 서버가 아직 없거나 꺼져 있는 경우다. 약속 화면에서 다시 알린다.
       }
@@ -57,11 +69,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const syncExchange = useCallback(
     async (data?: unknown) => {
       const exchangeId = exchangeIdOf(data) ?? state.appointment?.exchangeId
-      if (exchangeId === undefined) return
 
       try {
-        const exchange = await fetchExchange(exchangeId)
-        dispatch({ type: 'exchange-synced', exchange, myUserId })
+        /*
+          알림에 id 가 실려 있으면 그것을 읽고, 없으면 들고 있던 약속을 읽는다. 둘 다 없으면
+          내가 어느 약속에 속했는지 물어본다.
+
+          마지막 경우가 중요하다. 연결이 붙기 전에 만들어진 약속은 EXCHANGE_CREATED 를 들을
+          사람이 없어서 화면이 그 존재를 모른다. 새로고침한 직후도 마찬가지다.
+        */
+        const exchange =
+          exchangeId === undefined
+            ? await fetchActiveExchange(myUserId)
+            : await fetchExchange(exchangeId)
+
+        if (exchange) {
+          dispatch({ type: 'exchange-synced', exchange, myUserId })
+        }
       } catch {
         // 잠깐 실패한 것이면 다음 알림이나 heartbeat 재연결 때 다시 맞는다.
       }
@@ -81,6 +105,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     EXCHANGE_CREATED: (data) => void syncExchange(data),
     EXCHANGE_TIME_UPDATED: (data) => void syncExchange(data),
     EXCHANGE_ARRIVED: (data) => void syncExchange(data),
+    EXCHANGE_COMPLETED: (data) => void syncExchange(data),
     EXCHANGE_CANCELLED: (data) => void syncExchange(data),
   })
 

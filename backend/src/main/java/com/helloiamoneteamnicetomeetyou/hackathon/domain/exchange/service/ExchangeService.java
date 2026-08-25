@@ -111,6 +111,20 @@ public class ExchangeService {
     }
 
     /**
+     * 이 사람이 지금 잡고 있는 약속. 없으면 {@code null} 이다.
+     *
+     * <p>앱을 다시 열거나 새로고침하면 화면이 들고 있던 것이 전부 사라진다. 그때 이걸 불러서
+     * 진행 중인 약속으로 돌아온다. 실시간 알림만으로는 부족한데, 끊겨 있던 동안 온 알림은 다시
+     * 오지 않기 때문이다.
+     */
+    public ExchangeResponseDto findActiveOf(UUID userId) {
+        return exchangeRepository.findActiveByUserId(userId, ACTIVE_STATUSES).stream()
+                .findFirst()
+                .map(this::toResponse)
+                .orElse(null);
+    }
+
+    /**
      * 내가 고른 칸을 통째로 덮어쓴다.
      *
      * <p>시간이 이미 확정된 뒤에는 받지 않는다. 확정된 약속의 칸을 누가 뒤늦게 바꾸면 화면마다
@@ -202,6 +216,23 @@ public class ExchangeService {
         participant.arrive();
 
         notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_ARRIVED);
+
+        return toResponse(exchange);
+    }
+
+    /**
+     * 만나서 교환을 끝냈다. 참가자 누구든 누를 수 있고, 먼저 누른 한 번만 반영된다.
+     *
+     * <p>카드 주인은 아직 바꾸지 않는다. 무엇을 주고받는지는 매칭이 정하는 값이라 서버가 모른다.
+     */
+    @Transactional
+    public ExchangeResponseDto complete(Long exchangeId, UUID userId) {
+        Exchange exchange = getExchange(exchangeId);
+        getParticipant(exchangeId, userId);
+
+        exchange.complete();
+
+        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_COMPLETED);
 
         return toResponse(exchange);
     }

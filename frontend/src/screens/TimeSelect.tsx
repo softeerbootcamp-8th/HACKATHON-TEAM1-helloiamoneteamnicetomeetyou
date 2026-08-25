@@ -7,7 +7,13 @@ import { Dialog } from '@/components/ui/Dialog'
 import { ClockIcon } from '@/components/ui/icons'
 import { TopBar } from '@/components/ui/TopBar'
 import { cn } from '@/lib/cn'
-import { confirmExchangeTime, resetTimeSlots, updateTimeSlots, type Exchange } from '@/lib/exchange'
+import {
+  confirmExchangeTime,
+  fetchExchange,
+  resetTimeSlots,
+  updateTimeSlots,
+  type Exchange,
+} from '@/lib/exchange'
 import { tick } from '@/lib/haptics'
 import { springSheet, springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
@@ -53,12 +59,14 @@ export function TimeSelect() {
   const matched = appt.overlapSlot !== null
   const conflict = appt.allAnswered && !matched
   const waiting = !appt.allAnswered
+  const confirmed = appt.confirmedLabel !== null
 
   /**
    * 서버에 저장하고 결과로 화면을 맞춘다.
    *
-   * 실패하면 마지막으로 성공한 상태를 다시 읽어 되돌린다. 화면만 바뀐 채로 남으면
-   * 상대에게는 안 보이는 칸이 나에게만 칠해져 있게 된다.
+   * 실패하면 서버에서 현재 상태를 다시 읽는다. 화면만 바뀐 채로 남으면 상대에게는 안 보이는 칸이
+   * 나에게만 칠해져 있게 되고, 실패의 원인이 "상대가 먼저 했다" 인 경우에는 다시 읽는 것만으로
+   * 화면이 맞는 상태가 된다.
    */
   const run = async (action: () => Promise<Exchange>) => {
     setBusy(true)
@@ -67,11 +75,34 @@ export function TimeSelect() {
       dispatch({ type: 'exchange-synced', exchange, myUserId })
       return true
     } catch {
-      dispatch({ type: 'toast', message: '잠시 후 다시 시도해주세요' })
+      const latest = await fetchExchange(appt.exchangeId).catch(() => null)
+      if (latest) dispatch({ type: 'exchange-synced', exchange: latest, myUserId })
       return false
     } finally {
       setBusy(false)
     }
+  }
+
+  /**
+   * 약속을 확정한다.
+   *
+   * <b>상대가 먼저 눌렀으면 실패가 아니다.</b> 서버는 이미 정해진 약속을 다시 확정하지 못하게
+   * 막는데, 누른 사람 입장에서는 원하던 일이 이미 일어난 것이라 그대로 약속 화면으로 넘어간다.
+   */
+  const confirmTime = async () => {
+    if (confirmed) {
+      navigate('/appointment')
+      return
+    }
+
+    const ok = await run(() => confirmExchangeTime(appt.exchangeId, myUserId))
+
+    if (ok || state.appointment?.confirmedLabel) {
+      navigate('/appointment')
+      return
+    }
+
+    dispatch({ type: 'toast', message: '잠시 후 다시 시도해주세요' })
   }
 
   const toggle = (index: number) => {
@@ -81,7 +112,9 @@ export function TimeSelect() {
 
     // 누른 즉시 칠한다. 서버 응답을 기다리면 손가락을 뗀 뒤에야 칸이 차서 눌린 느낌이 사라진다.
     dispatch({ type: 'my-slots-picked', slots: next })
-    void run(() => updateTimeSlots(appt.exchangeId, myUserId, next))
+    void run(() => updateTimeSlots(appt.exchangeId, myUserId, next)).then((ok) => {
+      if (!ok) dispatch({ type: 'toast', message: '시간을 저장하지 못했어요' })
+    })
   }
 
   return (
@@ -187,16 +220,8 @@ export function TimeSelect() {
 
       <div className="shrink-0 px-6 pt-3 pb-8">
         {matched && (
-          <Button
-            variant="brand"
-            disabled={busy}
-            onClick={() => {
-              void run(() => confirmExchangeTime(appt.exchangeId, myUserId)).then((ok) => {
-                if (ok) navigate('/appointment')
-              })
-            }}
-          >
-            약속 확정하기
+          <Button variant="brand" disabled={busy} onClick={() => void confirmTime()}>
+            {confirmed ? '약속 보러 가기' : '약속 확정하기'}
           </Button>
         )}
 
@@ -205,7 +230,10 @@ export function TimeSelect() {
             disabled={busy}
             onClick={() => {
               void run(() => resetTimeSlots(appt.exchangeId, myUserId)).then((ok) => {
-                if (!ok) return
+                if (!ok) {
+                  dispatch({ type: 'toast', message: '잠시 후 다시 시도해주세요' })
+                  return
+                }
                 dispatch({ type: 'request-time-again' })
                 navigate('/home')
               })
@@ -234,8 +262,11 @@ export function TimeSelect() {
         onCancel={() => setCancelOpen(false)}
         onConfirm={() => {
           setCancelOpen(false)
-          void cancelAppointment()
-          navigate('/home')
+          void cancelAppointment().then((cancelled) => {
+            // 상대가 먼저 교환을 마쳤으면 취소가 안 된다. 그때는 화면이 그 결과를 따라간다.
+
+            if (cancelled) navigate('/home')
+          })
         }}
       />
     </div>

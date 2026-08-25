@@ -1,11 +1,13 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { Dialog } from '@/components/ui/Dialog'
+import { completeExchange } from '@/lib/exchange'
 import { tick } from '@/lib/haptics'
 import { springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
+import { getDeviceId } from '@/store/identity'
 import { identityLabel, identityMarkAt } from '@/store/identity-mark'
 import { useCancelAppointment } from '@/store/use-cancel-appointment'
 import { useStore } from '@/store/useStore'
@@ -16,10 +18,47 @@ import { useStore } from '@/store/useStore'
  */
 export function Identify() {
   const navigate = useNavigate()
-  const { state } = useStore()
+  const { state, dispatch } = useStore()
   const cancelAppointment = useCancelAppointment()
   const appt = useLastDefined(state.appointment)
+  const myUserId = useMemo(() => getDeviceId(), [])
   const [noShowOpen, setNoShowOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  /*
+    상대가 먼저 "만났어요" 를 눌렀을 때 내 화면도 따라간다. 서버가 EXCHANGE_COMPLETED 를 보내면
+    약속 단계가 완료로 바뀌고, 그걸 보고 넘어간다.
+
+    두 사람이 서로 다른 버튼을 누를 수 있어서 필요하다. 한 명이 만났다고 하고 다른 한 명이
+    "상대가 오지 않아요" 를 누르면, 먼저 도착한 쪽만 반영되고 늦은 쪽은 그 결과를 따라야 한다.
+  */
+  useEffect(() => {
+    if (state.appointment?.stage === 'completed') navigate('/complete')
+  }, [state.appointment?.stage, navigate])
+
+  /**
+   * "만났어요". 서버에 끝났다고 남긴 다음 완료 화면으로 간다.
+   *
+   * 상대가 먼저 취소했으면 실패한다. 그때는 서버가 알려 준 결과를 그대로 받아들인다.
+   */
+  const goComplete = async () => {
+    if (!appt) {
+      navigate('/complete')
+      return
+    }
+
+    setBusy(true)
+    try {
+      const exchange = await completeExchange(appt.exchangeId, myUserId)
+      dispatch({ type: 'exchange-synced', exchange, myUserId })
+      navigate('/complete')
+    } catch {
+      dispatch({ type: 'toast', message: '상대가 먼저 거래를 취소했어요' })
+      navigate('/home')
+    } finally {
+      setBusy(false)
+    }
+  }
   // 레몬을 누른 횟수. 누를 때마다 키가 바뀌어서 흔들림이 처음부터 다시 돈다.
   const [pokes, setPokes] = useState(0)
 
@@ -123,8 +162,9 @@ export function Identify() {
           <motion.button
             type="button"
             whileTap={{ scale: 0.97 }}
-            onClick={() => navigate('/complete')}
-            className="h-[54px] w-full rounded-full bg-white text-[16px] font-bold text-ink"
+            disabled={busy}
+            onClick={() => void goComplete()}
+            className="h-[54px] w-full rounded-full bg-white text-[16px] font-bold text-ink disabled:opacity-60"
           >
             만났어요
           </motion.button>
@@ -148,8 +188,11 @@ export function Identify() {
         onCancel={() => setNoShowOpen(false)}
         onConfirm={() => {
           setNoShowOpen(false)
-          void cancelAppointment()
-          navigate('/home')
+          void cancelAppointment().then((cancelled) => {
+            // 상대가 먼저 교환을 마쳤으면 취소가 안 된다. 그때는 화면이 그 결과를 따라간다.
+
+            if (cancelled) navigate('/home')
+          })
         }}
       />
     </div>
