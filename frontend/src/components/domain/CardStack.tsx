@@ -1,5 +1,6 @@
 import { motion } from 'motion/react'
 
+import { GoodsFace } from '@/components/domain/GoodsCard'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
 import { itemById } from '@/mocks/data'
@@ -16,7 +17,7 @@ type Props = {
 
 /**
  * 내 카드 묶음. 시안처럼 뒤로 두 장이 어긋나게 겹쳐 있고, 맨 위 카드에만
- * 그라데이션 앞면과 이름이 들어간다.
+ * 굿즈 앞면과 이름이 들어간다.
  */
 export function CardStack({ topItemId, count, className, lifted = false }: Props) {
   const item = itemById(topItemId)
@@ -43,9 +44,9 @@ export function CardStack({ topItemId, count, className, lifted = false }: Props
         transition={springSnap}
         className="absolute inset-0 rounded-2xl bg-white p-2.5 shadow-[0_10px_26px_rgba(0,0,0,0.16)]"
       >
-        <div className="card-face h-[72%] w-full rounded-xl" />
-        <p className="mt-1.5 text-center text-[12px] font-bold tracking-tight text-ink md:text-[13px]">
-          {item.name.toUpperCase()}
+        <GoodsFace item={item} size="md" />
+        <p className="mt-1.5 text-center text-[12px] leading-tight font-bold tracking-tight text-ink md:text-[13px]">
+          {item.name}
         </p>
       </motion.div>
     </div>

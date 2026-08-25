@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
@@ -15,10 +15,14 @@ const TILE: Record<Size, string> = {
 }
 
 /**
- * 카드 앞면. 굿즈 이미지가 아직 없어서 시안처럼 약칭을 초록 빛무리 위에 얹는다.
- * 이미지가 들어오면 이 컴포넌트만 바꾸면 된다.
+ * 카드 앞면. 굿즈 이미지를 브랜드색 빛무리 위에 얹는다.
+ *
+ * 이미지를 못 받아오면 약칭 글자가 대신 남는다. 현장 와이파이가 느릴 때 카드가 통째로
+ * 비어 보이는 것보다는 낫다.
  */
 export function GoodsFace({ item, size = 'md' }: { item: Item; size?: Size }) {
+  const [failed, setFailed] = useState(false)
+
   return (
     <div
       className={cn(
@@ -29,9 +33,21 @@ export function GoodsFace({ item, size = 'md' }: { item: Item; size?: Size }) {
       <span
         aria-hidden
         className="absolute size-[70%] rounded-full blur-[14px]"
-        style={{ background: 'radial-gradient(circle, #2ced90 0%, #2ced9000 70%)' }}
+        style={{ background: 'radial-gradient(circle, #2cb3ed 0%, #2cb3ed00 70%)' }}
       />
-      <span className="relative">{item.code}</span>
+      {failed ? (
+        <span className="relative">{item.code}</span>
+      ) : (
+        <img
+          src={item.image}
+          alt=""
+          aria-hidden
+          loading="lazy"
+          draggable={false}
+          onError={() => setFailed(true)}
+          className="relative size-full object-contain p-1.5 select-none"
+        />
+      )}
     </div>
   )
 }
@@ -39,11 +55,9 @@ export function GoodsFace({ item, size = 'md' }: { item: Item; size?: Size }) {
 type CardProps = {
   item: Item
   selected?: boolean
-  /** 고를 수 없는 상태. 이유는 note 로 알려 준다. */
+  /** 고를 수 없는 상태. 시안에서는 이유를 글로 적지 않고 흐리게만 둔다. */
   disabled?: boolean
-  note?: string
   qty?: number
-  showKo?: boolean
   size?: Size
   onClick?: () => void
   onIncrease?: () => void
@@ -55,14 +69,15 @@ type CardProps = {
 /**
  * 선택 가능한 굿즈 카드. 고른 뒤에는 아래에 수량 스테퍼가 붙는다.
  * 시안에서 Have 는 수량이 있고 Needs 도 같은 모양이라 한 컴포넌트로 쓴다.
+ *
+ * 카드 안에는 굵은 아이템 이름 한 줄만 둔다. 한글 이름 같은 서브 텍스트는
+ * 시안에서 전부 빠졌다.
  */
 export function GoodsCard({
   item,
   selected = false,
   disabled = false,
-  note,
   qty,
-  showKo = true,
   size = 'md',
   onClick,
   onIncrease,
@@ -105,12 +120,7 @@ export function GoodsCard({
         <div className={cn(disabled && 'grayscale')}>
           <GoodsFace item={item} size={size} />
         </div>
-        <p className="mt-2 text-center text-[12px] font-bold text-ink">{item.name}</p>
-        {note ? (
-          <p className="text-center text-[10px] leading-tight text-neutral-400">{note}</p>
-        ) : (
-          showKo && <p className="text-center text-[11px] text-neutral-400">{item.nameKo}</p>
-        )}
+        <p className="mt-2 text-center text-[12px] leading-tight font-bold text-ink">{item.name}</p>
       </motion.button>
 
       {selected && qty !== undefined && (
