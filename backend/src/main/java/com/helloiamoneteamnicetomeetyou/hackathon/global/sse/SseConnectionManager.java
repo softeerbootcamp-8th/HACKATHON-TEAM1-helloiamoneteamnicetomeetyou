@@ -95,6 +95,17 @@ public class SseConnectionManager {
     }
 
     /**
+     * 이 사용자가 지금 앱을 열어 두고 있는지.
+     *
+     * <p>웹푸시가 이걸 본다. 연결이 있으면 화면이 실시간으로 받고 있다는 뜻이라 잠금 화면 알림까지
+     * 보내면 같은 소식이 두 번 간다. iOS 는 푸시를 받으면 반드시 알림을 띄워야 해서 클라이언트
+     * 쪽에서 억누를 수가 없고, 그래서 보낼지 말지를 서버가 여기서 정한다.
+     */
+    public boolean hasConnection(UUID userId) {
+        return !findByUser(userId).isEmpty();
+    }
+
+    /**
      * 연결마다 전송을 {@code sseExecutor} 에 넘긴다. 부르는 스레드는 바로 돌아온다.
      *
      * <p><b>여기서 직접 write 하면 안 된다.</b> 전파가 안 되는 곳에 있는 사람 한 명이 소켓
