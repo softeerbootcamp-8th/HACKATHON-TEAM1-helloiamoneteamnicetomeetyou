@@ -37,8 +37,6 @@ export type AppointmentPartner = {
   /** 이름을 안 보낸 사용자는 "상대" 로 들어간다. */
   name: string
   slots: number[]
-  /** 식별 화면에서 사람을 가르는 두 자리 번호 */
-  identityNumber: number
   arrived: boolean
 }
 
@@ -53,11 +51,11 @@ export type Appointment = {
   /** 격자 0번 칸이 가리키는 시각. 서버가 정한 값이라 참가자 모두가 같다. */
   slotBaseTime: string
   slotCount: number
-  /** 식별 화면에서 쓸 표시. 같은 교환의 참가자는 같은 값이다. */
+  /** 식별 화면에서 쓸 표시와 번호. 참가자 전원이 같은 값을 든다. */
   identityMark: number
+  identityNumber: number
   mySlots: number[]
   myName: string
-  myIdentityNumber: number
   myArrived: boolean
   partners: AppointmentPartner[]
   /** 모두가 되는 가장 빠른 칸. 서버가 계산해 준다. */

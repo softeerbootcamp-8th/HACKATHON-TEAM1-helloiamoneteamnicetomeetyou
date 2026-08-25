@@ -22,9 +22,9 @@ export function toAppointment(
     slotBaseTime: exchange.slotBaseTime,
     slotCount: exchange.slotCount,
     identityMark: exchange.identityMark,
+    identityNumber: exchange.identityNumber,
     mySlots: me?.slots ?? [],
     myName: me?.username ?? '나',
-    myIdentityNumber: me?.identityNumber ?? 0,
     myArrived: me?.arrived ?? false,
     partners: exchange.participants
       .filter((p) => p.userId !== myUserId)
@@ -32,7 +32,6 @@ export function toAppointment(
         userId: p.userId,
         name: p.username ?? '상대',
         slots: p.slots,
-        identityNumber: p.identityNumber,
         arrived: p.arrived,
       })),
     overlapSlot: exchange.overlapSlot,

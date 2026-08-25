@@ -5,6 +5,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.TimeSlotGrid;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeParticipantResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeStatus;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 뒤 임시 엔드포인트로 이걸 부르지만, 서버가 상대를 찾게 되면 그쪽에서 같은 메서드를 부르면 된다.
  * 이 클래스는 "누구와 교환하는지" 를 정하지 않고 "정해진 사람들의 약속" 만 다룬다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -46,13 +49,19 @@ public class ExchangeService {
 
     /**
      * 식별 화면에서 쓸 표시의 가짓수다. 화면이 이 범위의 번호마다 그림과 색을 정해 두고 있어서,
-     * 늘리려면 프론트의 표도 같이 늘려야 한다.
+     * 늘리려면 프론트의 {@code IDENTITY_MARKS} 표도 같이 늘려야 한다.
      */
     private static final int IDENTITY_MARK_COUNT = 8;
 
-    /** 식별 번호는 두 자리로 둔다. 시안의 "레몬 28" 이 그 자리다. */
+    /** 식별 번호는 두 자리로 둔다. 시안의 "레몬 28" 에서 28 자리다. */
     private static final int IDENTITY_NUMBER_MIN = 10;
-    private static final int IDENTITY_NUMBER_MAX = 99;
+    private static final int IDENTITY_NUMBER_COUNT = 90;
+
+    /** 표시 8가지 × 번호 90가지. 이만큼의 교환이 동시에 진행될 때까지는 겹치지 않는다. */
+    private static final int IDENTITY_CAPACITY = IDENTITY_MARK_COUNT * IDENTITY_NUMBER_COUNT;
+
+    private static final List<ExchangeStatus> ACTIVE_STATUSES =
+            List.of(ExchangeStatus.PENDING, ExchangeStatus.IN_PROGRESS);
 
     private final ExchangeRepository exchangeRepository;
     private final ExchangeParticipantRepository participantRepository;
@@ -84,14 +93,12 @@ public class ExchangeService {
 
         Exchange exchange = exchangeRepository.save(
                 Exchange.of(zone, type, TimeSlotGrid.baseTimeFrom(LocalDateTime.now())));
-        exchange.assignIdentityMark(IDENTITY_MARK_COUNT);
+        assignFreeIdentity(exchange);
 
-        Set<Integer> usedNumbers = new HashSet<>();
         for (UUID userId : distinctIds) {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_FOUND));
-            participantRepository.save(
-                    ExchangeParticipant.of(exchange, user, nextIdentityNumber(userId, usedNumbers)));
+            participantRepository.save(ExchangeParticipant.of(exchange, user));
         }
 
         notifyParticipants(exchange.getId(), distinctIds, SseEventType.EXCHANGE_CREATED);
@@ -219,23 +226,38 @@ public class ExchangeService {
     }
 
     /**
-     * 참가자의 식별 번호를 정한다.
+     * 진행 중인 어느 교환과도 겹치지 않는 식별자를 골라 넣는다.
      *
-     * <p>UUID 에서 끌어내서 같은 사람이 같은 번호를 받게 하되, 한 교환 안에서 겹치면 다음 번호로
-     * 밀어 준다. 두 자리 안에서 고르기 때문에 서너 명이면 거의 안 겹치지만, 겹치면 두 사람이 서로를
-     * 못 가려서 식별 화면이 제 역할을 못 한다.
+     * <p><b>겹치면 안 되는 이유가 화면에 있다.</b> 같은 화면을 든 사람이 내 상대라고 안내하기
+     * 때문에, 두 교환이 같은 값을 들면 행사장에서 엉뚱한 사람과 서로를 상대로 착각한다.
+     *
+     * <p>끝나거나 취소된 교환은 후보에서 빠지므로 값이 저절로 다시 쓸 수 있게 된다. 시작 자리를
+     * 교환 id 로 흩어 두는 것은, 늘 앞에서부터 고르면 먼저 만들어진 교환이 끝났을 때 방금 끝난
+     * 값을 바로 다음 사람이 받게 되기 때문이다.
+     *
+     * <p>고르는 것과 저장하는 것이 한 트랜잭션 안에 있지만 DB 제약으로 막지는 않는다. 두 교환이
+     * 같은 순간에 만들어지면 이론상 같은 값을 고를 수 있는데, 서버가 한 대이고 교환 생성이 초당
+     * 수십 건씩 일어나는 흐름이 아니라 지금은 여기까지만 한다.
      */
-    private int nextIdentityNumber(UUID userId, Set<Integer> used) {
-        int range = IDENTITY_NUMBER_MAX - IDENTITY_NUMBER_MIN + 1;
-        int candidate = IDENTITY_NUMBER_MIN + Math.floorMod(userId.hashCode(), range);
+    private void assignFreeIdentity(Exchange exchange) {
+        Set<Integer> used = new HashSet<>(exchangeRepository.findIdentityCodesByStatuses(ACTIVE_STATUSES));
+        int start = Math.floorMod(exchange.getId() * 37, IDENTITY_CAPACITY);
 
-        while (used.contains(candidate)) {
-            candidate = IDENTITY_NUMBER_MIN + Math.floorMod(candidate + 1 - IDENTITY_NUMBER_MIN, range);
+        for (int step = 0; step < IDENTITY_CAPACITY; step++) {
+            int index = (start + step) % IDENTITY_CAPACITY;
+            int mark = index / IDENTITY_NUMBER_COUNT;
+            int number = IDENTITY_NUMBER_MIN + index % IDENTITY_NUMBER_COUNT;
+
+            if (!used.contains(mark * 100 + number)) {
+                exchange.assignIdentity(mark, number);
+                return;
+            }
         }
 
-        used.add(candidate);
-
-        return candidate;
+        // 720개를 동시에 쓰고 있다는 뜻이라 이 행사 규모에서는 오지 않는 자리다. 그래도 교환을
+        // 못 만들게 막지는 않는다. 식별 화면이 헷갈리는 것보다 교환이 안 되는 쪽이 더 나쁘다.
+        log.warn("식별자를 모두 쓰고 있어 겹치는 값을 준다: exchangeId={}", exchange.getId());
+        exchange.assignIdentity(start / IDENTITY_NUMBER_COUNT, IDENTITY_NUMBER_MIN + start % IDENTITY_NUMBER_COUNT);
     }
 
     private Exchange getExchange(Long exchangeId) {
@@ -316,7 +338,6 @@ public class ExchangeService {
                                     user.getUsername(),
                                     slots,
                                     !slots.isEmpty(),
-                                    participant.getIdentityNumber(),
                                     participant.hasArrived());
                         })
                         .toList();
@@ -333,6 +354,7 @@ public class ExchangeService {
                 TimeSlotGrid.SLOT_COUNT,
                 TimeSlotGrid.SLOT_MINUTES,
                 exchange.getIdentityMark(),
+                exchange.getIdentityNumber(),
                 participants,
                 TimeSlotGrid.earliestOverlap(slotsByUser.values()),
                 participants.stream().allMatch(ExchangeParticipantResponseDto::answered),

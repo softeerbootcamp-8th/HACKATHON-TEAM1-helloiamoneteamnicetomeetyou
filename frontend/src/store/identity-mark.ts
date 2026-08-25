@@ -32,7 +32,12 @@ export function identityMarkAt(index: number): IdentityMark {
   return IDENTITY_MARKS[index] ?? IDENTITY_MARKS[0]
 }
 
-/** 시안의 "레몬 28" 자리. */
+/**
+ * 시안의 "레몬 28" 자리.
+ *
+ * 교환 하나에 하나뿐이고 참가자 전원이 같은 값을 본다. 진행 중인 다른 교환과 겹치지 않게
+ * 서버가 골라 주기 때문에, 같은 글자를 든 사람이 곧 내 교환 상대다.
+ */
 export function identityLabel(markIndex: number, number: number): string {
   return `${identityMarkAt(markIndex).name} ${number}`
 }

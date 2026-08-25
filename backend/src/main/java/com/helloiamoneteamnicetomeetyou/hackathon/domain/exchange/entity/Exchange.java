@@ -58,15 +58,25 @@ public class Exchange {
     private LocalDateTime exchangeTime;
 
     /**
-     * 식별 화면에서 서로를 찾는 표시다. 같은 교환의 참가자는 같은 값을 받는다.
+     * 식별 화면에서 서로를 찾는 표시다. 시안의 "레몬 28" 에서 레몬 자리다.
+     *
+     * <p><b>참가자 전원이 같은 값을 든다.</b> 같은 화면을 든 사람이 내 교환 상대라는 것이 이 화면의
+     * 규칙이라, 사람마다 다르면 서로를 못 찾는다.
      *
      * <p>화면은 이 번호로 그림과 색을 고른다. 어떤 그림인지는 서버가 정하지 않는다. 지도 위 핀
      * 좌표를 화면이 정하는 것과 같은 이유로, 표시 방법이 바뀌어도 서버를 안 고치게 하려는 것이다.
-     *
-     * <p>교환 id 에서 끌어내기 때문에 같은 시각에 열린 교환끼리는 서로 다른 값을 받는다.
      */
     @Column(nullable = false)
     private int identityMark;
+
+    /**
+     * 표시와 짝을 이루는 두 자리 번호다. 시안의 "레몬 28" 에서 28 자리다.
+     *
+     * <p>표시만으로는 가짓수가 모자라서 번호를 붙인다. 둘을 합친 값이 <b>진행 중인 교환 사이에서
+     * 겹치지 않아야</b> 한다. 겹치면 행사장에서 엉뚱한 사람과 서로를 상대로 착각한다.
+     */
+    @Column(nullable = false)
+    private int identityNumber;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -83,9 +93,15 @@ public class Exchange {
         return new Exchange(zone, type, slotBaseTime);
     }
 
-    /** 식별 표시는 id 가 있어야 정해지므로 저장한 뒤에 부른다. */
-    public void assignIdentityMark(int markCount) {
-        this.identityMark = (int) Math.floorMod(id, markCount);
+    /** 식별자는 이미 쓰이고 있는 것을 봐야 정해지므로 서비스가 골라서 넣어 준다. */
+    public void assignIdentity(int mark, int number) {
+        this.identityMark = mark;
+        this.identityNumber = number;
+    }
+
+    /** 아직 만나지 않은 교환. 식별자가 이 교환들 사이에서 겹치면 안 된다. */
+    public boolean isActive() {
+        return status == ExchangeStatus.PENDING || status == ExchangeStatus.IN_PROGRESS;
     }
 
     public boolean isTimeConfirmed() {

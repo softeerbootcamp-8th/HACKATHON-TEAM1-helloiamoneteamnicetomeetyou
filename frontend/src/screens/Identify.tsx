@@ -24,14 +24,14 @@ export function Identify() {
   const [pokes, setPokes] = useState(0)
 
   /*
-    표시는 교환마다 서버가 정해 주고, 번호는 그 안에서 사람마다 다르다. 그래서 같은 그림을 든
-    사람이 내 교환 상대이고, 번호로 그중 누구인지 가른다.
+    식별자는 교환 하나에 하나이고 참가자 전원이 같은 값을 든다. 그래서 같은 화면을 든 사람이
+    곧 내 교환 상대다. 진행 중인 다른 교환과 겹치지 않게 서버가 골라 준다.
 
     약속 없이 주소로 바로 들어온 경우에는 첫 표시로 보여준다. 화면이 비면 무엇을 보는 자리인지
     알 수 없기 때문이다.
   */
   const mark = identityMarkAt(appt?.identityMark ?? 0)
-  const label = appt ? identityLabel(appt.identityMark, appt.myIdentityNumber) : mark.name
+  const label = appt ? identityLabel(appt.identityMark, appt.identityNumber) : mark.name
 
   return (
     <div
@@ -117,15 +117,6 @@ export function Identify() {
             <br />내 교환 상대예요.
           </p>
           <p className="mt-4 text-[13px] text-white/45">휴대폰 화면을 들어 서로를 찾아보세요.</p>
-          {appt && appt.partners.length > 0 && (
-            <p className="mt-2 text-[13px] text-white/45">
-              상대는{' '}
-              {appt.partners
-                .map((p) => identityLabel(appt.identityMark, p.identityNumber))
-                .join(', ')}{' '}
-              예요.
-            </p>
-          )}
         </div>
 
         <div className="shrink-0 space-y-2.5 px-6 pb-8">

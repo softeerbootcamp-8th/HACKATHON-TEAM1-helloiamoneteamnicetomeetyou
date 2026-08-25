@@ -86,7 +86,7 @@ class ExchangeServiceTest {
 
         given(exchangeRepository.findById(EXCHANGE_ID)).willReturn(Optional.of(exchange));
         given(participantRepository.findAllByExchangeId(EXCHANGE_ID))
-                .willReturn(List.of(ExchangeParticipant.of(exchange, me, 28), ExchangeParticipant.of(exchange, partner, 16)));
+                .willReturn(List.of(ExchangeParticipant.of(exchange, me), ExchangeParticipant.of(exchange, partner)));
         given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of());
     }
 
@@ -98,18 +98,43 @@ class ExchangeServiceTest {
         given(userRepository.findById(ME)).willReturn(Optional.of(me));
         given(userRepository.findById(PARTNER)).willReturn(Optional.of(partner));
         given(exchangeRepository.save(any(Exchange.class))).willReturn(exchange);
+        given(exchangeRepository.findIdentityCodesByStatuses(any())).willReturn(List.of());
 
         ExchangeResponseDto response =
                 exchangeService.create(BOOTH_ID, ExchangeType.ONE_TO_ONE, List.of(ME, PARTNER));
 
         assertThat(response.slotBaseTime()).isEqualTo(BASE_TIME);
         assertThat(response.slotCount()).isEqualTo(TimeSlotGrid.SLOT_COUNT);
-        // 식별 화면에서 서로를 찾으려면 참가자마다 번호가 달라야 한다.
-        assertThat(response.participants()).extracting(p -> p.identityNumber()).doesNotHaveDuplicates();
+        // 식별자는 교환이 통째로 갖는다. 참가자가 같은 화면을 들어야 서로를 찾을 수 있다.
+        assertThat(response.identityNumber()).isBetween(10, 99);
         assertThat(response.zone().name()).isEqualTo("중앙 포토존 앞");
         assertThat(response.boothId()).isEqualTo(booth.getId());
         verify(sseEventPublisher).toUser(eq(ME), eq(SseEventType.EXCHANGE_CREATED), any());
         verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_CREATED), any());
+    }
+
+    @Test
+    @DisplayName("진행 중인 교환이 쓰는 식별자는 피해서 고른다")
+    void 쓰이고_있는_식별자는_피한다() {
+        given(zoneRepository.findByBoothIdOrderByIdAsc(BOOTH_ID)).willReturn(List.of(exchange.getZone()));
+        given(userRepository.findById(ME)).willReturn(Optional.of(me));
+        given(userRepository.findById(PARTNER)).willReturn(Optional.of(partner));
+        given(exchangeRepository.save(any(Exchange.class))).willReturn(exchange);
+
+        // 교환 id 1 이 처음 집으려는 자리를 미리 차지해 둔다.
+        int taken = firstCandidateCode(EXCHANGE_ID);
+        given(exchangeRepository.findIdentityCodesByStatuses(any())).willReturn(List.of(taken));
+
+        ExchangeResponseDto response =
+                exchangeService.create(BOOTH_ID, ExchangeType.ONE_TO_ONE, List.of(ME, PARTNER));
+
+        assertThat(response.identityMark() * 100 + response.identityNumber()).isNotEqualTo(taken);
+    }
+
+    /** 서비스가 비어 있을 때 고르는 첫 자리. 배정 규칙과 같은 식이라 규칙이 바뀌면 같이 바뀐다. */
+    private static int firstCandidateCode(long exchangeId) {
+        int start = Math.floorMod(exchangeId * 37, 8 * 90);
+        return (start / 90) * 100 + 10 + start % 90;
     }
 
     @Test

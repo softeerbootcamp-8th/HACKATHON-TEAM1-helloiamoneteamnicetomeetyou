@@ -27,8 +27,6 @@ export type ExchangeParticipant = {
   username: string | null
   slots: number[]
   answered: boolean
-  /** 식별 화면에서 사람을 가르는 두 자리 번호. 시안의 "레몬 28" 에서 28 자리다. */
-  identityNumber: number
   arrived: boolean
 }
 
@@ -49,8 +47,14 @@ export type Exchange = {
   slotBaseTime: string
   slotCount: number
   slotMinutes: number
-  /** 식별 화면에서 쓸 표시. 같은 교환의 참가자는 같은 값을 받는다. */
+  /**
+   * 식별 화면에서 쓸 표시와 번호. 시안의 "레몬 28" 이다.
+   *
+   * 참가자 전원이 같은 값을 든다. 같은 화면을 든 사람이 내 상대라는 것이 그 화면의 규칙이다.
+   * 진행 중인 다른 교환과도 겹치지 않게 서버가 골라 준다.
+   */
   identityMark: number
+  identityNumber: number
   participants: ExchangeParticipant[]
   /** 모두가 되는 가장 빠른 칸. 없으면 null 이다. */
   overlapSlot: number | null

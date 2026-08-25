@@ -21,8 +21,14 @@ public record ExchangeResponseDto(
         LocalDateTime slotBaseTime,
         int slotCount,
         int slotMinutes,
-        /** 식별 화면에서 쓸 표시. 같은 교환의 참가자는 같은 값을 받는다. */
+        /**
+         * 식별 화면에서 쓸 표시와 번호. 시안의 "레몬 28" 이다.
+         *
+         * <p>참가자 전원이 같은 값을 든다. 같은 화면을 든 사람이 내 상대라는 것이 그 화면의
+         * 규칙이라, 사람마다 다르면 서로를 못 찾는다. 진행 중인 다른 교환과도 겹치지 않는다.
+         */
         int identityMark,
+        int identityNumber,
         List<ExchangeParticipantResponseDto> participants,
         /** 모두가 되는 가장 빠른 칸. 없으면 null 이다. */
         Integer overlapSlot,
