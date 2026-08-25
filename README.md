@@ -38,9 +38,11 @@ PR 제목은 모두 `feat(be): 주문 생성 API 구현` 형식(Conventional Com
 ## 백엔드 실행하기
 
 Java 21 이 필요하고, Gradle 은 wrapper 가 알아서 받습니다.
+DB 로 MySQL 을 쓰기 때문에 실행 전에 컨테이너로 DB 를 먼저 띄웁니다.
 
 ```bash
 cd backend
+docker compose up -d mysql # localhost:3306 (DB: hackathon)
 ./gradlew bootRun          # http://localhost:8080
 ./gradlew test
 ```

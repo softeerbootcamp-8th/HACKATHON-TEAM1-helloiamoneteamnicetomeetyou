@@ -6,9 +6,12 @@ Spring 백엔드에서 항상 지키는 규칙만 적는다. 루트 `CLAUDE.md` 
 ## 현재 스택
 
 - Java 21, Spring Boot 4.0.7, Gradle Wrapper
-- 지금 들어와 있는 의존성은 `spring-boot-starter-webmvc` 하나다
-- **JPA, MySQL, Bean Validation 은 아직 없다.** 필요해지면 `build.gradle` 에
-  추가하고 아래 규칙을 그때부터 적용한다
+- 의존성은 `spring-boot-starter-webmvc`, `spring-boot-starter-data-jpa`,
+  `mysql-connector-j` 다
+- DB 는 MySQL 이다. 배포 환경은 RDS, 로컬은 `docker compose up -d mysql` 로 띄운 컨테이너다.
+  스키마는 `ddl-auto: update` 로 반영하고 마이그레이션 도구는 쓰지 않는다
+- **Bean Validation 은 아직 없다.** 필요해지면 `build.gradle` 에 추가하고
+  아래 검증 규칙을 그때부터 적용한다
 - Redis 는 쓰지 않는다
 
 ## 구조
