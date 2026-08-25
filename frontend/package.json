@@ -15,8 +15,10 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "motion": "^13.1.1",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-router": "^8.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

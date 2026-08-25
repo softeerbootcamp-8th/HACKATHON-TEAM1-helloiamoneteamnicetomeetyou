@@ -18,8 +18,8 @@ export default defineConfig({
       injectRegister: 'auto',
       // 아이콘은 pwa-assets.config.ts 가 public/logo.svg 로 미리 만들어 둔 것을 쓴다.
       manifest: {
-        name: 'TRADIT',
-        short_name: 'TRADIT',
+        name: 'NearLy',
+        short_name: 'NearLy',
         description: '현장에서 쉽고 빠르게 현대자동차 팝업 굿즈를 교환하세요',
         lang: 'ko',
         start_url: '/',
