@@ -69,8 +69,10 @@ export function Complete() {
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
+        <Button variant="brand" onClick={() => navigate('/home')}>
+          계속 교환하러 가기
+        </Button>
         <TextButton
-          className="mb-1"
           onClick={() => {
             dispatch({ type: 'reset' })
             navigate('/')
@@ -78,9 +80,6 @@ export function Complete() {
         >
           교환 끝 ~
         </TextButton>
-        <Button variant="brand" onClick={() => navigate('/home')}>
-          계속 교환하러 가기
-        </Button>
       </div>
     </div>
   )
