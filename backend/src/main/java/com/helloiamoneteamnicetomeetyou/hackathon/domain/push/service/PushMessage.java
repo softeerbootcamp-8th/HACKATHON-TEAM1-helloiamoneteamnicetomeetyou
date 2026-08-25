@@ -23,6 +23,11 @@ public enum PushMessage {
     MATCH_SUGGESTED(SseEventType.MATCH_SUGGESTED, "서로의 니즈가 매칭됐어요!", "탭하여 확인해 보세요", "/match"),
     MATCH_ACCEPTED(SseEventType.MATCH_ACCEPTED, "교환이 성사됐어요", "만날 자리를 정해 주세요", "/match"),
     MATCH_REJECTED(SseEventType.MATCH_REJECTED, "상대가 교환을 거절했어요", "다시 상대를 찾아볼까요", "/home"),
+    // 찔러보기. 문구는 시안(204:5032, 204:5154)을 그대로 옮겼다.
+    POKE_RECEIVED(SseEventType.POKE_RECEIVED, "교환 신청이 왔어요~", "탭하여 확인해 보세요", "/poke/received"),
+    POKE_ACCEPTED(SseEventType.POKE_ACCEPTED, "상대방이 내 신청을 받아들였어요!", "만날 자리를 정해 주세요", "/match"),
+    POKE_REJECTED(SseEventType.POKE_REJECTED, "상대가 교환을 거절했어요", "다른 상대를 찾아보세요", "/home"),
+
     EXCHANGE_CREATED(SseEventType.EXCHANGE_CREATED, "교환 약속이 잡혔어요", "장소와 시간을 확인해 주세요", "/appointment"),
     EXCHANGE_TIME_UPDATED(SseEventType.EXCHANGE_TIME_UPDATED, "약속 시간이 바뀌었어요", "새 시간을 확인해 주세요", "/appointment"),
     EXCHANGE_PLACE_UPDATED(SseEventType.EXCHANGE_PLACE_UPDATED, "만나는 자리가 정해졌어요", "어디서 만나는지 확인해 주세요", "/appointment"),
