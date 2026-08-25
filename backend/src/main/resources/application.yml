@@ -29,6 +29,24 @@ spring:
 server:
   port: 8080
 
+# 부스 실시간 알림(SSE) 설정이다.
+#
+# emitter-timeout-ms: 이 시간이 지나면 서버가 연결을 끊는다. 브라우저의 EventSource 가 곧바로
+#   다시 붙고, 재연결되면 CONNECTED 를 다시 받아 화면이 현재 상태를 읽으므로 사용자는 모른다.
+#   무한(0)으로 두지 않는 것은, 어떤 이유로든 정리되지 못한 연결이 영영 쌓이는 것을 막기 위해서다.
+# heartbeat-interval-ms: 이 주기로 주석 줄을 보내 죽은 연결을 찾아낸다. 브라우저 기본 재연결
+#   대기가 3초라 그보다 충분히 길게 두되, 중간 프록시가 조용한 연결을 끊기 전에는 오게 잡았다.
+sse:
+  emitter-timeout-ms: 1800000
+  heartbeat-interval-ms: 15000
+
+# 프론트가 다른 오리진에서 뜨기 때문에 허용할 오리진을 적어 둔다.
+# YAML 목록으로 쓰면 @Value 가 못 읽어서 쉼표로 구분한 한 줄로 둔다.
+# - https://*.vercel.app : 배포와 프리뷰. 프리뷰는 커밋마다 도메인이 바뀐다
+# - http://localhost:5173 : Vite 개발 서버
+cors:
+  allowed-origin-patterns: https://*.vercel.app,http://localhost:5173
+
 ---
 # 로컬 docker compose E2E 테스트용 프로파일 (SPRING_PROFILES_ACTIVE=e2e)
 # compose 네트워크 안에서는 서비스 이름 mysql 이 그대로 호스트명이 된다.

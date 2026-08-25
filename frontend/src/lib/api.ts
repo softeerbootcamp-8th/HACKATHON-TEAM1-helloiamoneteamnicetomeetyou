@@ -5,7 +5,19 @@
  * 배포 환경에서 API 오리진이 프론트와 다르면 VITE_API_BASE_URL 만 채우면 되고,
  * 호출하는 쪽 코드는 그대로 둔다.
  */
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+
+/**
+ * 백엔드가 모든 응답을 감싸는 공통 형식.
+ * 형식 자체는 `.claude/skills/oneteam-development/references/contracts.md` 가 기준이다.
+ */
+export type CommonResponse<T> = {
+  success: boolean
+  data?: T
+  code?: number
+  message?: string
+  errors?: { field: string; message: string }[]
+}
 
 export class ApiError extends Error {
   readonly status: number

@@ -60,6 +60,14 @@ com.helloiamoneteamnicetomeetyou.hackathon
 
 응답 형식은 `.claude/skills/oneteam-development/references/contracts.md` 에 있다.
 
+## CORS
+
+- 허용 오리진은 `application.yml` 의 `cors.allowed-origin-patterns` 에 있다. 자바 코드에
+  도메인을 적지 않는다.
+- Vercel 프리뷰는 커밋마다 도메인이 달라서 `allowedOrigins` 가 아니라
+  `allowedOriginPatterns` 로 받아야 한다.
+- `allowCredentials` 는 켜지 않았다. 인증이 붙어서 쿠키를 실제로 보내게 될 때 같이 켠다.
+
 ## 네이밍
 
 자바 컨벤션을 따른다.
