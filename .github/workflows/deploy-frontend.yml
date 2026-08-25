@@ -53,13 +53,24 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
-      - name: 토큰이 있는지 먼저 확인
-        # 없으면 vercel 이 로그인 화면 비슷한 에러로 죽어서 원인이 안 보인다. 먼저 끊는다.
+      - name: 토큰이 쓸 수 있는 상태인지 확인
+        # 토큰이 없거나 스코프가 다르면 vercel pull 이 "Could not retrieve Project Settings" 라는
+        # 인증과 상관없어 보이는 메시지로 죽는다. 원인이 보이도록 여기서 먼저 끊는다.
         run: |
           if [ -z "$VERCEL_TOKEN" ]; then
             echo "::error::VERCEL_TOKEN 시크릿이 없습니다. 저장소 Settings > Secrets and variables > Actions 에 추가하세요."
             exit 1
           fi
+
+          if ! account=$(npx --yes vercel@latest whoami 2>&1 | tail -1); then
+            echo "::error::VERCEL_TOKEN 으로 인증하지 못했습니다. 만료되었거나 값이 잘못되었습니다."
+            exit 1
+          fi
+          echo "인증된 계정: $account"
+
+          echo "이 토큰이 볼 수 있는 스코프:"
+          npx --yes vercel@latest teams ls 2>&1 | tail -n +2
+          echo "찾고 있는 스코프: $VERCEL_ORG_ID"
 
       - name: 배포 대상 결정
         id: target
