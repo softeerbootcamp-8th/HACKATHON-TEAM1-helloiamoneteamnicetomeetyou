@@ -2,6 +2,7 @@ import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 
+import { RejectDialog } from '@/components/domain/ConfirmDialogs'
 import { GoodsCard, GoodsFace } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
 import { staggerChild, staggerParent } from '@/lib/motion'
@@ -16,6 +17,7 @@ export function PokeReceived() {
   const { state, dispatch } = useStore()
   const incoming = useLastDefined(state.incomingPoke)
   const [picked, setPicked] = useState<string | null>(null)
+  const [rejectOpen, setRejectOpen] = useState(false)
   const demo = params.get('demo')
 
   // 주소로 바로 열었을 때 화면을 볼 수 있게 상태를 심어 준다.
@@ -52,11 +54,8 @@ export function PokeReceived() {
           <h2 className="text-[13px] font-bold text-ink">상대가 원하는 카드</h2>
           <div className="mt-3 w-[118px] rounded-2xl bg-white p-2.5 shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
             <GoodsFace item={itemById(incoming.wantItemId)} size="md" />
-            <p className="mt-2 text-center text-[12px] font-bold text-ink">
+            <p className="mt-2 text-center text-[12px] leading-tight font-bold text-ink">
               {itemById(incoming.wantItemId).name}
-            </p>
-            <p className="text-center text-[11px] text-neutral-400">
-              {itemById(incoming.wantItemId).nameKo}
             </p>
           </div>
         </section>
@@ -93,15 +92,18 @@ export function PokeReceived() {
         >
           이 카드로 진행하기
         </Button>
-        <TextButton
-          onClick={() => {
-            dispatch({ type: 'reject-incoming' })
-            navigate('/home')
-          }}
-        >
-          거절하기
-        </TextButton>
+        <TextButton onClick={() => setRejectOpen(true)}>거절하기</TextButton>
       </div>
+
+      <RejectDialog
+        open={rejectOpen}
+        onKeep={() => setRejectOpen(false)}
+        onReject={() => {
+          setRejectOpen(false)
+          dispatch({ type: 'reject-incoming' })
+          navigate('/home')
+        }}
+      />
     </div>
   )
 }

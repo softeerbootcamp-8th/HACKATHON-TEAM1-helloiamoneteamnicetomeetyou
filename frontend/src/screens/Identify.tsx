@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { Dialog } from '@/components/ui/Dialog'
+import { BreakupDialog } from '@/components/domain/ConfirmDialogs'
 import { tick } from '@/lib/haptics'
 import { springSnap } from '@/lib/motion'
 import { MY_IDENTITY } from '@/mocks/data'
@@ -32,7 +32,7 @@ export function Identify() {
           <motion.button
             type="button"
             aria-label="닫기"
-            onClick={() => navigate('/appointment')}
+            onClick={() => navigate('/home')}
             whileTap={{ scale: 0.88 }}
             className="flex size-10 items-center justify-center text-[26px] font-light text-white/80"
           >
@@ -124,14 +124,10 @@ export function Identify() {
         </div>
       </div>
 
-      <Dialog
+      <BreakupDialog
         open={noShowOpen}
-        title="거래를 취소할까요?"
-        description="상대가 오지 않으면 약속을 접고 다시 상대를 찾습니다."
-        cancelLabel="조금 더 기다릴게요"
-        confirmLabel="취소할게요"
-        onCancel={() => setNoShowOpen(false)}
-        onConfirm={() => {
+        onKeep={() => setNoShowOpen(false)}
+        onFindNew={() => {
           setNoShowOpen(false)
           dispatch({ type: 'cancel-appointment' })
           navigate('/home')

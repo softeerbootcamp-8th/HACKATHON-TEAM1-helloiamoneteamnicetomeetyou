@@ -2,8 +2,8 @@ import { motion } from 'motion/react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { RejectDialog } from '@/components/domain/ConfirmDialogs'
 import { Button } from '@/components/ui/Button'
-import { Dialog } from '@/components/ui/Dialog'
 import { PinIcon } from '@/components/ui/icons'
 import { TopBar } from '@/components/ui/TopBar'
 import { springSnap } from '@/lib/motion'
@@ -17,17 +17,17 @@ import { useStore } from '@/store/useStore'
 export function PlaceSelect() {
   const navigate = useNavigate()
   const { dispatch } = useStore()
-  const [cancelOpen, setCancelOpen] = useState(false)
+  const [rejectOpen, setRejectOpen] = useState(false)
 
   return (
     <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
-      <TopBar onBack={() => navigate('/match')} onClose={() => setCancelOpen(true)} />
+      <TopBar onBack={() => navigate('/home')} onClose={() => setRejectOpen(true)} />
 
       <div className="flex-1 overflow-y-auto px-6 no-scrollbar">
         <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink">
           교환 장소를 확인해주세요
         </h1>
-        <p className="mt-2 text-[13px] text-neutral-400">핀 위치에서 교환할 수 있어요</p>
+        <p className="mt-2 text-[13px] text-neutral-400">핀이 있는 위치에서 교환할 수 있어요</p>
 
         <div className="relative mt-6 h-[230px] overflow-hidden rounded-2xl bg-neutral-100">
           {/* 운영측에서 받은 약도 자리. 지금은 격자로 대신한다. */}
@@ -52,8 +52,8 @@ export function PlaceSelect() {
                 dispatch({
                   type: 'toast',
                   message: zone.selectable
-                    ? `${FIXED_ZONE.name}에서 교환해요`
-                    : '이번 행사는 중앙 포토존에서만 교환할 수 있어요',
+                    ? `이번에는 ${FIXED_ZONE.name}에서만 교환할 수 있어요`
+                    : `이번에는 ${FIXED_ZONE.name}에서만 교환할 수 있어요`,
                 })
               }
               initial={{ opacity: 0, y: -8, scale: 0.7 }}
@@ -82,7 +82,10 @@ export function PlaceSelect() {
         <motion.button
           type="button"
           onClick={() =>
-            dispatch({ type: 'toast', message: `${FIXED_ZONE.name}으로 정해져 있어요` })
+            dispatch({
+              type: 'toast',
+              message: `이번에는 ${FIXED_ZONE.name}에서만 교환할 수 있어요`,
+            })
           }
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -90,16 +93,13 @@ export function PlaceSelect() {
           transition={{ ...springSnap, delay: 0.1 }}
           className="mt-5 flex w-full items-center gap-3 rounded-2xl border-2 border-ink bg-neutral-50 p-3.5 text-left"
         >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand text-ink">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand text-white">
             <PinIcon className="size-5" />
           </span>
           <div>
             <p className="text-[15px] font-bold text-ink">{FIXED_ZONE.name}</p>
             <p className="text-[12px] text-neutral-400">{FIXED_ZONE.location}</p>
           </div>
-          <span className="ml-auto flex size-6 items-center justify-center rounded-full bg-ink text-[12px] text-white">
-            ✓
-          </span>
         </motion.button>
       </div>
 
@@ -107,14 +107,11 @@ export function PlaceSelect() {
         <Button onClick={() => navigate('/time')}>시간 선택하기</Button>
       </div>
 
-      <Dialog
-        open={cancelOpen}
-        title="거래를 취소할까요?"
-        cancelLabel="아니요"
-        confirmLabel="취소할게요"
-        onCancel={() => setCancelOpen(false)}
-        onConfirm={() => {
-          setCancelOpen(false)
+      <RejectDialog
+        open={rejectOpen}
+        onKeep={() => setRejectOpen(false)}
+        onReject={() => {
+          setRejectOpen(false)
           dispatch({ type: 'cancel-appointment' })
           navigate('/home')
         }}

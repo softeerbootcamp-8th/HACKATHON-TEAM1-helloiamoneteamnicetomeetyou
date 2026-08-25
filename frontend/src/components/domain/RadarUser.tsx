@@ -73,10 +73,9 @@ export function RadarUser({ user, hovered, pending, burst = false, onSelect, ind
         )}
       >
         <GoodsFace item={item} size="sm" />
-        <p className="mt-1.5 text-center text-[10px] font-bold text-ink md:text-[13px]">
+        <p className="mt-1.5 text-center text-[9px] leading-tight font-bold text-ink md:text-[12px]">
           {item.name}
         </p>
-        <p className="text-center text-[9px] text-neutral-400 md:text-[11px]">{user.nickname}</p>
 
         {pending && (
           <span className="absolute inset-0 flex items-center justify-center text-[15px] font-bold text-neutral-500">

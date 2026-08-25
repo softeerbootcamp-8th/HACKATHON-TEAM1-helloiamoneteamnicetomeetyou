@@ -3,10 +3,12 @@ import { useEffect, useMemo, useReducer, type ReactNode } from 'react'
 import { ALL_WAITING } from '@/mocks/data'
 
 import { StoreContext } from './context'
-import { initialState, reducer } from './reducer'
+import { activeAppointment, initialState, reducer } from './reducer'
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState)
+  // 지금 다루고 있는 약속. 아래 효과들이 이것만 보고 돌면 되므로 밖에서 한 번 꺼내 둔다.
+  const appointment = activeAppointment(state)
 
   // 자동 매칭. 켜져 있는 동안 짧은 간격으로 상대를 찾는다.
   useEffect(() => {
@@ -39,7 +41,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // 남이 나에게 보내는 찔러보기. 내놓은 카드가 있어야 들어온다.
   useEffect(() => {
     if (state.have.length === 0) return
-    if (state.incomingPoke || state.heldIncoming || state.match || state.appointment) return
+    // 약속이 잡혀 있어도 찔러보기는 계속 들어온다. 약속을 기다리는 동안 다른 카드를
+    // 더 바꿀 수 있어야 하기 때문이다.
+    if (state.incomingPoke || state.heldIncoming || state.match) return
     const timer = window.setTimeout(() => {
       const mine = state.have[0].itemId
       const from = ALL_WAITING.find(
@@ -60,29 +64,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       })
     }, 9000)
     return () => window.clearTimeout(timer)
-  }, [
-    state.have,
-    state.incomingPoke,
-    state.heldIncoming,
-    state.match,
-    state.appointment,
-    state.outgoingPoke,
-  ])
+  }, [state.have, state.incomingPoke, state.heldIncoming, state.match, state.outgoingPoke])
 
   // 시간 선택 후 상대들의 응답.
   useEffect(() => {
-    const appt = state.appointment
+    const appt = appointment
     if (!appt || appt.stage !== 'time-waiting') return
     if (appt.mySlots.length === 0) return
     if (Object.keys(appt.partnerSlots).length > 0) return
 
     const timer = window.setTimeout(() => {
       const partners =
-        state.match?.kind === 'ONE_TO_ONE'
-          ? [state.match.partner.id]
-          : state.match
-            ? [state.match.giver.id, state.match.receiver.id]
-            : []
+        appt.match.kind === 'ONE_TO_ONE'
+          ? [appt.match.partner.id]
+          : [appt.match.giver.id, appt.match.receiver.id]
 
       // 상대도 자기가 되는 칸을 고른다. 내가 고른 칸이 하나라도 들어 있으면 약속이 잡히고,
       // 늦은 시간만 되는 상대를 만나면 겹치는 칸이 없어서 조율 화면으로 넘어간다.
@@ -95,7 +90,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'partner-slots-arrived', slots })
     }, 1800)
     return () => window.clearTimeout(timer)
-  }, [state.appointment, state.match])
+  }, [appointment])
 
   // 토스트는 스스로 사라진다.
   useEffect(() => {

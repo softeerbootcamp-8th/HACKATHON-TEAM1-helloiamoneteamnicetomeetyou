@@ -13,12 +13,21 @@ import { itemById } from '@/mocks/data'
  * 후보가 여럿이면 인기 많은 아이템(rank 가 작은 쪽)을 가진 상대를 고른다.
  */
 
-export type OneToOneMatch = {
-  kind: 'ONE_TO_ONE'
-  partner: WaitingUser
+/** 주고받을 카드 한 쌍 */
+export type ExchangePair = {
   /** 내가 주는 카드 */
   giveItemId: string
   /** 내가 받는 카드 */
+  receiveItemId: string
+}
+
+export type OneToOneMatch = {
+  kind: 'ONE_TO_ONE'
+  partner: WaitingUser
+  /** 주고받을 카드 쌍 전부. 한 번에 여러 장을 바꾸면 둘 이상이 된다. */
+  pairs: ExchangePair[]
+  /** 첫 쌍. 한 줄로 줄여 보여주는 자리와 교환 정리에서 쓴다. */
+  giveItemId: string
   receiveItemId: string
 }
 
@@ -40,6 +49,28 @@ function byPopularity(a: WaitingUser, b: WaitingUser) {
   return itemById(a.itemId).rank - itemById(b.itemId).rank
 }
 
+/** 이 사람이 들고 있는 카드 전부. 대표 카드 말고도 더 가지고 있을 수 있다. */
+export function heldBy(user: WaitingUser): string[] {
+  return [user.itemId, ...(user.alsoHasItemIds ?? [])]
+}
+
+/**
+ * 서로 줄 수 있는 카드를 인기순으로 하나씩 맞물린다.
+ * 한쪽이 더 많으면 적은 쪽 개수만큼만 바꾼다.
+ */
+function pairUp(partner: WaitingUser, haveIds: string[], needIds: string[]): ExchangePair[] {
+  const mine = wantedFromMe(partner, haveIds)
+  const theirs = heldBy(partner)
+    .filter((id) => needIds.includes(id))
+    .sort((a, b) => itemById(a).rank - itemById(b).rank)
+
+  const count = Math.min(mine.length, theirs.length)
+  return Array.from({ length: count }, (_, i) => ({
+    giveItemId: mine[i],
+    receiveItemId: theirs[i],
+  }))
+}
+
 /** 이 사람이 내 카드 중 하나라도 원하는지. 원하면 그중 가장 인기 있는 것을 돌려준다. */
 export function wantedFromMe(user: WaitingUser, haveIds: string[]): string[] {
   return haveIds
@@ -54,17 +85,19 @@ export function findMatch(haveIds: string[], needIds: string[]): MatchResult | n
 
   // 1. 서로 원하는 것이 정확히 맞는 상대
   const direct = ALL_WAITING.filter(
-    (u) => need.has(u.itemId) && wantedFromMe(u, haveIds).length > 0,
+    (u) => heldBy(u).some((id) => need.has(id)) && wantedFromMe(u, haveIds).length > 0,
   ).sort(byPopularity)
 
   if (direct.length > 0) {
     const partner = direct[0]
+    // 인기 많은 아이템을 먼저 내준다는 규칙은 pairUp 이 지킨다.
+    const pairs = pairUp(partner, haveIds, needIds)
     return {
       kind: 'ONE_TO_ONE',
       partner,
-      // 인기 많은 아이템을 먼저 내준다는 규칙을 여기서 지킨다.
-      giveItemId: wantedFromMe(partner, haveIds)[0],
-      receiveItemId: partner.itemId,
+      pairs,
+      giveItemId: pairs[0].giveItemId,
+      receiveItemId: pairs[0].receiveItemId,
     }
   }
 
@@ -96,33 +129,69 @@ export function findMatch(haveIds: string[], needIds: string[]): MatchResult | n
 }
 
 /**
- * 레이더에 띄울 상대를 고른다. 내가 원하는 굿즈를 가졌고 아직 약속이 없는 사람만,
- * 최대 5명이다. 원하는 것이 없으면 인기순으로 채워서 화면이 비지 않게 한다.
+ * 레이더 후보. 내가 원하는 굿즈를 가진 사람을 먼저 세우고, 모자라면 인기순으로 채운다.
+ * 같은 아이템을 든 사람이 둘 이상이면 레이더에는 한 명만 세운다.
  */
-export function radarUsers(needIds: string[]): WaitingUser[] {
+function radarPool(needIds: string[]): WaitingUser[] {
   const need = new Set(needIds)
   const wanted = ALL_WAITING.filter((u) => need.has(u.itemId))
   const rest = ALL_WAITING.filter((u) => !need.has(u.itemId)).sort(byPopularity)
   const seen = new Set<string>()
-  return [...wanted, ...rest]
-    .filter((u) => {
-      // 같은 아이템을 든 사람이 둘 이상이면 레이더에는 한 명만 세운다.
-      if (seen.has(u.itemId)) return false
-      seen.add(u.itemId)
-      return true
-    })
-    .slice(0, 5)
+  return [...wanted, ...rest].filter((u) => {
+    if (seen.has(u.itemId)) return false
+    seen.add(u.itemId)
+    return true
+  })
+}
+
+export const RADAR_SIZE = 5
+
+/**
+ * 레이더에 띄울 상대를 고른다. 최대 5명이다.
+ *
+ * `page` 는 "다른 카드 보기" 를 누른 횟수다. 화면에 떠 있던 카드보다 뒷순위를 보여주고,
+ * 뒷순위가 모자라면 앞에서부터 다시 채운다. 답변을 기다리는 중인 상대(`pinnedIds`)는
+ * 새로고침해도 자리를 지킨다. 다시 신청할 수 없다는 것이 화면에 계속 남아 있어야 한다.
+ */
+export function radarUsers(needIds: string[], page = 0, pinnedIds: string[] = []): WaitingUser[] {
+  const pool = radarPool(needIds)
+  if (pool.length === 0) return []
+
+  const pinned = pool.filter((u) => pinnedIds.includes(u.id))
+  const rest = pool.filter((u) => !pinnedIds.includes(u.id))
+  const room = Math.max(RADAR_SIZE - pinned.length, 0)
+
+  const picked: WaitingUser[] = []
+  const seen = new Set(pinned.map((u) => u.id))
+  for (let i = 0; picked.length < room && i < rest.length; i += 1) {
+    const user = rest[(page * room + i) % rest.length]
+    if (seen.has(user.id)) continue
+    seen.add(user.id)
+    picked.push(user)
+  }
+
+  return [...pinned, ...picked]
 }
 
 /**
- * 바텀시트 리스트 정렬. 내 Needs 를 위로 올리고, 그 안에서는 인기 많은 순이다.
+ * 전체리스트에 올릴 상대. 내 Needs 와 맞는 아이템만 보여준다.
+ * 아직 Needs 를 하나도 안 골랐으면 화면이 비어 버리므로 전체를 인기순으로 보여준다.
  */
 export function sortedWaitingList(needIds: string[]): WaitingUser[] {
   const need = new Set(needIds)
-  return [...ALL_WAITING].sort((a, b) => {
-    const aWanted = need.has(a.itemId) ? 0 : 1
-    const bWanted = need.has(b.itemId) ? 0 : 1
-    if (aWanted !== bWanted) return aWanted - bWanted
-    return byPopularity(a, b)
-  })
+  const matched = ALL_WAITING.filter((u) => heldBy(u).some((id) => need.has(id)))
+  const source = matched.length > 0 ? matched : ALL_WAITING
+  return [...source].sort(byPopularity)
+}
+
+/** 전체리스트 한 줄의 오른쪽에 붙는 상태. 시안이 세 가지로 나눠 둔다. */
+export type WaitingStatus = '매칭됨' | '교환 가능' | '그래도 찔러보기'
+
+export function waitingStatus(
+  user: WaitingUser,
+  haveIds: string[],
+  matchedUserIds: string[],
+): WaitingStatus {
+  if (matchedUserIds.includes(user.id)) return '매칭됨'
+  return wantedFromMe(user, haveIds).length > 0 ? '교환 가능' : '그래도 찔러보기'
 }
