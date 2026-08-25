@@ -73,8 +73,12 @@ export function usePush(userId: string) {
         if (cancelled) return
 
         setState({ status: already ? 'enabled' : 'idle' })
-      } catch {
+      } catch (error: unknown) {
         if (cancelled) return
+
+        // 원인을 삼키면 왜 안 켜지는지 알 방법이 없다. 화면에는 짧게 보여 주고 콘솔에 남긴다.
+        console.error('[push] 초기화 실패', error)
+
         // 공개키를 못 받으면 켤 수가 없다. 버튼을 보여 주고 누르게 하면 실패만 반복한다.
         setState({ status: 'error', reason: '알림 설정을 불러오지 못했어요.' })
       }
@@ -87,7 +91,11 @@ export function usePush(userId: string) {
 
   /** 반드시 클릭 핸들러에서 부른다. */
   const enable = useCallback(async () => {
-    if (!vapidPublicKey) return
+    if (!vapidPublicKey) {
+      // 조용히 아무것도 안 하면 버튼이 고장 난 것처럼 보인다.
+      setState({ status: 'error', reason: '알림 설정을 아직 불러오지 못했어요.' })
+      return
+    }
 
     setState({ status: 'enabling' })
 
@@ -97,13 +105,18 @@ export function usePush(userId: string) {
 
       // 켜자마자 한 번 보내 준다. 실제로 오는 것을 봐야 켜졌다고 믿을 수 있다.
       await sendTestPush(userId)
-    } catch {
+    } catch (error: unknown) {
+      console.error('[push] 켜기 실패', error)
+
       // 권한 팝업에서 거부한 경우와 그 밖의 실패를 나눠 보여 준다.
-      setState(
-        getPermission() === 'denied'
-          ? { status: 'denied' }
-          : { status: 'error', reason: '알림을 켜지 못했어요.' },
-      )
+      if (getPermission() === 'denied') {
+        setState({ status: 'denied' })
+        return
+      }
+
+      // 무엇 때문에 막혔는지 화면에서도 보이게 한다. 현장에서 콘솔을 열 수 없다.
+      const reason = error instanceof Error ? error.message : '알 수 없는 오류'
+      setState({ status: 'error', reason: `알림을 켜지 못했어요. (${reason})` })
     }
   }, [userId, vapidPublicKey])
 

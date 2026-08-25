@@ -57,7 +57,12 @@ public class PushSendService {
                 // 404/410. 브라우저가 구독을 지웠거나 사용자가 앱을 삭제했다. 다시 보낼 일이 없다.
                 log.info("만료된 구독을 지운다: endpoint={}", endpoint);
                 pushSubscriptionService.deleteByEndpoint(endpoint);
+                return;
             }
+
+            // 성공도 남긴다. 이게 없으면 "안 보냈다" 와 "보냈는데 화면에 안 떴다" 를 구분할 수 없어서,
+            // 알림이 안 온다는 이야기가 나왔을 때 어디부터 봐야 할지 알 수 없다.
+            log.info("푸시를 푸시 서비스에 넘겼다: endpoint={}", endpoint);
         } catch (Exception e) {
             // WebPushStatusException 은 코틀린에서 온 checked 예외인데 send() 에 throws 절이 없어서
             // 자바에서는 직접 catch 할 수 없다(잡을 수 없는 예외라고 컴파일이 막는다).
