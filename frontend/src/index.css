@@ -1,12 +1,77 @@
 /* Tailwind v4 는 설정 파일(tailwind.config.js) 없이 이 import 하나로 동작한다.
-   커스텀 토큰이 필요해지면 아래 @theme 블록에 추가한다. */
+   토큰은 아래 @theme 블록에 모아 두고, 화면에서는 항상 토큰 이름으로만 쓴다. */
 @import 'tailwindcss';
 
 @theme {
   --font-sans:
     'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+  /* 시안에서 뽑은 값이다. 임의로 바꾸지 않는다. */
+  --color-brand: #2ced90;
+  --color-brand-soft: #eafcf936;
+  --color-ink: #111111;
+  --color-tile: #eef0f4;
+  --color-disabled: #f1f1f0;
+  --color-line: #ececec;
+  --color-muted: #9aa0a8;
+
+  /* 카드 썸네일 그라데이션. 시안 card-preview-thumbnail 과 같은 값이다. */
+  --gradient-card: linear-gradient(160deg, #2ced90 0%, #e8eaf1 75%, #cfd3df 100%);
+}
+
+html,
+body,
+#root {
+  height: 100%;
 }
 
 body {
-  @apply bg-white text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100;
+  /* 목업은 라이트 한 벌만 만든다. 시안에 다크 모드가 없다. */
+  @apply bg-neutral-100 text-neutral-900 antialiased;
+  overscroll-behavior: none;
+}
+
+/* iOS 에서 주소창이 접힐 때 화면이 튀지 않게 한다. */
+@supports (height: 100dvh) {
+  html,
+  body,
+  #root {
+    height: 100dvh;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* 카드 앞면. 굿즈 이미지가 아직 없어서 시안의 그라데이션을 그대로 쓴다. */
+@utility card-face {
+  background: var(--gradient-card);
+}
+
+/* 레이더 배경에 깔리는 연한 빛 무리. */
+@utility sweep-glow {
+  background: radial-gradient(circle at 70% 45%, #2ced9033 0%, #2ced9000 60%);
+}
+
+/* 버튼과 카드를 누를 때 시스템 하이라이트가 겹쳐 보이지 않게 한다. */
+button,
+[role='button'] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 모션을 줄이겠다고 한 사용자에게는 전환을 걷어낸다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
