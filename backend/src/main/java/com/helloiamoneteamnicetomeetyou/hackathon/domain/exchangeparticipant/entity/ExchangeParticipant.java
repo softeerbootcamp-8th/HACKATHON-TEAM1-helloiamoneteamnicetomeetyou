@@ -43,4 +43,13 @@ public class ExchangeParticipant {
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime joinedAt;
+
+    public static ExchangeParticipant create(Exchange exchange, User user) {
+        ExchangeParticipant participant = new ExchangeParticipant();
+        participant.exchange = exchange;
+        participant.user = user;
+        participant.status = ParticipantStatus.PENDING;
+        participant.joinedAt = LocalDateTime.now();
+        return participant;
+    }
 }

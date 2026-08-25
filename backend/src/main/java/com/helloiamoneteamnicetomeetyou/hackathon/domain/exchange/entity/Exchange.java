@@ -45,4 +45,12 @@ public class Exchange {
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    public static Exchange create(ExchangeType type) {
+        Exchange exchange = new Exchange();
+        exchange.type = type;
+        exchange.status = ExchangeStatus.PENDING;
+        exchange.createdAt = LocalDateTime.now();
+        return exchange;
+    }
 }

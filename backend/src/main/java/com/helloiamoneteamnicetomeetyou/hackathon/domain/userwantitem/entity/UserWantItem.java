@@ -2,6 +2,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.entity;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -31,4 +32,15 @@ public class UserWantItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "item_id", nullable = false)
     private Item item;
+
+    @Column(nullable = false)
+    private Integer quantity;
+
+    public static UserWantItem create(User user, Item item, int quantity) {
+        UserWantItem userWantItem = new UserWantItem();
+        userWantItem.user = user;
+        userWantItem.item = item;
+        userWantItem.quantity = quantity;
+        return userWantItem;
+    }
 }

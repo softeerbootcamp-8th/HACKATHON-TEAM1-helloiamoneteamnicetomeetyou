@@ -4,6 +4,8 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -11,6 +13,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -35,4 +39,36 @@ public class UserHaveItem {
 
     @Column(nullable = false)
     private Integer quantity;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private ItemStatus status;
+
+    @Column(nullable = false)
+    private Integer quantityLeft;
+
+    @Version
+    private Long version;
+
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    public static UserHaveItem create(User user, Item item, int quantity) {
+        UserHaveItem userHaveItem = new UserHaveItem();
+        userHaveItem.user = user;
+        userHaveItem.item = item;
+        userHaveItem.quantity = quantity;
+        userHaveItem.status = ItemStatus.LEFT;
+        userHaveItem.quantityLeft = quantity;
+        userHaveItem.createdAt = LocalDateTime.now();
+        return userHaveItem;
+    }
+
+    public void decreaseQuantityLeft(int amount) {
+        this.quantityLeft -= amount;
+        if (this.quantityLeft <= 0) {
+            this.quantityLeft = 0;
+            this.status = ItemStatus.OUT;
+        }
+    }
 }

@@ -3,6 +3,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -40,4 +41,17 @@ public class ExchangeItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "to_user_id", nullable = false)
     private User toUser;
+
+    @Column(nullable = false)
+    private Integer quantity;
+
+    public static ExchangeItem create(Exchange exchange, User fromUser, Item item, User toUser, int quantity) {
+        ExchangeItem exchangeItem = new ExchangeItem();
+        exchangeItem.exchange = exchange;
+        exchangeItem.fromUser = fromUser;
+        exchangeItem.item = item;
+        exchangeItem.toUser = toUser;
+        exchangeItem.quantity = quantity;
+        return exchangeItem;
+    }
 }
