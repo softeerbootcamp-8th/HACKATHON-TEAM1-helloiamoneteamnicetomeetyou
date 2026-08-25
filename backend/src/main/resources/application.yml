@@ -57,12 +57,29 @@ sse:
   emitter-timeout-ms: 1800000
   heartbeat-interval-ms: 15000
 
+# 웹푸시(VAPID) 키다. `npx web-push generate-vapid-keys --json` 으로 만든 값을 그대로 쓴다.
+# 값은 팀에서 따로 공유하고 저장소에 넣지 않는다. 배포는 GitHub Secrets 로 들어온다.
+#
+# 기본값을 주지 않는 것은 datasource 와 같은 이유다. 값이 빠지면 부팅 단계에서 바로 죽는 편이,
+# 아무한테도 안 가는 알림을 조용히 성공으로 처리하는 것보다 낫다.
+# 로컬에서 bootRun 하려면 셸이나 실행 구성에 VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY 를 넣는다.
+#
+# subject 는 APNs 가 https:// 나 mailto: 로 시작하지 않으면 403 을 준다.
+push:
+  vapid:
+    public-key: ${VAPID_PUBLIC_KEY}
+    private-key: ${VAPID_PRIVATE_KEY}
+    subject: ${VAPID_SUBJECT:https://52-78-131-174.sslip.io}
+
 # 프론트가 다른 오리진에서 뜨기 때문에 허용할 오리진을 적어 둔다.
 # YAML 목록으로 쓰면 @Value 가 못 읽어서 쉼표로 구분한 한 줄로 둔다.
 # - https://*.vercel.app : 배포와 프리뷰. 프리뷰는 커밋마다 도메인이 바뀐다
 # - http://localhost:5173 : Vite 개발 서버
+# - http://localhost:4173 : Vite preview 서버. 서비스 워커가 dev 에서 돌지 않아서 PWA 와
+#   푸시 확인은 preview 로만 할 수 있다. 브라우저는 same-origin 이어도 POST 에는 Origin 을
+#   붙이기 때문에, 프록시를 거쳐도 이 오리진이 허용 목록에 없으면 403 이 된다.
 cors:
-  allowed-origin-patterns: https://*.vercel.app,http://localhost:5173
+  allowed-origin-patterns: https://*.vercel.app,http://localhost:5173,http://localhost:4173
 
 ---
 # 로컬 docker compose E2E 테스트용 프로파일 (SPRING_PROFILES_ACTIVE=e2e)

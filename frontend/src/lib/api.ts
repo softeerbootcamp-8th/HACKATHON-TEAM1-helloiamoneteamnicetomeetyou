@@ -21,12 +21,38 @@ export type CommonResponse<T> = {
 
 export class ApiError extends Error {
   readonly status: number
+  /** 팀 내부 에러 코드. 화면이 상황을 갈라야 할 때 본다 (예: 2000 이면 사용자 재등록). */
+  readonly code?: number
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: number) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.code = code
   }
+}
+
+/**
+ * 실패 응답에서 사용자에게 보여줄 문장을 꺼낸다.
+ *
+ * 서버의 `message` 는 그대로 화면에 띄워도 되는 한글 문장이라는 것이 팀 약속이라, 있으면
+ * 그것을 쓴다. 본문이 없거나 JSON 이 아닌 경우(프록시 오류 등)에만 기본 문장으로 떨어진다.
+ */
+async function toApiError(res: Response, path: string, method: string): Promise<ApiError> {
+  try {
+    const body = (await res.json()) as CommonResponse<never>
+    if (body.message) return new ApiError(res.status, body.message, body.code)
+  } catch {
+    // 본문이 비었거나 JSON 이 아니다. 아래 기본 문장으로 간다.
+  }
+
+  // 서버가 팀 형식으로 답하지 못한 경우다. 프록시나 게이트웨이가 대신 뱉은 응답이라
+  // 사용자에게 보여줄 문장이 없다. 기술적인 내용은 화면에 올리지 않고 개발 모드 콘솔로만 넘긴다.
+  if (import.meta.env.DEV) {
+    console.warn(`[api] ${method} ${path} → ${res.status} (팀 응답 형식이 아님)`)
+  }
+
+  return new ApiError(res.status, '서버에 닿지 못했습니다. 잠시 뒤에 다시 시도해 주세요.')
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -39,7 +65,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   })
 
   if (!res.ok) {
-    throw new ApiError(res.status, `${init?.method ?? 'GET'} ${path} → ${res.status}`)
+    throw await toApiError(res, path, init?.method ?? 'GET')
   }
 
   // 204 No Content 처럼 본문이 없는 응답에 res.json() 을 부르면 파싱 에러가 난다.
@@ -51,4 +77,33 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return (await res.json()) as T
+}
+
+/**
+ * 공통 응답 껍데기를 벗겨 `data` 만 돌려준다.
+ *
+ * 실패는 `api()` 가 이미 던진다. 여기서 `success` 를 다시 보는 것은 200 인데
+ * `success: false` 인 경우를 잡기 위해서다. 그런 응답이 조용히 `undefined` 로 흘러가면
+ * 화면이 빈 채로 성공한 것처럼 보인다.
+ */
+export async function apiData<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await api<CommonResponse<T>>(path, init)
+
+  if (!res.success || res.data === undefined) {
+    // 여기까지 왔다는 것은 HTTP 는 2xx 였다는 뜻이라 상태 코드는 200 으로 둔다.
+    throw new ApiError(200, res.message ?? '서버 응답 형식이 예상과 다릅니다.', res.code)
+  }
+
+  return res.data
+}
+
+/** 본문 없이 성공만 확인하면 되는 요청(등록 등). 실패는 `api()` 가 던진다. */
+export async function apiVoid(path: string, init?: RequestInit): Promise<void> {
+  await api<CommonResponse<never>>(path, init)
+}
+
+/** 어떤 예외든 화면에 그대로 띄울 수 있는 한글 한 문장으로 바꾼다. */
+export function messageOf(error: unknown): string {
+  if (error instanceof ApiError) return error.message
+  return '서버에 닿지 못했습니다. 잠시 뒤에 다시 시도해 주세요.'
 }

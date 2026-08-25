@@ -5,8 +5,17 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// https://vite.dev/config/
+// 백엔드 주소를 DEV_PROXY_TARGET 으로 덮을 수 있게 열어 두었다. 기본값은 그대로 8080 이라
+// 평소에는 아무것도 달라지지 않고, 워크트리를 하나 더 띄워 다른 포트에서 돌릴 때만 쓴다.
 const proxyTarget = process.env.DEV_PROXY_TARGET ?? 'http://localhost:8080'
+
+// dev 서버와 preview 서버가 같이 쓴다. 한쪽만 고치면 둘 중 하나에서만 백엔드가 붙는다.
+const API_PROXY = {
+  '/api': { target: proxyTarget, changeOrigin: true },
+  '/health': { target: proxyTarget, changeOrigin: true },
+}
+
+// https://vite.dev/config/
 
 export default defineConfig({
   plugins: [
@@ -18,6 +27,12 @@ export default defineConfig({
       registerType: 'autoUpdate',
       // 서비스 워커 등록 스크립트는 플러그인이 index.html 에 넣어 준다.
       injectRegister: 'auto',
+      // 푸시 알림을 받으려면 서비스 워커에 push 핸들러가 있어야 하는데, 플러그인이 만들어 주는
+      // 워커에는 그걸 넣을 자리가 없다. 그래서 src/sw.ts 를 직접 쓰고 플러그인은 프리캐시
+      // 목록만 주입하게 한다. filename 이 .ts 면 플러그인이 컴파일해서 dist/sw.js 로 내보낸다.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       // 아이콘은 pwa-assets.config.ts 가 public/logo.svg 로 미리 만들어 둔 것을 쓴다.
       manifest: {
         name: 'NearLy',
@@ -41,13 +56,13 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
+      // strategies 가 injectManifest 면 workbox 옵션은 통째로 무시된다. 예전에 거기 있던
+      // navigateFallbackDenylist 는 src/sw.ts 안에서 NavigationRoute 로 직접 구현했다.
+      // 빼먹으면 오프라인 앱 껍데기가 조용히 사라지므로 둘을 같이 봐야 한다.
+      injectManifest: {
         // 빌드 산출물만 프리캐시한다. 오프라인에서 앱 껍데기가 뜨는 데까지가 목표다.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         // API 응답은 캐시하지 않는다. 오래된 데이터가 화면에 남으면 디버깅이 어려워진다.
-        // 여기에 runtimeCaching 을 넣지 않는 것으로 충분하고, 아래 denylist 는 /api 로 가는
-        // 네비게이션 요청까지 index.html 로 되돌려 보내지 않게 막는 것이다.
-        navigateFallbackDenylist: [/^\/api\//, /^\/health$/],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
       },
     }),
   ],
@@ -63,12 +78,16 @@ export default defineConfig({
     // 개발 중에는 프론트(5173)와 백엔드(8080)의 오리진이 달라 그냥 부르면 CORS 에 막힌다.
     // 서버 쪽에 CORS 설정을 넣는 대신 dev 서버가 같은 오리진인 척 프록시해 준다.
     // 덕분에 코드에서는 배포 환경과 똑같이 상대경로('/api/...')로만 호출하면 된다.
+    proxy: API_PROXY,
+  },
+  preview: {
+    port: 4173,
+    // preview 는 server.proxy 를 물려받지 않는다. 여기에 같은 설정을 두지 않으면
+    // `pnpm preview` 로 띄운 화면의 /api 호출이 전부 404 가 된다.
     //
-    // 백엔드 주소를 DEV_PROXY_TARGET 으로 덮을 수 있게 열어 두었다. 기본값은 그대로 8080 이라
-    // 평소에는 아무것도 달라지지 않고, 워크트리를 하나 더 띄워 다른 포트에서 돌릴 때만 쓴다.
-    proxy: {
-      '/api': { target: proxyTarget, changeOrigin: true },
-      '/health': { target: proxyTarget, changeOrigin: true },
-    },
+    // 서비스 워커는 dev 에서 돌지 않기 때문에 푸시와 오프라인 확인은 preview 로만 할 수 있고,
+    // 그 확인에는 백엔드가 붙어 있어야 한다. localhost 는 HTTPS 가 아니어도 secure context 로
+    // 쳐 주기 때문에 인증서 없이 서비스 워커와 푸시가 그대로 동작한다.
+    proxy: API_PROXY,
   },
 })

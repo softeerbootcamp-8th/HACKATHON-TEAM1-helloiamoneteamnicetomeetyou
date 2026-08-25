@@ -49,11 +49,15 @@ export function slotTimeLabel(slots: Slot[], index: number, from: Date): string 
   return `${base.getHours()}:${pad(base.getMinutes())}`
 }
 
+/** 모두가 되는 칸 전부. 시안이 이 칸들 아래에 밑줄을 긋는다. */
+export function overlappingSlots(rows: number[][]): number[] {
+  if (rows.length === 0) return []
+  return Array.from({ length: SLOT_COUNT }, (_, i) => i).filter((i) =>
+    rows.every((row) => row.includes(i)),
+  )
+}
+
 /** 모두가 되는 가장 빠른 칸을 찾는다. 없으면 -1 이다. */
 export function earliestOverlap(rows: number[][]): number {
-  if (rows.length === 0) return -1
-  for (let i = 0; i < SLOT_COUNT; i += 1) {
-    if (rows.every((row) => row.includes(i))) return i
-  }
-  return -1
+  return overlappingSlots(rows)[0] ?? -1
 }

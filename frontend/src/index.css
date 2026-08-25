@@ -7,16 +7,22 @@
     'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 
   /* 시안에서 뽑은 값이다. 임의로 바꾸지 않는다. */
-  --color-brand: #2ced90;
-  --color-brand-soft: #eafcf936;
+  --color-brand: #2cb3ed;
+  --color-brand-soft: #eaf7fd;
+  /* 겹친 시간처럼 브랜드색보다 더 눌러야 하는 자리에 쓰는 남색이다. */
+  --color-navy: #002c5f;
+  /* 상대가 고른 시간 칸. 내 칸(brand)보다 연해야 한 눈에 갈린다. */
+  --color-partner: #aacae6;
+  /* 알림 카드 왼쪽의 단색 사각형. 시안이 이 자리만 다른 색으로 두고 있다. */
+  --color-alarm: #2ced90;
   --color-ink: #111111;
-  --color-tile: #eef0f4;
+  --color-tile: #f5f7fa;
   --color-disabled: #f1f1f0;
   --color-line: #ececec;
   --color-muted: #9aa0a8;
 
   /* 카드 썸네일 그라데이션. 시안 card-preview-thumbnail 과 같은 값이다. */
-  --gradient-card: linear-gradient(160deg, #2ced90 0%, #e8eaf1 75%, #cfd3df 100%);
+  --gradient-card: linear-gradient(160deg, #2cb3ed 0%, #e8eaf1 75%, #cfd3df 100%);
 }
 
 html,
@@ -54,7 +60,7 @@ body {
 }
 
 /*
-  레이더 스윕. 시안(99:5005)은 각도 그라데이션이다. 0도에서 초록 30% 로 시작해
+  레이더 스윕. 시안은 각도 그라데이션이다. 0도에서 브랜드색 30% 로 시작해
   50도 만에 투명해지고 나머지 각도는 비어 있는 부채꼴이다.
 
   요소를 통째로 돌리지 않고 그라데이션의 시작 각도만 돌린다. 타원을 돌리면 도형 자체가
@@ -70,10 +76,16 @@ body {
 @utility sweep-fan {
   background: conic-gradient(
     from var(--sweep-angle),
-    #2ced904d 0deg,
-    #edf92000 50deg,
+    #2cb3ed5c 0deg,
+    #2ced9047 26deg,
+    #7ad9ff2e 52deg,
+    #2cb3ed00 82deg,
     #00000000 360deg
   );
+  /* 가장자리로 갈수록 흐려지고, 부채꼴 경계도 뭉개져야 시안처럼 은은하게 훑고 지나간다. */
+  -webkit-mask-image: radial-gradient(circle, #000 0%, #000000a6 50%, #0000 100%);
+  mask-image: radial-gradient(circle, #000 0%, #000000a6 50%, #0000 100%);
+  filter: blur(10px);
   animation: tradit-sweep 3s linear infinite;
 }
 

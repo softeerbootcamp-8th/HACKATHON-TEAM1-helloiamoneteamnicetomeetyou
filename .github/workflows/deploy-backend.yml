@@ -202,7 +202,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           # 배포가 걸려도 러너를 물고 있지 않게 자른다.
           command_timeout: 5m
-          envs: IMAGE,GHCR_USER,GHCR_TOKEN,DB_URL,DB_USERNAME,DB_PASSWORD,ADMIN_USERNAME,ADMIN_PASSWORD
+          envs: IMAGE,GHCR_USER,GHCR_TOKEN,DB_URL,DB_USERNAME,DB_PASSWORD,ADMIN_USERNAME,ADMIN_PASSWORD,VAPID_PUBLIC_KEY,VAPID_PRIVATE_KEY,VAPID_SUBJECT
           # script_stop 은 이 액션의 입력이 아니다(Unexpected input 경고).
           # 스크립트 첫 줄의 set -euo pipefail 이 같은 역할을 한다.
           script: |
@@ -270,6 +270,9 @@ jobs:
               -e DB_PASSWORD="$DB_PASSWORD" \
               -e ADMIN_USERNAME="$ADMIN_USERNAME" \
               -e ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+              -e VAPID_PUBLIC_KEY="$VAPID_PUBLIC_KEY" \
+              -e VAPID_PRIVATE_KEY="$VAPID_PRIVATE_KEY" \
+              -e VAPID_SUBJECT="$VAPID_SUBJECT" \
               "$IMAGE"
 
             # 배포를 fire-and-forget 으로 두지 않는다. 안 뜨면 로그를 남기고 워크플로를 실패시킨다.
@@ -303,6 +306,11 @@ jobs:
           # 달라진다. 영문과 숫자로만 두는 것이 안전하다.
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          # 웹푸시 VAPID 키. application.yml 의 push.vapid.* 가 이 이름 그대로 읽는다.
+          # 셋 중 하나라도 빠지면 placeholder 미해결로 부팅이 실패하고 health check 가 배포를 막는다.
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
 
   notify:
     name: Notify Slack

@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { Dialog } from '@/components/ui/Dialog'
+import { BreakupDialog } from '@/components/domain/ConfirmDialogs'
 import { tick } from '@/lib/haptics'
 import { springSnap } from '@/lib/motion'
 import { MY_IDENTITY } from '@/mocks/data'
@@ -20,19 +20,26 @@ export function Identify() {
   const [pokes, setPokes] = useState(0)
 
   return (
-    <div
-      className="relative flex h-full flex-col text-white"
-      style={{
-        background: 'linear-gradient(160deg, #3dd2ff8c 0%, #0a1a33 35%, #050d1c 100%), #050d1c',
-      }}
-    >
-      {/* 배경은 화면을 다 덮고, 내용 폭만 다른 화면과 같이 맞춘다. */}
-      <div className="mx-auto flex h-full w-full flex-col md:max-w-[900px] md:px-10">
+    <div className="relative flex h-full flex-col text-white">
+      {/*
+        배경은 화면을 다 덮는다. 판이 노치 밑에 주는 여백까지 끌어올리지 않으면
+        어두운 화면 위쪽에 흰 띠가 남는다.
+      */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 -top-[max(0.75rem,env(safe-area-inset-top))] bottom-0"
+        style={{
+          background: 'linear-gradient(160deg, #3dd2ff8c 0%, #0a1a33 35%, #050d1c 100%), #050d1c',
+        }}
+      />
+
+      {/* 내용 폭만 다른 화면과 같이 맞춘다. */}
+      <div className="relative mx-auto flex h-full w-full flex-col md:max-w-[900px] md:px-10">
         <div className="flex h-14 shrink-0 items-center justify-end px-4">
           <motion.button
             type="button"
             aria-label="닫기"
-            onClick={() => navigate('/appointment')}
+            onClick={() => navigate('/home')}
             whileTap={{ scale: 0.88 }}
             className="flex size-10 items-center justify-center text-[26px] font-light text-white/80"
           >
@@ -124,14 +131,10 @@ export function Identify() {
         </div>
       </div>
 
-      <Dialog
+      <BreakupDialog
         open={noShowOpen}
-        title="거래를 취소할까요?"
-        description="상대가 오지 않으면 약속을 접고 다시 상대를 찾습니다."
-        cancelLabel="조금 더 기다릴게요"
-        confirmLabel="취소할게요"
-        onCancel={() => setNoShowOpen(false)}
-        onConfirm={() => {
+        onKeep={() => setNoShowOpen(false)}
+        onFindNew={() => {
           setNoShowOpen(false)
           dispatch({ type: 'cancel-appointment' })
           navigate('/home')

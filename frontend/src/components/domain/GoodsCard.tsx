@@ -1,37 +1,137 @@
 import { motion } from 'motion/react'
-import { useRef } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
 import type { Item } from '@/mocks/data'
 
-type Size = 'sm' | 'md' | 'lg'
+export type Size = 'sm' | 'md' | 'lg' | 'fill'
 
-// 데스크톱은 화면이 넓어서 같은 크기로 두면 카드가 유난히 작아 보인다.
+/**
+ * 카드 앞면(회색 타일)의 높이와, 이미지를 못 받았을 때 대신 나오는 약칭 글자 크기다.
+ * 데스크톱은 화면이 넓어서 같은 크기로 두면 카드가 유난히 작아 보인다.
+ */
 const TILE: Record<Size, string> = {
-  sm: 'h-[62px] text-[15px] md:h-[70px] md:text-[16px]',
-  md: 'h-[74px] text-[17px] md:h-[88px] md:text-[20px]',
-  lg: 'h-[92px] text-[20px] md:h-[104px] md:text-[23px]',
+  sm: 'h-[70px] text-[15px] md:h-[78px] md:text-[16px]',
+  md: 'h-[96px] text-[17px] md:h-[106px] md:text-[20px]',
+  lg: 'h-[108px] text-[20px] md:h-[118px] md:text-[23px]',
+  fill: 'h-full text-[22px]',
+}
+
+/** 이름 자리. 두 줄까지 들어가게 높이를 잡아 둬야 격자가 어긋나지 않는다. */
+const NAME: Record<Size, string> = {
+  sm: 'h-[26px] text-[10px]',
+  md: 'h-[30px] text-[12px]',
+  lg: 'h-[32px] text-[13px]',
+  fill: 'h-[32px] text-[13px]',
+}
+
+const PAD: Record<Size, string> = {
+  sm: 'p-2',
+  md: 'p-2.5',
+  lg: 'p-3',
+  fill: 'p-3',
 }
 
 /**
- * 카드 앞면. 굿즈 이미지가 아직 없어서 시안처럼 약칭을 초록 빛무리 위에 얹는다.
- * 이미지가 들어오면 이 컴포넌트만 바꾸면 된다.
+ * 카드 겉모양. 굿즈 카드는 화면마다 쓰임이 달라도 생김새는 하나여야 한다.
+ * 흰 바닥에 옅은 테두리, 시안의 `#e8e8e5` 자리다.
  */
-export function GoodsFace({ item, size = 'md' }: { item: Item; size?: Size }) {
+export const CARD_SHELL = 'rounded-2xl bg-white ring-1 ring-line'
+
+/**
+ * 카드 앞면. 브랜드색 빛무리 위에 굿즈 이미지를 얹는다.
+ *
+ * 시안에서 이미지는 회색 타일보다 크게 그려져 위아래 양옆으로 삐져나온다. 타일 안에
+ * 가두면 차가 작아 보이고 빛무리도 번지지 않아서, 타일만 배경으로 깔고 이미지는 그 위를
+ * 덮게 둔다. 다만 카드 여백보다 더 나가면 카드를 벗어난 것처럼 보여서 118% 로 맞췄다.
+ *
+ * `max-w-none` 이 없으면 preflight 의 `img { max-width: 100% }` 가 폭을 잘라서
+ * 이미지가 넓어지지 않고 왼쪽으로만 밀린다.
+ */
+export function GoodsFace({
+  item,
+  size = 'md',
+  className,
+}: {
+  item: Item
+  size?: Size
+  className?: string
+}) {
+  const [failed, setFailed] = useState(false)
+
   return (
     <div
       className={cn(
-        'relative flex w-full items-center justify-center overflow-hidden rounded-xl bg-tile font-bold text-ink',
+        'relative flex w-full shrink-0 items-center justify-center font-bold text-ink',
         TILE[size],
+        className,
       )}
     >
+      <span aria-hidden className="absolute inset-0 rounded-xl bg-tile ring-1 ring-line" />
       <span
         aria-hidden
-        className="absolute size-[70%] rounded-full blur-[14px]"
-        style={{ background: 'radial-gradient(circle, #2ced90 0%, #2ced9000 70%)' }}
+        className="absolute size-[58%] rounded-full blur-[11px]"
+        style={{ background: 'radial-gradient(circle, #2cb3edd9 0%, #2cb3ed00 74%)' }}
       />
-      <span className="relative">{item.code}</span>
+      {failed ? (
+        <span className="relative">{item.code}</span>
+      ) : (
+        <img
+          src={item.image}
+          alt=""
+          aria-hidden
+          loading="lazy"
+          draggable={false}
+          onError={() => setFailed(true)}
+          className="absolute -top-[9%] -left-[9%] h-[118%] w-[118%] max-w-none object-contain select-none"
+        />
+      )}
+    </div>
+  )
+}
+
+/** 카드 속. 앞면과 이름만 들어간다. 모든 화면이 이걸 그대로 쓴다. */
+export function ItemCardBody({ item, size = 'md' }: { item: Item; size?: Size }) {
+  return (
+    <>
+      <GoodsFace item={item} size={size} />
+      <p
+        className={cn(
+          'mt-2 flex items-center justify-center text-center leading-tight font-bold text-ink',
+          NAME[size],
+        )}
+      >
+        <span className="line-clamp-2">{item.name}</span>
+      </p>
+    </>
+  )
+}
+
+/** 누를 일이 없는 자리에 쓰는 카드. 매칭 결과, 찔러보기 확인 같은 화면이 쓴다. */
+export function ItemCard({
+  item,
+  size = 'md',
+  className,
+  children,
+}: {
+  item: Item
+  size?: Size
+  className?: string
+  children?: ReactNode
+}) {
+  return (
+    <div
+      className={cn(
+        CARD_SHELL,
+        PAD[size],
+        'shadow-[0_4px_16px_rgba(0,0,0,0.08)]',
+        'relative',
+        className,
+      )}
+    >
+      <ItemCardBody item={item} size={size} />
+      {children}
     </div>
   )
 }
@@ -39,11 +139,9 @@ export function GoodsFace({ item, size = 'md' }: { item: Item; size?: Size }) {
 type CardProps = {
   item: Item
   selected?: boolean
-  /** 고를 수 없는 상태. 이유는 note 로 알려 준다. */
+  /** 고를 수 없는 상태. 시안에서는 이유를 글로 적지 않고 흐리게만 둔다. */
   disabled?: boolean
-  note?: string
   qty?: number
-  showKo?: boolean
   size?: Size
   onClick?: () => void
   onIncrease?: () => void
@@ -60,9 +158,7 @@ export function GoodsCard({
   item,
   selected = false,
   disabled = false,
-  note,
   qty,
-  showKo = true,
   size = 'md',
   onClick,
   onIncrease,
@@ -84,8 +180,10 @@ export function GoodsCard({
       layout
       transition={springSnap}
       className={cn(
-        'rounded-2xl bg-white p-2.5 shadow-[0_2px_10px_rgba(0,0,0,0.06)]',
-        selected ? 'ring-2 ring-ink' : 'ring-1 ring-neutral-100',
+        CARD_SHELL,
+        PAD[size],
+        'shadow-[0_2px_10px_rgba(0,0,0,0.06)]',
+        selected && 'ring-2 ring-ink',
         disabled && 'opacity-45',
       )}
     >
@@ -103,14 +201,8 @@ export function GoodsCard({
         aria-disabled={disabled}
       >
         <div className={cn(disabled && 'grayscale')}>
-          <GoodsFace item={item} size={size} />
+          <ItemCardBody item={item} size={size} />
         </div>
-        <p className="mt-2 text-center text-[12px] font-bold text-ink">{item.name}</p>
-        {note ? (
-          <p className="text-center text-[10px] leading-tight text-neutral-400">{note}</p>
-        ) : (
-          showKo && <p className="text-center text-[11px] text-neutral-400">{item.nameKo}</p>
-        )}
       </motion.button>
 
       {selected && qty !== undefined && (

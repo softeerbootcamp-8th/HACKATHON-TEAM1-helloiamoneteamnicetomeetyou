@@ -40,8 +40,13 @@ export function MenuIcon({ className }: IconProps) {
 export function PinIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
-      <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" fill="currentColor" />
-      <circle cx="12" cy="10" r="2.6" fill="#fff" />
+      {/* 가운데가 실제로 뚫린 핀이다. 뒤에 있는 것이 구멍으로 비친다. */}
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Zm0-8.2a2.8 2.8 0 1 0 0-5.6 2.8 2.8 0 0 0 0 5.6Z"
+        fill="currentColor"
+      />
     </svg>
   )
 }
