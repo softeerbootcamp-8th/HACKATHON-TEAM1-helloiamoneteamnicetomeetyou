@@ -24,6 +24,12 @@ public interface UserWantItemRepository extends JpaRepository<UserWantItem, Long
            AND my_uhi.status = 'LEFT'
            AND my_uhi.quantity_left > 0
         WHERE uwi.user_id != :myUserId
+          AND uwi.user_id NOT IN (
+              SELECT ep.user_id FROM exchange_participants ep
+              JOIN exchanges e ON e.id = ep.exchange_id
+              WHERE e.status = 'PENDING'
+          )
+        ORDER BY my_uhi.created_at ASC
         """, nativeQuery = true)
     List<Object[]> findToThemData(@Param("myUserId") Long myUserId);
 }

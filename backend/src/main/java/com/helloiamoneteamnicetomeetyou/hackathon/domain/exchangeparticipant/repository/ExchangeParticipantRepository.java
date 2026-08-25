@@ -13,4 +13,7 @@ public interface ExchangeParticipantRepository extends JpaRepository<ExchangePar
 
     @Query("SELECT ep FROM ExchangeParticipant ep JOIN FETCH ep.exchange WHERE ep.user.id = :userId ORDER BY ep.joinedAt DESC")
     List<ExchangeParticipant> findByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT COUNT(ep) > 0 FROM ExchangeParticipant ep WHERE ep.user.id = :userId AND ep.exchange.status = 'PENDING'")
+    boolean existsPendingExchange(@Param("userId") Long userId);
 }

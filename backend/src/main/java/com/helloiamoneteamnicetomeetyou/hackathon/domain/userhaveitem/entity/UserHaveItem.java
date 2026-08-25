@@ -10,6 +10,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -20,7 +21,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "user_have_items")
+@Table(name = "user_have_items", indexes = {
+        @Index(name = "idx_uhi_item_status", columnList = "item_id, status, quantity_left"),
+        @Index(name = "idx_uhi_user_status", columnList = "user_id, status, quantity_left")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserHaveItem {
@@ -68,7 +72,16 @@ public class UserHaveItem {
         this.quantityLeft -= amount;
         if (this.quantityLeft <= 0) {
             this.quantityLeft = 0;
-            this.status = ItemStatus.OUT;
+            this.status = ItemStatus.RESERVED;
         }
+    }
+
+    public void completeExchange() {
+        this.status = ItemStatus.OUT;
+    }
+
+    public void cancelReservation(int amount) {
+        this.quantityLeft += amount;
+        this.status = ItemStatus.LEFT;
     }
 }

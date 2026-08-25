@@ -24,6 +24,12 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
         WHERE uhi.user_id != :myUserId
           AND uhi.status = 'LEFT'
           AND uhi.quantity_left > 0
+          AND uhi.user_id NOT IN (
+              SELECT ep.user_id FROM exchange_participants ep
+              JOIN exchanges e ON e.id = ep.exchange_id
+              WHERE e.status = 'PENDING'
+          )
+        ORDER BY uhi.created_at ASC
         """, nativeQuery = true)
     List<Object[]> findToMeData(@Param("myUserId") Long myUserId);
 
@@ -39,6 +45,7 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
           AND uhi.user_id != uwi.user_id
           AND uhi.status = 'LEFT'
           AND uhi.quantity_left > 0
+        ORDER BY uhi.created_at ASC
         """, nativeQuery = true)
     List<Object[]> findBToCData(@Param("bIds") Set<Long> bIds, @Param("cIds") Set<Long> cIds);
 

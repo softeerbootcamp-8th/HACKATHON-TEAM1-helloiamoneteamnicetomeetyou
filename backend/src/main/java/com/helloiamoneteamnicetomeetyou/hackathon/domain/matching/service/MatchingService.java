@@ -46,6 +46,7 @@ public class MatchingService {
             List<UserWantItem> myWantItems
     ) {
         if (myHaveItems.isEmpty() || myWantItems.isEmpty()) return;
+        if (exchangeParticipantRepository.existsPendingExchange(myUser.getId())) return;
 
         Map<Long, Long> earliestReg = new HashMap<>();
         Map<Long, Map<Long, Integer>> toThem = buildToThem(myUser.getId(), earliestReg);
@@ -235,13 +236,13 @@ public class MatchingService {
      * 부수효과: earliestReg에 후보별 최초 want 등록 ID(최솟값)를 기록한다 (동점 tiebreaker용).
      */
     private Map<Long, Map<Long, Integer>> buildToThem(Long myUserId, Map<Long, Long> earliestReg) {
-        Map<Long, Map<Long, Integer>> result = new HashMap<>();
+        Map<Long, Map<Long, Integer>> result = new LinkedHashMap<>();
         for (Object[] row : userWantItemRepository.findToThemData(myUserId)) {
             Long candidateId = toLong(row[0]);
             Long itemId      = toLong(row[1]);
             int  qty         = toInt(row[2]);
             Long wantId      = toLong(row[3]);
-            result.computeIfAbsent(candidateId, k -> new HashMap<>()).put(itemId, qty);
+            result.computeIfAbsent(candidateId, k -> new LinkedHashMap<>()).put(itemId, qty);
             earliestReg.merge(candidateId, wantId, Math::min);
         }
         return result;
@@ -253,12 +254,12 @@ public class MatchingService {
      * 결과: candidateId → { itemId → qty }
      */
     private Map<Long, Map<Long, Integer>> buildToMe(Long myUserId) {
-        Map<Long, Map<Long, Integer>> result = new HashMap<>();
+        Map<Long, Map<Long, Integer>> result = new LinkedHashMap<>();
         for (Object[] row : userHaveItemRepository.findToMeData(myUserId)) {
             Long candidateId = toLong(row[0]);
             Long itemId      = toLong(row[1]);
             int  qty         = toInt(row[2]);
-            result.computeIfAbsent(candidateId, k -> new HashMap<>()).put(itemId, qty);
+            result.computeIfAbsent(candidateId, k -> new LinkedHashMap<>()).put(itemId, qty);
         }
         return result;
     }
@@ -268,14 +269,14 @@ public class MatchingService {
      * 결과: bId → cId → { itemId → qty }
      */
     private Map<Long, Map<Long, Map<Long, Integer>>> buildBToC(Set<Long> bIds, Set<Long> cIds) {
-        Map<Long, Map<Long, Map<Long, Integer>>> result = new HashMap<>();
+        Map<Long, Map<Long, Map<Long, Integer>>> result = new LinkedHashMap<>();
         for (Object[] row : userHaveItemRepository.findBToCData(bIds, cIds)) {
             Long bId    = toLong(row[0]);
             Long cId    = toLong(row[1]);
             Long itemId = toLong(row[2]);
             int  qty    = toInt(row[3]);
-            result.computeIfAbsent(bId, k -> new HashMap<>())
-                  .computeIfAbsent(cId, k -> new HashMap<>())
+            result.computeIfAbsent(bId, k -> new LinkedHashMap<>())
+                  .computeIfAbsent(cId, k -> new LinkedHashMap<>())
                   .put(itemId, qty);
         }
         return result;
