@@ -11,6 +11,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.event.ContextClosedEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -132,6 +134,38 @@ public class SseConnectionManager {
                     drop(connection, "heartbeat 실패");
                 }
             });
+        }
+    }
+
+    /**
+     * 서버가 내려가기 시작할 때 열려 있는 연결을 먼저 닫는다.
+     *
+     * <p><b>없으면 배포할 때마다 종료가 30초씩 밀린다.</b> SSE 는 끝나지 않는 요청이라 톰캣이
+     * 보기에는 계속 처리 중인 async 요청이고, 종료 신호를 받아도 그것들이 끝나기를 기다리다
+     * 타임아웃이 나야 죽는다. 실측으로 확인했다(연결 3개, SIGTERM 이후 30초).
+     * EC2 배포는 {@code docker stop} 으로 컨테이너를 바꾸기 때문에 그 시간이 그대로 배포 지연이
+     * 되고, 그 사이 붙어 있던 사람들은 끊긴 줄도 모른 채 조용히 기다린다.
+     *
+     * <p>{@code @PreDestroy} 가 아니라 {@link ContextClosedEvent} 인 것이 중요하다. 빈 소멸은
+     * 톰캣이 요청을 기다린 <b>뒤에</b> 일어나서, 거기서 닫으면 이미 30초를 다 쓴 다음이다.
+     * 이 이벤트는 그 기다림이 시작되기 전에 온다.
+     *
+     * <p>연결마다 종료 로그를 남기지 않는다. 접속자가 많을 때 종료 로그만 수백 줄이 되고,
+     * 개별 사유가 전부 "서버 종료"로 같아서 알 수 있는 것이 없다.
+     */
+    @EventListener(ContextClosedEvent.class)
+    void closeAllOnShutdown() {
+        List<SseConnection> all = zoneConnections.values().stream().flatMap(Set::stream).toList();
+
+        if (all.isEmpty()) {
+            return;
+        }
+
+        log.info("서버 종료: 열려 있는 sse 연결 {}개를 닫는다", all.size());
+
+        for (SseConnection connection : all) {
+            unregister(connection);
+            connection.completeQuietly();
         }
     }
 
