@@ -10,6 +10,11 @@ on:
     paths:
       - 'frontend/**'
       - '.github/workflows/deploy-frontend.yml'
+  # 리뷰어가 화면을 눈으로 보고 리뷰할 수 있도록 PR 에도 미리보기를 올린다.
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
   # 배포만 다시 돌리고 싶을 때 Actions 탭에서 수동 실행한다.
   workflow_dispatch:
 
@@ -18,7 +23,7 @@ permissions:
 
 concurrency:
   group: vercel-deploy-${{ github.ref }}
-  # dev 는 미리보기라 앞선 실행을 취소해도 되지만, main 은 프로덕션이라 끝까지 보낸다.
+  # 미리보기는 앞선 실행을 취소해도 되지만, main 프로덕션 배포는 끝까지 보낸다.
   cancel-in-progress: ${{ github.ref_name != 'main' }}
 
 jobs:
@@ -58,9 +63,9 @@ jobs:
 
       - name: 배포 대상 결정
         id: target
-        # main 은 프로덕션, 그 외(dev)는 미리보기로 올린다.
+        # main push 만 프로덕션이다. dev push 와 PR 은 미리보기로 올린다.
         run: |
-          if [ "${{ github.ref_name }}" = "main" ]; then
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_name }}" = "main" ]; then
             echo "flag=--prod" >> "$GITHUB_OUTPUT"
             echo "environment=production" >> "$GITHUB_OUTPUT"
           else
