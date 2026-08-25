@@ -21,3 +21,9 @@
 
 ### VS Code ###
 .vscode/
+
+### Claude Code ###
+# 팀 공용 설정(.claude/settings.json, commands, skills, hooks)은 커밋한다.
+# 개인 권한 설정과 로컬 상태만 제외한다.
+.claude/settings.local.json
+.claude/worktrees/
