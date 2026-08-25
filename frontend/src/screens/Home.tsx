@@ -266,7 +266,7 @@ export function Home() {
           </div>
         </div>
 
-        <p className="mt-4 shrink-0 text-center text-[12px] text-neutral-400 md:text-[14px]">
+        <p className="mt-8 shrink-0 text-center text-[12px] text-neutral-400 md:text-[14px]">
           {dragging
             ? '놓아주면 찔러보기가 전송돼요'
             : '내 카드 묶음을 상대 카드 위에 끌어서 놓아보세요'}
