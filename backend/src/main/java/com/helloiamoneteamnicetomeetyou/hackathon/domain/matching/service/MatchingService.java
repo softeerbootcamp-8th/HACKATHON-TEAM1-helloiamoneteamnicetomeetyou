@@ -7,11 +7,14 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.Exc
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.repository.ExchangeParticipantRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.dto.ExchangeMatchedItemDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventPublisher;
+import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventType;
 
 import java.util.*;
 import java.util.UUID;
@@ -31,6 +34,7 @@ public class MatchingService {
     private final ExchangeRepository exchangeRepository;
     private final ExchangeParticipantRepository exchangeParticipantRepository;
     private final ExchangeItemRepository exchangeItemRepository;
+    private final SseEventPublisher sseEventPublisher;
 
     /**
      * 교환 매칭 진행. 1대1 매칭을 먼저 시도하고, 실패하면 3인 교환으로 폴백한다.
@@ -135,6 +139,7 @@ public class MatchingService {
             hi.reserve();
         });
         exchangeItemRepository.saveAll(items);
+        notifyParticipants(items, List.of(myUser, bestUser));
         return exchange;
     }
 
@@ -205,16 +210,18 @@ public class MatchingService {
                 ExchangeParticipant.create(exchange, userC)
         ));
 
-        exchangeItemRepository.saveAll(List.of(
+        List<ExchangeItem> items = List.of(
                 ExchangeItem.create(exchange, myUser, myHaveItem.getItem(), userB,  1),
                 ExchangeItem.create(exchange, userB,  bHaveItem.getItem(),  userC,  1),
                 ExchangeItem.create(exchange, userC,  cHaveItem.getItem(),  myUser, 1)
-        ));
+        );
+        exchangeItemRepository.saveAll(items);
 
         myHaveItem.reserve();
         bHaveItem.reserve();
         cHaveItem.reserve();
 
+        notifyParticipants(items, List.of(myUser, userB, userC));
         return exchange;
     }
 
@@ -312,6 +319,18 @@ public class MatchingService {
 
     private int sum(Map<Long, Integer> m) {
         return m.values().stream().mapToInt(i -> i).sum();
+    }
+
+    private void notifyParticipants(List<ExchangeItem> items, List<User> participants) {
+        List<ExchangeMatchedItemDto> dtos = items.stream()
+                .map(ei -> new ExchangeMatchedItemDto(
+                        ei.getFromUser().getId(),
+                        ei.getToUser().getId(),
+                        ei.getItem().getName()))
+                .toList();
+        for (User participant : participants) {
+            sseEventPublisher.toUser(participant.getId(), SseEventType.MATCH_SUGGESTED, dtos);
+        }
     }
 
     private UUID toUUID(Object o) { return UUID.fromString(o.toString()); }
