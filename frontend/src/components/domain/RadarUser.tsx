@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
 
-import { GoodsFace } from '@/components/domain/GoodsCard'
+import { CARD_SHELL, ItemCardBody } from '@/components/domain/GoodsCard'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
 import { itemById, type WaitingUser } from '@/mocks/data'
@@ -66,16 +66,14 @@ export function RadarUser({ user, hovered, pending, burst = false, onSelect, ind
         transition={springSnap}
         style={{ animationDelay: `${index * 0.4}s` }}
         className={cn(
-          'block w-full rounded-2xl bg-white p-2 shadow-[0_4px_16px_rgba(0,0,0,0.10)]',
+          CARD_SHELL,
+          'block w-full p-2 shadow-[0_4px_16px_rgba(0,0,0,0.10)]',
           !hovered && !pending && 'anim-float-sm',
           hovered && 'ring-2 ring-ink',
           pending && 'opacity-45 grayscale',
         )}
       >
-        <GoodsFace item={item} size="sm" />
-        <p className="mt-1.5 text-center text-[9px] leading-tight font-bold text-ink md:text-[12px]">
-          {item.name}
-        </p>
+        <ItemCardBody item={item} size="sm" />
 
         {pending && (
           <span className="absolute inset-0 flex items-center justify-center text-[15px] font-bold text-neutral-500">

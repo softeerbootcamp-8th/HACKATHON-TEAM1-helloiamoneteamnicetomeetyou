@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 
 import { RejectDialog } from '@/components/domain/ConfirmDialogs'
+import { EmptyState } from '@/components/domain/EmptyState'
 import { OneToOneView, ThreeWayView } from '@/components/domain/ExchangeCards'
 import { Button, TextButton } from '@/components/ui/Button'
 import { TopBar } from '@/components/ui/TopBar'
@@ -32,12 +33,11 @@ export function MatchResult() {
 
   if (!match) {
     return (
-      <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-          <p className="text-[15px] text-neutral-500">진행 중인 매칭이 없어요.</p>
-          <Button onClick={() => navigate('/home')}>홈으로</Button>
-        </div>
-      </div>
+      <EmptyState
+        title="진행 중인 매칭이 없어요"
+        description={'교환 대기장에서 원하는 카드를\n먼저 찔러보세요.'}
+        onAction={() => navigate('/home')}
+      />
     )
   }
 

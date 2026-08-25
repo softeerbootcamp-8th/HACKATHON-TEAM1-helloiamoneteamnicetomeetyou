@@ -1,7 +1,7 @@
 import { motion } from 'motion/react'
 import type { ReactNode } from 'react'
 
-import { GoodsFace } from '@/components/domain/GoodsCard'
+import { ItemCard } from '@/components/domain/GoodsCard'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
 import { itemById, MY_IDENTITY } from '@/mocks/data'
@@ -31,15 +31,13 @@ export function ExchangeCard({
         initial={{ opacity: 0, y: 16, scale: 0.94 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={springSnap}
-        className={cn(
-          'rounded-2xl bg-white p-3 shadow-[0_6px_22px_rgba(0,0,0,0.10)]',
-          compact ? 'w-[124px] md:w-[112px]' : 'w-[124px] md:w-[140px]',
-        )}
+        className={cn(compact ? 'w-[124px] md:w-[112px]' : 'w-[124px] md:w-[140px]')}
       >
-        <GoodsFace item={item} size={compact ? 'md' : 'lg'} />
-        <p className="mt-2.5 text-center text-[12px] leading-tight font-bold text-ink">
-          {item.name}
-        </p>
+        <ItemCard
+          item={item}
+          size={compact ? 'md' : 'lg'}
+          className="shadow-[0_6px_22px_rgba(0,0,0,0.10)]"
+        />
       </motion.div>
       {badge && <div className="mt-2.5">{badge}</div>}
     </div>

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router'
 import { AppointmentStatusRail } from '@/components/domain/AppointmentStatus'
 import { BottomSheet } from '@/components/domain/BottomSheet'
 import { CardStack } from '@/components/domain/CardStack'
-import { GoodsFace } from '@/components/domain/GoodsCard'
+import { GoodsFace, ItemCard } from '@/components/domain/GoodsCard'
 import { PushOptInBanner } from '@/components/domain/PushOptInBanner'
 import { RadarRings } from '@/components/domain/Radar'
 import { RadarUser } from '@/components/domain/RadarUser'
@@ -164,127 +164,129 @@ export function Home() {
   const radarPanel = (
     <div
       ref={radarRef}
-      className="relative flex min-h-0 flex-1 flex-col px-3 pt-4 pb-[84px] md:rounded-3xl md:bg-neutral-50/70 md:px-4 md:pt-2 md:pb-4"
+      className="relative flex min-h-0 flex-1 flex-col px-1 pt-0 pb-[84px] md:rounded-3xl md:bg-neutral-50/70 md:px-4 md:pt-2 md:pb-4"
     >
       {/*
-        무대는 남는 공간을 그대로 쓴다. 정사각형으로 잡아 두었더니 폭에 막혀 아래쪽이
-        통째로 비고 카드끼리도 붙어 보였다. 이제 세로로 긴 화면에서는 타원이 된다.
+        무대는 정사각형이다. 시안의 링이 정원이라 무대가 찌그러지면 원도 같이 찌그러진다.
+        폭을 기준으로 잡되 세로로 짧은 화면에서 넘치지 않게 화면 높이로도 묶어 둔다.
       */}
-      <div className="relative mx-auto min-h-0 w-full max-w-[560px] flex-1">
-        <RadarRings />
+      <div className="relative mx-auto flex min-h-0 w-full max-w-[560px] -translate-y-3 flex-1 flex-col items-center justify-center">
+        <div className="relative aspect-square w-[min(92%,44vh)] shrink-0">
+          <RadarRings />
 
-        {radar.map((user, i) => {
-          const angle = (-90 + i * (360 / Math.max(radar.length, 1))) * (Math.PI / 180)
-          // 가로와 세로 반지름을 따로 둬서 화면이 길수록 위아래로 더 벌어지게 한다.
-          const radiusX = 37
-          const radiusY = 36
-          return (
-            <div
-              key={user.id}
-              className="absolute -translate-x-1/2 -translate-y-1/2"
-              style={{
-                left: `${50 + radiusX * Math.cos(angle)}%`,
-                top: `${50 + radiusY * Math.sin(angle)}%`,
-              }}
-            >
-              <RadarUser
-                user={user}
-                index={i}
-                hovered={hovered === user.id}
-                pending={pendingTarget === user.id}
-                burst={burstOn === user.id}
-                onSelect={() => sendPokeTo(user.id)}
+          {radar.map((user, i) => {
+            const angle = (-90 + i * (360 / Math.max(radar.length, 1))) * (Math.PI / 180)
+            // 가로와 세로 반지름을 따로 둬서 화면이 길수록 위아래로 더 벌어지게 한다.
+            const radiusX = 41.5
+            const radiusY = 41.5
+            return (
+              <div
+                key={user.id}
+                className="absolute -translate-x-1/2 -translate-y-1/2"
+                style={{
+                  left: `${50 + radiusX * Math.cos(angle)}%`,
+                  top: `${50 + radiusY * Math.sin(angle)}%`,
+                }}
+              >
+                <RadarUser
+                  user={user}
+                  index={i}
+                  hovered={hovered === user.id}
+                  pending={pendingTarget === user.id}
+                  burst={burstOn === user.id}
+                  onSelect={() => sendPokeTo(user.id)}
+                />
+              </div>
+            )
+          })}
+
+          {/* 카드를 펼치면 뒤가 흐려진다. 아무 데나 누르면 다시 접힌다. */}
+          <AnimatePresence>
+            {fanOpen && (
+              <motion.button
+                type="button"
+                aria-label="내 카드 접기"
+                onClick={() => setFanOpen(false)}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-10 bg-neutral-100/70 backdrop-blur-[1px]"
               />
-            </div>
-          )
-        })}
+            )}
+          </AnimatePresence>
 
-        {/* 카드를 펼치면 뒤가 흐려진다. 아무 데나 누르면 다시 접힌다. */}
-        <AnimatePresence>
-          {fanOpen && (
-            <motion.button
-              type="button"
-              aria-label="내 카드 접기"
-              onClick={() => setFanOpen(false)}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 z-10 bg-neutral-100/70 backdrop-blur-[1px]"
-            />
-          )}
-        </AnimatePresence>
+          <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+            <p className="mb-1 text-center text-[11px] font-bold text-ink md:text-[14px]">
+              {fanOpen ? `내 카드 ${state.have.length}종 ${haveCount}장` : '내 카드'}
+            </p>
 
-        <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
-          <p className="mb-1 text-center text-[11px] font-bold text-ink md:text-[14px]">
-            {fanOpen ? `내 카드 ${state.have.length}종 ${haveCount}장` : '내 카드'}
-          </p>
-
-          {fanOpen ? (
-            <MyCardsFan
-              have={state.have}
-              onEdit={() => {
-                setFanOpen(false)
-                navigate('/have')
-              }}
-            />
-          ) : (
-            /*
+            {fanOpen ? (
+              <MyCardsFan
+                have={state.have}
+                onEdit={() => {
+                  setFanOpen(false)
+                  navigate('/have')
+                }}
+              />
+            ) : (
+              /*
               끌면 찔러보기, 그냥 누르면 내 카드를 펼쳐 본다. 끌고 난 뒤에도 click 이
               따라오기 때문에 끌었는지를 기억해 두고 그 click 은 버린다.
             */
-            <motion.div
-              drag
-              dragSnapToOrigin
-              dragMomentum={false}
-              dragTransition={{ bounceStiffness: 480, bounceDamping: 30 }}
-              transition={springSnap}
-              onDragStart={() => {
-                draggedRef.current = true
-                setDragging(true)
-              }}
-              onDrag={onDrag}
-              onDragEnd={(event, info) => {
-                onDragEnd()
-                window.setTimeout(() => {
-                  draggedRef.current = false
-                }, 0)
-                void event
-                void info
-              }}
-              onClick={() => {
-                if (draggedRef.current) return
-                setFanOpen(true)
-              }}
-              whileDrag={{ zIndex: 60, cursor: 'grabbing' }}
-              data-my-cards
-              className="cursor-grab touch-none"
-            >
-              <CardStack topItemId={topItemId} count={Math.max(haveCount, 1)} lifted={dragging} />
-            </motion.div>
-          )}
+              <motion.div
+                drag
+                dragSnapToOrigin
+                dragMomentum={false}
+                dragTransition={{ bounceStiffness: 480, bounceDamping: 30 }}
+                transition={springSnap}
+                onDragStart={() => {
+                  draggedRef.current = true
+                  setDragging(true)
+                }}
+                onDrag={onDrag}
+                onDragEnd={(event, info) => {
+                  onDragEnd()
+                  window.setTimeout(() => {
+                    draggedRef.current = false
+                  }, 0)
+                  void event
+                  void info
+                }}
+                onClick={() => {
+                  if (draggedRef.current) return
+                  setFanOpen(true)
+                }}
+                whileDrag={{ zIndex: 60, cursor: 'grabbing' }}
+                data-my-cards
+                className="cursor-grab touch-none"
+              >
+                <CardStack topItemId={topItemId} count={Math.max(haveCount, 1)} lifted={dragging} />
+              </motion.div>
+            )}
+          </div>
         </div>
-      </div>
 
-      <p className="mt-5 shrink-0 text-center text-[12px] text-neutral-400 md:text-[14px]">
-        {dragging
-          ? '놓아주면 찔러보기가 전송돼요'
-          : '내 카드 묶음을 상대 카드 위에 끌어서 놓아보세요'}
-      </p>
+        <p className="mt-4 shrink-0 text-center text-[12px] text-neutral-400 md:text-[14px]">
+          {dragging
+            ? '놓아주면 찔러보기가 전송돼요'
+            : '내 카드 묶음을 상대 카드 위에 끌어서 놓아보세요'}
+        </p>
 
-      {/* 레이더에 올라온 카드를 뒷순위로 새로 채운다. 답변을 기다리는 카드는 남는다. */}
-      <div className="mt-2 shrink-0 text-center">
-        <motion.button
-          type="button"
-          onClick={() => {
-            tick(8)
-            setRadarPage((page) => page + 1)
-          }}
-          whileTap={{ scale: 0.94 }}
-          transition={springSnap}
-          className="rounded-full bg-neutral-200 px-4 py-1.5 text-[11px] font-bold text-neutral-500"
-        >
-          다른 카드 보기
-        </motion.button>
+        {/* 레이더에 올라온 카드를 뒷순위로 새로 채운다. 답변을 기다리는 카드는 남는다. */}
+        <div className="mt-2 shrink-0 text-center">
+          <motion.button
+            type="button"
+            onClick={() => {
+              tick(8)
+              setRadarPage((page) => page + 1)
+            }}
+            whileTap={{ scale: 0.94 }}
+            transition={springSnap}
+            className="rounded-full bg-neutral-200 px-4 py-1.5 text-[11px] font-bold text-neutral-500"
+          >
+            다른 카드 보기
+          </motion.button>
+        </div>
       </div>
     </div>
   )
@@ -318,7 +320,7 @@ export function Home() {
               )}
             >
               <div className="w-[92px] shrink-0">
-                <GoodsFace item={item} size="lg" />
+                <GoodsFace item={item} size="md" />
               </div>
 
               <div className="min-w-0 flex-1">
@@ -360,23 +362,8 @@ export function Home() {
   return (
     <div className="relative flex h-full flex-col">
       <header className="flex shrink-0 items-center justify-between px-5 pt-2 md:px-10 md:pt-4">
-        <h1 className="pl-1 text-[23px] font-extrabold tracking-[-0.02em] text-ink">
-          교환 대기장소
-        </h1>
+        <h1 className="pl-1 text-[23px] font-extrabold tracking-[-0.02em] text-ink">교환 대기장</h1>
         <div className="flex items-center gap-1">
-          {/*
-            목데이터만으로는 삼자 교환과 받은 요청을 보기 어려워서 넣어 둔 확인용 버튼이다.
-            실제 서비스에서는 서버가 보내 주는 상황이라 그때 빼면 된다.
-          */}
-          <DemoButton
-            label="요청받기"
-            onClick={() => dispatch({ type: 'seed-demo', kind: 'incoming' })}
-          />
-          <DemoButton
-            label="3인 매칭"
-            onClick={() => dispatch({ type: 'seed-demo', kind: 'three-way' })}
-          />
-
           <motion.button
             type="button"
             aria-label="알림"
@@ -397,7 +384,7 @@ export function Home() {
         모바일은 이 칸의 높이를 고정해서 "자동 매칭 중" 알약이든 약속 상태 카드든 같은 자리를
         쓰고, 데스크톱은 아예 흐름에서 빼서 화면 위에 띄운다. 둘 다 레이더가 움직이지 않는다.
       */}
-      <div className="min-h-[78px] shrink-0 px-5 pt-2 md:pointer-events-none md:absolute md:top-[76px] md:left-10 md:z-30 md:min-h-0 md:w-[360px] md:px-0 md:[&>*]:pointer-events-auto">
+      <div className="min-h-[60px] shrink-0 px-5 pt-1 md:pointer-events-none md:absolute md:top-[76px] md:left-10 md:z-30 md:min-h-0 md:w-[360px] md:px-0 md:[&>*]:pointer-events-auto">
         <AnimatePresence mode="popLayout">
           {statuses.length > 0 ? (
             <motion.div
@@ -627,13 +614,10 @@ function MyCardsFan({
               initial={{ opacity: 0, y: 10, scale: 0.94 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ ...springSnap, delay: i * 0.03 }}
-              className="relative rounded-2xl bg-white p-2 shadow-[0_4px_16px_rgba(0,0,0,0.10)]"
             >
-              <GoodsFace item={item} size="sm" />
-              <p className="mt-1.5 flex h-[26px] items-center justify-center text-center text-[10px] leading-tight font-bold text-ink">
-                <span className="line-clamp-2">{item.name}</span>
-              </p>
-              <QtyBadge qty={selection.qty} />
+              <ItemCard item={item} size="sm" className="shadow-[0_4px_16px_rgba(0,0,0,0.10)]">
+                <QtyBadge qty={selection.qty} />
+              </ItemCard>
             </motion.div>
           )
         })}
@@ -672,21 +656,6 @@ function EditCardsButton({ onClick }: { onClick: () => void }) {
       className="mx-auto mt-4 block rounded-full bg-ink px-4 py-2 text-[12px] font-bold text-white"
     >
       편집하기
-    </motion.button>
-  )
-}
-
-/** 확인용 버튼. 목데이터로는 잘 안 나오는 상황을 손으로 만들어 볼 수 있게 한다. */
-function DemoButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      whileTap={{ scale: 0.92 }}
-      transition={springSnap}
-      className="rounded-full border border-dashed border-neutral-300 px-2.5 py-1 text-[11px] font-semibold text-neutral-400"
-    >
-      {label}
     </motion.button>
   )
 }

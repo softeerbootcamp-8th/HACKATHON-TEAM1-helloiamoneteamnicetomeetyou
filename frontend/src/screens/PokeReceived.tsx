@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 
 import { RejectDialog } from '@/components/domain/ConfirmDialogs'
-import { GoodsCard, GoodsFace } from '@/components/domain/GoodsCard'
+import { EmptyState } from '@/components/domain/EmptyState'
+import { GoodsCard, ItemCard } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
 import { staggerChild, staggerParent } from '@/lib/motion'
 import { itemById } from '@/mocks/data'
@@ -31,12 +32,11 @@ export function PokeReceived() {
 
   if (!incoming) {
     return (
-      <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-          <p className="text-[15px] text-neutral-500">받은 교환 요청이 없어요.</p>
-          <Button onClick={() => navigate('/home')}>홈으로</Button>
-        </div>
-      </div>
+      <EmptyState
+        title="받은 교환 요청이 없어요"
+        description={'요청이 오면 알림으로\n바로 알려 드릴게요.'}
+        onAction={() => navigate('/home')}
+      />
     )
   }
 
@@ -52,12 +52,7 @@ export function PokeReceived() {
 
         <section className="mt-7">
           <h2 className="text-[13px] font-bold text-ink">상대가 원하는 카드</h2>
-          <div className="mt-3 w-[118px] rounded-2xl bg-white p-2.5 shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
-            <GoodsFace item={itemById(incoming.wantItemId)} size="md" />
-            <p className="mt-2 text-center text-[12px] leading-tight font-bold text-ink">
-              {itemById(incoming.wantItemId).name}
-            </p>
-          </div>
+          <ItemCard item={itemById(incoming.wantItemId)} size="md" className="mt-3 w-[118px]" />
         </section>
 
         <section className="mt-8">

@@ -3,9 +3,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { BreakupDialog } from '@/components/domain/ConfirmDialogs'
+import { EmptyState } from '@/components/domain/EmptyState'
 import { MoveStatusBadge, OneToOneView, ThreeWayView } from '@/components/domain/ExchangeCards'
 import { Button, TextButton } from '@/components/ui/Button'
-import { PinIcon } from '@/components/ui/icons'
+import { ClockIcon, PinIcon } from '@/components/ui/icons'
 import { TopBar } from '@/components/ui/TopBar'
 import { springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
@@ -26,12 +27,12 @@ export function Appointment() {
 
   if (!appt || appt.stage === 'place') {
     return (
-      <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-          <p className="text-[15px] text-neutral-500">확정된 약속이 없어요.</p>
-          <Button onClick={() => navigate('/home')}>홈으로</Button>
-        </div>
-      </div>
+      <EmptyState
+        title="확정된 약속이 없어요"
+        description={'장소와 시간을 정하면\n여기에서 다시 볼 수 있어요.'}
+        icon={<ClockIcon className="size-9" />}
+        onAction={() => navigate('/home')}
+      />
     )
   }
 

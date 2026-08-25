@@ -46,8 +46,8 @@ export function Complete() {
         >
           <div className="anim-float w-[190px] rounded-[22px] bg-white p-4 shadow-[0_16px_44px_rgba(0,0,0,0.16)]">
             {item ? (
-              <div className="h-[190px] [&>div]:h-full">
-                <GoodsFace item={item} size="lg" />
+              <div className="h-[190px]">
+                <GoodsFace item={item} size="fill" />
               </div>
             ) : (
               <div className="card-face h-[190px] w-full rounded-2xl" />

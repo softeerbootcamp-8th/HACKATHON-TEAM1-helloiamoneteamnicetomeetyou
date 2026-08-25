@@ -38,34 +38,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timer)
   }, [state.outgoingPoke, state.have])
 
-  // 남이 나에게 보내는 찔러보기. 내놓은 카드가 있어야 들어온다.
-  useEffect(() => {
-    if (state.have.length === 0) return
-    // 약속이 잡혀 있어도 찔러보기는 계속 들어온다. 약속을 기다리는 동안 다른 카드를
-    // 더 바꿀 수 있어야 하기 때문이다.
-    if (state.incomingPoke || state.heldIncoming || state.match) return
-    const timer = window.setTimeout(() => {
-      const mine = state.have[0].itemId
-      const from = ALL_WAITING.find(
-        (u) => u.needsItemIds.includes(mine) && u.id !== state.outgoingPoke?.targetUserId,
-      )
-      if (!from) return
-      const offered = ALL_WAITING.filter((u) => u.id !== from.id)
-        .map((u) => u.itemId)
-        .filter((id, i, arr) => arr.indexOf(id) === i)
-        .slice(0, 3)
-      dispatch({
-        type: 'receive-poke',
-        poke: {
-          fromUserId: from.id,
-          wantItemId: mine,
-          offeredItemIds: [from.itemId, ...offered].slice(0, 3),
-        },
-      })
-    }, 9000)
-    return () => window.clearTimeout(timer)
-  }, [state.have, state.incomingPoke, state.heldIncoming, state.match, state.outgoingPoke])
-
   // 시간 선택 후 상대들의 응답.
   useEffect(() => {
     const appt = appointment

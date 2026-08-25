@@ -2,7 +2,8 @@ import { motion } from 'motion/react'
 import { useNavigate, useSearchParams } from 'react-router'
 
 import { CardStack } from '@/components/domain/CardStack'
-import { GoodsFace } from '@/components/domain/GoodsCard'
+import { EmptyState } from '@/components/domain/EmptyState'
+import { ItemCard } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
 import { springSnap } from '@/lib/motion'
 import { ALL_WAITING, itemById } from '@/mocks/data'
@@ -22,12 +23,11 @@ export function PokeConfirm() {
 
   if (!target) {
     return (
-      <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8">
-          <p className="text-[15px] text-neutral-500">상대를 찾을 수 없어요.</p>
-          <Button onClick={() => navigate('/home')}>홈으로</Button>
-        </div>
-      </div>
+      <EmptyState
+        title="상대를 찾을 수 없어요"
+        description={'교환 대기장에서\n다시 골라 주세요.'}
+        onAction={() => navigate('/home')}
+      />
     )
   }
 
@@ -60,12 +60,13 @@ export function PokeConfirm() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={springSnap}
-              className="w-[112px] rounded-2xl bg-white p-2.5 shadow-[0_6px_20px_rgba(0,0,0,0.10)]"
+              className="w-[112px]"
             >
-              <GoodsFace item={itemById(target.itemId)} size="md" />
-              <p className="mt-2 text-center text-[12px] leading-tight font-bold text-ink">
-                {itemById(target.itemId).name}
-              </p>
+              <ItemCard
+                item={itemById(target.itemId)}
+                size="md"
+                className="shadow-[0_6px_20px_rgba(0,0,0,0.10)]"
+              />
             </motion.div>
           </div>
         </div>

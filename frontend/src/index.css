@@ -16,7 +16,7 @@
   /* 알림 카드 왼쪽의 단색 사각형. 시안이 이 자리만 다른 색으로 두고 있다. */
   --color-alarm: #2ced90;
   --color-ink: #111111;
-  --color-tile: #eef0f4;
+  --color-tile: #f5f7fa;
   --color-disabled: #f1f1f0;
   --color-line: #ececec;
   --color-muted: #9aa0a8;
@@ -76,8 +76,10 @@ body {
 @utility sweep-fan {
   background: conic-gradient(
     from var(--sweep-angle),
-    #2cb3ed40 0deg,
-    #2cb3ed00 70deg,
+    #2cb3ed5c 0deg,
+    #2ced9047 26deg,
+    #7ad9ff2e 52deg,
+    #2cb3ed00 82deg,
     #00000000 360deg
   );
   /* 가장자리로 갈수록 흐려지고, 부채꼴 경계도 뭉개져야 시안처럼 은은하게 훑고 지나간다. */

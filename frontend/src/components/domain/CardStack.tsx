@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
 
-import { GoodsFace } from '@/components/domain/GoodsCard'
+import { CARD_SHELL, ItemCardBody } from '@/components/domain/GoodsCard'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
 import { itemById } from '@/mocks/data'
@@ -17,19 +17,19 @@ type Props = {
 
 /**
  * 내 카드 묶음. 시안처럼 뒤로 두 장이 어긋나게 겹쳐 있고, 맨 위 카드에만
- * 굿즈 앞면과 이름이 들어간다.
+ * 굿즈 앞면과 이름이 들어간다. 카드 생김새는 다른 화면과 똑같다.
  */
 export function CardStack({ topItemId, count, className, lifted = false }: Props) {
   const item = itemById(topItemId)
   const behind = Math.min(Math.max(count - 1, 0), 2)
 
   return (
-    <div className={cn('relative aspect-[112/140] w-[112px] md:w-[118px]', className)}>
+    <div className={cn('relative w-[112px] md:w-[118px]', className)}>
       {Array.from({ length: behind }).map((_, i) => (
         <motion.div
           key={i}
           aria-hidden
-          className="absolute inset-0 rounded-2xl bg-white shadow-[0_4px_14px_rgba(0,0,0,0.08)]"
+          className={cn(CARD_SHELL, 'absolute inset-0 shadow-[0_4px_14px_rgba(0,0,0,0.08)]')}
           animate={{
             rotate: -(i + 1) * 5,
             x: -(i + 1) * 5,
@@ -42,13 +42,9 @@ export function CardStack({ topItemId, count, className, lifted = false }: Props
       <motion.div
         animate={{ rotate: lifted ? -3 : -6, scale: lifted ? 1.06 : 1 }}
         transition={springSnap}
-        className="absolute inset-0 flex flex-col rounded-2xl bg-white p-2.5 pb-4 shadow-[0_10px_26px_rgba(0,0,0,0.16)]"
+        className={cn(CARD_SHELL, 'relative p-2.5 shadow-[0_10px_26px_rgba(0,0,0,0.16)]')}
       >
-        {/* 앞면이 남는 자리를 다 쓴다. 높이를 고정해 두면 이름 밑이 통째로 빈다. */}
-        <GoodsFace item={item} size="md" className="min-h-0 flex-1" />
-        <p className="mt-2 shrink-0 text-center text-[12px] leading-tight font-bold tracking-tight text-ink md:text-[13px]">
-          {item.name}
-        </p>
+        <ItemCardBody item={item} size="md" />
       </motion.div>
     </div>
   )

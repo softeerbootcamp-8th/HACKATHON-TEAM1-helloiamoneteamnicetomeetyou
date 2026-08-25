@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { RejectDialog } from '@/components/domain/ConfirmDialogs'
+import { EmptyState } from '@/components/domain/EmptyState'
 import { Button, TextButton } from '@/components/ui/Button'
 import { ClockIcon } from '@/components/ui/icons'
 import { TopBar } from '@/components/ui/TopBar'
@@ -43,12 +44,12 @@ export function TimeSelect() {
 
   if (!appt) {
     return (
-      <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-          <p className="text-[15px] text-neutral-500">진행 중인 약속이 없어요.</p>
-          <Button onClick={() => navigate('/home')}>홈으로</Button>
-        </div>
-      </div>
+      <EmptyState
+        title="진행 중인 약속이 없어요"
+        description={'교환이 성사되면\n만날 시간을 고를 수 있어요.'}
+        icon={<ClockIcon className="size-9" />}
+        onAction={() => navigate('/home')}
+      />
     )
   }
 
