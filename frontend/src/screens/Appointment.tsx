@@ -7,14 +7,15 @@ import { PinIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
 import { itemById, ZONES } from '@/mocks/data'
+import { useLastDefined } from '@/lib/useLastDefined'
 import { useStore } from '@/store/useStore'
 
 /** 확정된 약속. 시간과 장소, 주고받을 카드를 다시 보여준다. */
 export function Appointment() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
-  const appt = state.appointment
-  const match = state.match
+  const appt = useLastDefined(state.appointment)
+  const match = useLastDefined(state.match)
 
   if (!appt || !match || appt.stage === 'place') {
     return (

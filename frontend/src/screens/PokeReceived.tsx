@@ -6,6 +6,7 @@ import { GoodsCard, GoodsFace } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
 import { staggerChild, staggerParent } from '@/lib/motion'
 import { itemById } from '@/mocks/data'
+import { useLastDefined } from '@/lib/useLastDefined'
 import { useStore } from '@/store/useStore'
 
 /** 받은 교환 요청. 상대의 묶음에서 한 장을 고른다. */
@@ -13,7 +14,7 @@ export function PokeReceived() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const { state, dispatch } = useStore()
-  const incoming = state.incomingPoke
+  const incoming = useLastDefined(state.incomingPoke)
   const [picked, setPicked] = useState<string | null>(null)
   const demo = params.get('demo')
 

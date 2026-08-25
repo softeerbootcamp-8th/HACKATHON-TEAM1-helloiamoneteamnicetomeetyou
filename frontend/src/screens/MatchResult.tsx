@@ -7,6 +7,7 @@ import { Button, TextButton } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { springSnap } from '@/lib/motion'
 import { itemById, MY_IDENTITY } from '@/mocks/data'
+import { useLastDefined } from '@/lib/useLastDefined'
 import { useStore } from '@/store/useStore'
 
 /**
@@ -18,7 +19,7 @@ export function MatchResult() {
   const [params] = useSearchParams()
   const { state, dispatch } = useStore()
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const match = state.match
+  const match = useLastDefined(state.match)
   const demo = params.get('demo')
 
   // 주소로 바로 열었을 때 화면을 볼 수 있게 상태를 심어 준다.

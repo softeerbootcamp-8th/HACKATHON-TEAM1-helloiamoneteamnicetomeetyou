@@ -192,7 +192,7 @@ export function Home() {
             onClick={() => navigate('/have')}
             whileTap={{ scale: 0.94 }}
             transition={springSnap}
-            className="mx-auto mb-1 flex items-center gap-0.5 text-[11px] font-bold text-neutral-500"
+            className="mx-auto mb-1 flex items-center gap-0.5 text-[11px] font-bold text-neutral-500 md:text-[14px]"
           >
             내 카드
             <span className="text-[13px] text-neutral-300">›</span>
@@ -234,7 +234,7 @@ export function Home() {
         </div>
       </div>
 
-      <p className="mt-5 shrink-0 text-center text-[12px] text-neutral-400">
+      <p className="mt-5 shrink-0 text-center text-[12px] text-neutral-400 md:text-[14px]">
         {dragging
           ? '놓아주면 찔러보기가 전송돼요'
           : '상대 카드를 누르거나, 내 카드 묶음을 끌어다 놓아보세요'}
@@ -309,7 +309,9 @@ export function Home() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex shrink-0 items-center justify-between px-5 pt-2 md:pt-3">
-        <h1 className="text-[23px] font-extrabold tracking-[-0.02em] text-ink">교환 대기장소</h1>
+        <h1 className="pl-1 text-[23px] font-extrabold tracking-[-0.02em] text-ink">
+          교환 대기장소
+        </h1>
         <div className="flex items-center gap-1">
           {/*
             목데이터만으로는 삼자 교환과 받은 요청을 보기 어려워서 넣어 둔 확인용 버튼이다.

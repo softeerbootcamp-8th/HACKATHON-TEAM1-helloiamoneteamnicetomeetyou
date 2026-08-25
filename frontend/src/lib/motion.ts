@@ -11,9 +11,9 @@ import type { Transition, Variants } from 'motion/react'
 /** 화면 전환처럼 큰 덩어리가 움직일 때. */
 export const springPage: Transition = {
   type: 'spring',
-  stiffness: 320,
+  stiffness: 300,
   damping: 34,
-  mass: 0.9,
+  mass: 0.85,
 }
 
 /** 버튼, 카드처럼 손가락 밑에서 바로 반응해야 하는 것. */
@@ -35,11 +35,23 @@ export const springSheet: Transition = {
 /** 사라지는 것은 빠르게. 기다리게 하면 답답하다. */
 export const easeOut: Transition = { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
 
-/** 화면 전환: 앞으로 갈 때는 오른쪽에서, 뒤로 갈 때는 왼쪽에서 들어온다. */
+/**
+ * 화면 전환. 새 화면이 오른쪽에서 밀고 들어오고 이전 화면은 왼쪽으로 조금 밀린다.
+ * 뒤로 갈 때는 반대로 위에 있던 화면이 오른쪽으로 빠지면서 아래 화면이 드러난다.
+ *
+ * **투명도로 겹치지 않는다.** 두 화면을 동시에 반투명하게 두면 서로 비쳐서 잔상이 남는다.
+ * 대신 z 순서를 방향에 따라 뒤집어서 한 장이 다른 장을 확실히 덮게 한다.
+ */
 export const pageVariants: Variants = {
-  enter: (back: boolean) => ({ x: back ? -28 : 28, opacity: 0 }),
-  center: { x: 0, opacity: 1 },
-  exit: (back: boolean) => ({ x: back ? 28 : -28, opacity: 0 }),
+  enter: (back: boolean) => ({
+    x: back ? '-24%' : '100%',
+    zIndex: back ? 0 : 2,
+  }),
+  center: { x: '0%', zIndex: 1 },
+  exit: (back: boolean) => ({
+    x: back ? '100%' : '-24%',
+    zIndex: back ? 2 : 0,
+  }),
 }
 
 /** 리스트가 순서대로 뜨게 한다. 한꺼번에 나타나면 싸구려로 보인다. */

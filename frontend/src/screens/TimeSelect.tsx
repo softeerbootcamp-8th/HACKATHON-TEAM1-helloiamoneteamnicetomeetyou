@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn'
 import { tick } from '@/lib/haptics'
 import { springSheet, springSnap } from '@/lib/motion'
 import { buildSlots, earliestOverlap, slotTimeLabel, SLOT_COUNT } from '@/store/time'
+import { useLastDefined } from '@/lib/useLastDefined'
 import { useStore } from '@/store/useStore'
 
 /**
@@ -28,8 +29,8 @@ export function TimeSelect() {
   const [now] = useState(() => new Date())
   const slots = useMemo(() => buildSlots(now), [now])
 
-  const appt = state.appointment
-  const match = state.match
+  const appt = useLastDefined(state.appointment)
+  const match = useLastDefined(state.match)
 
   if (!appt || !match) {
     return (

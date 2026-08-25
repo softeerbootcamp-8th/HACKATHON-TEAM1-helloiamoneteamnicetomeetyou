@@ -28,7 +28,7 @@ export function RadarUser({ user, hovered, pending, burst = false, onSelect, ind
       initial={{ opacity: 0, scale: 0.6 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ ...springSnap, delay: 0.08 * index }}
-      className="relative w-[76px]"
+      className="relative w-[76px] md:w-[112px]"
     >
       {burst && (
         <span aria-hidden className="pointer-events-none absolute inset-0 z-20">
@@ -48,7 +48,7 @@ export function RadarUser({ user, hovered, pending, burst = false, onSelect, ind
           initial={{ opacity: 0, y: 6, scale: 0.8 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={springSnap}
-          className="absolute -top-8 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-bold whitespace-nowrap text-white"
+          className="absolute -top-8 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-bold whitespace-nowrap text-white md:text-[13px]"
         >
           찔러보기
         </motion.span>
@@ -73,8 +73,10 @@ export function RadarUser({ user, hovered, pending, burst = false, onSelect, ind
         )}
       >
         <GoodsFace item={item} size="sm" />
-        <p className="mt-1.5 text-center text-[10px] font-bold text-ink">{item.name}</p>
-        <p className="text-center text-[9px] text-neutral-400">{user.nickname}</p>
+        <p className="mt-1.5 text-center text-[10px] font-bold text-ink md:text-[13px]">
+          {item.name}
+        </p>
+        <p className="text-center text-[9px] text-neutral-400 md:text-[11px]">{user.nickname}</p>
 
         {pending && (
           <span className="absolute inset-0 flex items-center justify-center text-[15px] font-bold text-neutral-500">

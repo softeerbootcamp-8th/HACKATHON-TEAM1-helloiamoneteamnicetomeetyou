@@ -6,6 +6,7 @@ import { GoodsFace } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
 import { springSnap } from '@/lib/motion'
 import { ALL_WAITING, itemById } from '@/mocks/data'
+import { useLastDefined } from '@/lib/useLastDefined'
 import { useStore } from '@/store/useStore'
 
 /** 찔러보기를 보내기 전 확인 화면. */
@@ -14,8 +15,8 @@ export function PokeConfirm() {
   const [params] = useSearchParams()
   const { state, dispatch } = useStore()
 
-  const targetId = params.get('to') ?? ''
-  const target = ALL_WAITING.find((u) => u.id === targetId)
+  // 나가는 중에는 주소가 이미 다음 화면 것이라, 처음 잡은 상대를 계속 들고 있는다.
+  const target = useLastDefined(ALL_WAITING.find((u) => u.id === (params.get('to') ?? '')))
   const topItemId = state.have[0]?.itemId ?? 'sf'
   const haveCount = state.have.reduce((sum, s) => sum + s.qty, 0)
 
