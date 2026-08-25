@@ -53,5 +53,24 @@ services:
       # DB 대기 + JPA 초기화가 붙어 기존 20s 로는 모자란다.
       start_period: 40s
 
+  # 운영과 같은 화면으로 로그를 보고 싶을 때만 쓴다:
+  #   docker compose --profile monitoring up -d   →  http://localhost:8081
+  # profile 로 격리해서 기본 `docker compose up` 은 이 컨테이너를 띄우지 않는다.
+  # 로컬은 `docker compose logs -f` 로도 충분하므로 인증은 걸지 않는다
+  # (운영에서는 DOZZLE_AUTH_PROVIDER=simple 로 로그인을 요구한다 — deploy-backend.yml 참고).
+  dozzle:
+    image: amir20/dozzle:v10.7.4
+    profiles: [monitoring]
+    ports:
+      - "8081:8080"
+    environment:
+      # 운영(deploy-backend.yml)은 name=^app$ 로 앵커링하지만 여기서는 앵커를 쓰지 않는다 —
+      # compose 가 만드는 컨테이너 이름에는 프로젝트 접두사가 붙어서
+      # (<project>-app-1) ^app$ 로는 아무것도 잡히지 않는다.
+      # mysql 컨테이너 이름에는 app 이 들어가지 않아 이 필터에 걸리지 않는다.
+      DOZZLE_FILTER: name=app
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
 volumes:
   mysql-data:
