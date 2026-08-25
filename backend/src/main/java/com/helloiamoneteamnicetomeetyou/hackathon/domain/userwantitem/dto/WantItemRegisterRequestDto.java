@@ -1,0 +1,11 @@
+package com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.dto;
+
+import java.util.UUID;
+
+/**
+ * 부스 관리자가 올린 상품 목록에서 내가 원하는 카드를 등록할 때 쓴다.
+ *
+ * @param userId 클라이언트가 만들어 들고 다니는 값
+ * @param itemId 등록할 카드
+ */
+public record WantItemRegisterRequestDto(UUID userId, Long itemId) {}

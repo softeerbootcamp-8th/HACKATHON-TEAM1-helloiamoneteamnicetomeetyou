@@ -35,4 +35,19 @@ public class UserHaveItem {
 
     @Column(nullable = false)
     private Integer quantity;
+
+    private UserHaveItem(User user, Item item, Integer quantity) {
+        this.user = user;
+        this.item = item;
+        this.quantity = quantity;
+    }
+
+    /**
+     * 등록할 때마다 새 행을 만든다. 부스 관리자가 올린 상품 목록에서 여러 종류를 고르고 각 상품
+     * 개수를 여러 번에 나눠 등록할 수 있는 흐름이라, 같은 (user, item) 조합이 다시 들어와도 기존
+     * 행을 찾아 합치지 않는다. 그래서 {@code (user_id, item_id)} 에 유니크 제약을 걸지 않는다.
+     */
+    public static UserHaveItem of(User user, Item item, Integer quantity) {
+        return new UserHaveItem(user, item, quantity);
+    }
 }

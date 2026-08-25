@@ -31,4 +31,13 @@ public class UserWantItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "item_id", nullable = false)
     private Item item;
+
+    private UserWantItem(User user, Item item) {
+        this.user = user;
+        this.item = item;
+    }
+
+    public static UserWantItem of(User user, Item item) {
+        return new UserWantItem(user, item);
+    }
 }
