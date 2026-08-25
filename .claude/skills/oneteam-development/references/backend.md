@@ -5,9 +5,13 @@
 
 ## 지금 들어와 있는 것
 
-`build.gradle` 에 `spring-boot-starter-webmvc` 하나만 있다. JPA, MySQL,
-Bean Validation, Lombok 모두 없다. 아래 규칙 중 JPA 나 검증 어노테이션이
-나오는 부분은 그 의존성을 추가한 시점부터 적용한다.
+`build.gradle` 에 `spring-boot-starter-webmvc`, `spring-boot-starter-data-jpa`,
+`mysql-connector-j`, Lombok 이 있다. **Bean Validation 은 아직 없다** — 아래 규칙 중
+검증 어노테이션이 나오는 부분은 그 의존성을 추가한 시점부터 적용한다.
+
+DB 접속 설정은 `application.yml` 의 세 프로파일에 나뉘어 있다. 기본은 로컬 MySQL
+(`localhost:3306`), `e2e` 는 compose 의 `mysql` 컨테이너, `prod` 는 RDS 이고 접속 정보를
+`DB_URL` / `DB_USERNAME` / `DB_PASSWORD` 환경변수로 받는다.
 
 의존성을 추가할 때는 `build.gradle` 에 넣고 왜 필요한지 한 줄로 알린다.
 **Redis, 메시지 큐, 배치 스케줄러는 지금 규모에서 필요하지 않다.** 넣어야 한다고
