@@ -7,15 +7,26 @@
  */
 const KEY = 'tradit.deviceId'
 
+/**
+ * 저장소를 못 쓸 때 이번 방문 동안만 들고 있을 값이다.
+ *
+ * 예전에는 고정 문자열 'anonymous' 를 돌려줬는데, 그러면 프라이빗 모드로 들어온 사람들이
+ * 전부 같은 사용자가 되어 서로의 알림과 교환을 받게 된다. UUID 형식도 아니라 서버가 거절한다.
+ */
+let memoryFallback: string | null = null
+
 export function getDeviceId(): string {
   try {
     const saved = localStorage.getItem(KEY)
     if (saved) return saved
+
     const fresh = crypto.randomUUID()
     localStorage.setItem(KEY, fresh)
     return fresh
   } catch {
     // 사파리 프라이빗 모드처럼 저장소가 막힌 경우에도 화면은 떠야 한다.
-    return 'anonymous'
+    // 새로고침하면 다른 사람이 되지만, 한 방문 안에서는 일관되게 동작한다.
+    memoryFallback ??= crypto.randomUUID()
+    return memoryFallback
   }
 }

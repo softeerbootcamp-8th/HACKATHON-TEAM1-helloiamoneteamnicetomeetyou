@@ -6,12 +6,15 @@ import { CardStack } from '@/components/domain/CardStack'
 import { BottomSheet } from '@/components/domain/BottomSheet'
 import { GoodsFace } from '@/components/domain/GoodsCard'
 import { RadarRings } from '@/components/domain/Radar'
+import { PushOptInBanner } from '@/components/domain/PushOptInBanner'
 import { RadarUser } from '@/components/domain/RadarUser'
 import { BellIcon, ClockIcon, SparkleIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { tick } from '@/lib/haptics'
 import { springSheet, springSnap, staggerChild, staggerParent } from '@/lib/motion'
+import { usePush, type PushState } from '@/lib/use-push'
 import { ALL_WAITING, itemById, ZONES } from '@/mocks/data'
+import { getDeviceId } from '@/store/identity'
 import { radarUsers, sortedWaitingList, wantedFromMe } from '@/store/matching'
 import { useStore } from '@/store/useStore'
 
@@ -20,6 +23,8 @@ export function Home() {
   const { state, dispatch } = useStore()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  // 앱을 닫아 둔 사이의 알림. 여는 자리는 알림 목록 위다.
+  const { state: pushState, enable: enablePush } = usePush(getDeviceId())
   const [hovered, setHovered] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   // 방금 카드를 놓은 상대. 고리가 한 번 터지고 나서 찔러보기 확인 화면으로 넘어간다.
@@ -496,6 +501,8 @@ export function Home() {
         open={notifOpen}
         onClose={() => setNotifOpen(false)}
         notifications={state.notifications}
+        pushState={pushState}
+        onEnablePush={enablePush}
         onDismiss={(id) => dispatch({ type: 'read-notification', id })}
         onSelect={(kind) => {
           setNotifOpen(false)
@@ -596,14 +603,18 @@ function NotificationSheet({
   notifications,
   onSelect,
   onDismiss,
+  pushState,
+  onEnablePush,
 }: {
   open: boolean
   onClose: () => void
   notifications: { id: string; kind: string; title: string; body: string }[]
   onSelect: (kind: string) => void
   onDismiss: (id: string) => void
+  pushState: PushState
+  onEnablePush: () => void
 }) {
-  const body =
+  const list =
     notifications.length === 0 ? (
       <p className="py-10 text-center text-[13px] text-neutral-400">아직 알림이 없어요</p>
     ) : (
@@ -620,6 +631,14 @@ function NotificationSheet({
         </AnimatePresence>
       </ul>
     )
+
+  // 모바일 시트와 데스크톱 판이 이 하나를 같이 쓴다.
+  const body = (
+    <>
+      <PushOptInBanner state={pushState} onEnable={onEnablePush} />
+      {list}
+    </>
+  )
 
   return (
     <AnimatePresence>
