@@ -140,8 +140,16 @@ Vercel 프로젝트 `hackathon-team1-frontend` 에 배포한다. Root Directory 
 - **`.env` 파일은 커밋하지 않는다.** 값은 팀에서 따로 공유한다.
 - **환경변수를 바꾸면 반드시 Redeploy 한다.** 빌드 시점에 번들에 박히는 값이라 재배포하지
   않으면 옛 주소를 계속 부른다.
-- GitHub 저장소 연결은 아직 안 되어 있다. `softeerbootcamp-8th` 에 Vercel GitHub App 을
-  설치해야 하는데 조직 권한이 필요해서, 지금은 `frontend/` 에서 `vercel deploy --prod` 로 올린다.
+- **배포는 `deploy-frontend.yml` 이 한다.** `main` push 는 프로덕션, `dev` push 와 PR 은
+  미리보기로 올라간다. 누가 push 하든 워크플로가 도는 것이라 팀원이 Vercel 에 로그인할
+  필요가 없다.
+- **Vercel GitHub App 은 쓰지 않는다.** 앱이 `members:read` 같은 조직 권한을 요구해서
+  org owner 승인이 필요한데 우리는 레포 권한만 있다. 그래서 토큰 방식으로 우회했다.
+- 워크플로가 쓰는 값은 secret `VERCEL_TOKEN` 과 variable `VERCEL_ORG_ID`,
+  `VERCEL_PROJECT_ID` 다. **토큰은 명령줄에 붙이지 않고 환경변수로만 넘긴다.** `--token` 을
+  쓰면 실행 로그에 찍힐 수 있다.
+- **토큰 Scope 를 특정 프로젝트 하나로 잡지 않는다.** 프로젝트 스코프 토큰은 `whoami` 나
+  `teams ls` 같은 user·team 레벨 API 를 거부해서, 멀쩡한 토큰인데 잘못된 것처럼 보인다.
 
 ### CORS
 
