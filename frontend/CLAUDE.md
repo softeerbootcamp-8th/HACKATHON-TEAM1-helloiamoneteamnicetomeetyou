@@ -7,6 +7,7 @@
 
 - Vite 8 + React 19 + TypeScript (strict)
 - Tailwind CSS v4 (`@tailwindcss/vite` 플러그인, CSS-first)
+- PWA (`vite-plugin-pwa`). 홈 화면 설치와 오프라인 앱 껍데기까지만 한다
 - ESLint + Prettier (포맷 규칙은 전부 Prettier 가 맡는다)
 - 패키지 매니저는 **pnpm 고정**이다. Node 22 이상이 필요하다.
 - **라우터와 서버 상태 라이브러리는 아직 없다.** 필요해지면 팀에 알리고 넣는다.
@@ -20,6 +21,36 @@
 | `pnpm lint`         | ESLint (`pnpm lint:fix` 로 자동 수정)                         |
 | `pnpm format`       | Prettier 로 정리                                              |
 | `pnpm format:check` | Prettier 검사만. **CI 가 이걸 돌린다**                        |
+| `pnpm preview`      | 빌드 결과를 띄운다. **서비스 워커는 여기서만 돈다**           |
+
+## PWA
+
+`vite.config.ts` 의 `VitePWA` 설정 한 군데에 모여 있다.
+
+- **서비스 워커는 `pnpm dev` 에서 돌지 않는다.** 설치나 오프라인을 확인하려면
+  `pnpm build && pnpm preview` 로 봐야 한다.
+- **`/api` 응답은 캐시하지 않는다.** 프리캐시 대상은 빌드 산출물뿐이고 `runtimeCaching`
+  을 비워 뒀다. 오래된 데이터가 화면에 남으면 디버깅이 어려워진다. 오프라인에서 API 를
+  쓰고 싶어지면 그때 팀에 알리고 넣는다.
+- 새 배포가 올라오면 다음 방문에 서비스 워커가 알아서 갈아끼운다(`autoUpdate`).
+
+### 아이콘 바꾸기
+
+**`public/logo.svg` 하나만 갈아끼우고 아래를 돌린다.** 512x512 정사각형이고,
+안드로이드가 아이콘을 원형으로 깎기 때문에 가장자리에 여백이 있어야 한다.
+
+```bash
+pnpm generate-pwa-assets
+```
+
+`public/` 의 `favicon.ico`, `apple-touch-icon-180x180.png`, `pwa-*.png`,
+`maskable-icon-512x512.png` 가 다시 만들어진다. **결과물은 커밋한다.** 빌드할 때
+만들지 않는 이유는 CI 와 Vercel 이 `sharp` 를 설치하지 않아도 되게 하려는 것이다.
+
+- 브라우저 탭 아이콘인 `public/favicon.svg` 는 이 생성기가 건드리지 않는다.
+  배경이 투명한 별도 파일이라 같이 바꿔야 한다.
+- 이름과 테마색은 `vite.config.ts` 의 `manifest` 에 있다. `theme_color` 를 바꾸면
+  `index.html` 의 `<meta name="theme-color">` 도 같이 고친다.
 
 ### push 전에 돌릴 것
 

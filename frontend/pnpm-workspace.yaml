@@ -1,0 +1,4 @@
+# sharp 는 아이콘 생성(@vite-pwa/assets-generator)에만 쓰고, 프리빌드 바이너리로 동작하므로
+# 설치 때 빌드 스크립트를 돌릴 필요가 없다. 이 값을 정해 두지 않으면 pnpm 이 install 을 멈춘다.
+allowBuilds:
+  sharp: false
