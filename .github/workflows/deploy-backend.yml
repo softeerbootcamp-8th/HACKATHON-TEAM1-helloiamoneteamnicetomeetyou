@@ -202,11 +202,21 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           # 배포가 걸려도 러너를 물고 있지 않게 자른다.
           command_timeout: 5m
-          envs: IMAGE,GHCR_USER,GHCR_TOKEN,DB_URL,DB_USERNAME,DB_PASSWORD
+          envs: IMAGE,GHCR_USER,GHCR_TOKEN,DB_URL,DB_USERNAME,DB_PASSWORD,ADMIN_USERNAME,ADMIN_PASSWORD
           # script_stop 은 이 액션의 입력이 아니다(Unexpected input 경고).
           # 스크립트 첫 줄의 set -euo pipefail 이 같은 역할을 한다.
           script: |
             set -euo pipefail
+
+            # 어드민 계정이 비어 있으면 여기서 끊는다.
+            #
+            # prod 프로파일에는 기본값이 없어서 이대로 두면 앱이 placeholder 미해결로 죽고,
+            # 워크플로에는 "health check failed" 만 남는다. DB 가 안 붙은 것인지 시크릿이
+            # 빠진 것인지 로그를 열어 봐야 알게 되므로, 원인을 여기서 말해 준다.
+            if [ -z "${ADMIN_USERNAME:-}" ] || [ -z "${ADMIN_PASSWORD:-}" ]; then
+              echo "::error::ADMIN_USERNAME / ADMIN_PASSWORD 시크릿이 없습니다. 저장소 Settings → Secrets and variables → Actions 에 등록하세요."
+              exit 1
+            fi
 
             # 패키지가 internal/private 이어도 GITHUB_TOKEN 으로 pull 할 수 있다.
             # 이 토큰은 잡 실행 중에만 유효하지만 pull 이 그 안에서 끝나므로 충분하고,
@@ -258,6 +268,8 @@ jobs:
               -e DB_URL="$DB_URL" \
               -e DB_USERNAME="$DB_USERNAME" \
               -e DB_PASSWORD="$DB_PASSWORD" \
+              -e ADMIN_USERNAME="$ADMIN_USERNAME" \
+              -e ADMIN_PASSWORD="$ADMIN_PASSWORD" \
               "$IMAGE"
 
             # 배포를 fire-and-forget 으로 두지 않는다. 안 뜨면 로그를 남기고 워크플로를 실패시킨다.
@@ -283,6 +295,14 @@ jobs:
           DB_URL: ${{ secrets.DB_URL }}
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          # 어드민 화면(/admin) 로그인 계정. application.yml 의 prod 프로파일이
+          # 이 이름 그대로 ${ADMIN_USERNAME}, ${ADMIN_PASSWORD} 로 읽는다.
+          #
+          # 비밀번호에 $ 나 따옴표, 백틱, 역슬래시를 넣지 않는다. 값이 SSH 로 넘어가면서
+          # 원격 셸을 한 번 거치기 때문에, 그런 문자가 있으면 서버에 저장된 값이 시크릿과
+          # 달라진다. 영문과 숫자로만 두는 것이 안전하다.
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
 
   notify:
     name: Notify Slack
