@@ -53,9 +53,28 @@ body {
   background: var(--gradient-card);
 }
 
-/* 레이더 배경에 깔리는 연한 빛 무리. */
-@utility sweep-glow {
-  background: radial-gradient(circle at 70% 45%, #2ced9033 0%, #2ced9000 60%);
+/*
+  레이더 스윕. 시안(99:5005)은 각도 그라데이션이다. 0도에서 초록 30% 로 시작해
+  50도 만에 투명해지고 나머지 각도는 비어 있는 부채꼴이다.
+
+  요소를 통째로 돌리지 않고 그라데이션의 시작 각도만 돌린다. 타원을 돌리면 도형 자체가
+  일그러지면서 같이 돌아 보인다. @property 가 없는 브라우저에서는 부채꼴이 멈춰 있을 뿐
+  화면이 깨지지는 않는다.
+*/
+@property --sweep-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@utility sweep-fan {
+  background: conic-gradient(
+    from var(--sweep-angle),
+    #2ced904d 0deg,
+    #edf92000 50deg,
+    #00000000 360deg
+  );
+  animation: tradit-sweep 3s linear infinite;
 }
 
 /* 버튼과 카드를 누를 때 시스템 하이라이트가 겹쳐 보이지 않게 한다.
@@ -159,13 +178,14 @@ body {
   }
 }
 
-@keyframes tradit-burst {
+/* 카드를 놓은 자리에서 물결처럼 퍼지는 고리. */
+@keyframes tradit-ripple {
   0% {
-    transform: scale(0.75);
-    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(0.35);
+    opacity: 0.85;
   }
   100% {
-    transform: scale(2.1);
+    transform: translate(-50%, -50%) scale(2.4);
     opacity: 0;
   }
 }
@@ -184,10 +204,10 @@ body {
 
 @keyframes tradit-sweep {
   from {
-    transform: rotate(0deg);
+    --sweep-angle: 0deg;
   }
   to {
-    transform: rotate(360deg);
+    --sweep-angle: 360deg;
   }
 }
 
@@ -225,14 +245,11 @@ body {
 @utility anim-glow {
   animation: tradit-glow 2.6s ease-in-out infinite;
 }
-@utility anim-burst {
-  animation: tradit-burst 0.62s ease-out forwards;
+@utility anim-ripple {
+  animation: tradit-ripple 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @utility anim-pop {
   animation: tradit-pop 0.5s ease-out;
-}
-@utility anim-sweep {
-  animation: tradit-sweep 3s linear infinite;
 }
 @utility anim-lemon {
   animation: tradit-lemon 5s ease-in-out infinite;

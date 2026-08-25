@@ -29,10 +29,16 @@ export function RadarUser({ user, hovered, pending, burst = false, index }: Prop
       className="relative w-[76px]"
     >
       {burst && (
-        <span
-          aria-hidden
-          className="anim-burst pointer-events-none absolute inset-0 z-20 rounded-2xl border-[3px] border-brand"
-        />
+        <span aria-hidden className="pointer-events-none absolute inset-0 z-20">
+          {/* 고리 두 개를 살짝 어긋나게 띄워서 물결처럼 퍼지게 한다. */}
+          {[0, 0.13].map((delay) => (
+            <span
+              key={delay}
+              className="anim-ripple absolute top-1/2 left-1/2 aspect-square w-full rounded-full border-[3px] border-brand"
+              style={{ animationDelay: `${delay}s` }}
+            />
+          ))}
+        </span>
       )}
 
       {hovered && (
@@ -68,13 +74,6 @@ export function RadarUser({ user, hovered, pending, burst = false, index }: Prop
             ···
           </span>
         )}
-        {burst && (
-          <span
-            aria-hidden
-            className="anim-burst pointer-events-none absolute inset-0 z-20 rounded-2xl border-[3px] border-brand"
-          />
-        )}
-
         {hovered && (
           <span className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-ink text-[10px] text-white">
             ✓

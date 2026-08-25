@@ -14,8 +14,12 @@ export function RadarRings() {
           style={{ scale, animationDelay: `${i * 0.5}s` }}
         />
       ))}
-      {/* 빛무리가 한 방향으로 계속 돈다. 레이더가 훑고 있다는 느낌을 주는 자리다. */}
-      <span className="anim-sweep sweep-glow absolute top-1/2 left-1/2 h-[84%] w-[88%] -translate-x-1/2 -translate-y-1/2 rounded-[50%]" />
+      {/*
+        부채꼴이 한 방향으로 훑고 지나간다. 시안의 Shape / .sweep 자리다.
+        링은 타원인데 이것만 정원인 이유는, 타원에 각도 그라데이션을 얹으면 쐐기가
+        늘어져서 부채꼴로 안 보이기 때문이다. 시안도 정원이고 프레임 폭보다 조금 크다.
+      */}
+      <span className="sweep-fan absolute top-1/2 left-1/2 aspect-square w-[108%] -translate-x-1/2 -translate-y-1/2 rounded-full" />
     </div>
   )
 }
