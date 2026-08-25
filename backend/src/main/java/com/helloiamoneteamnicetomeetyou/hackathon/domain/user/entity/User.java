@@ -9,6 +9,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -49,10 +50,13 @@ public class User {
      * 시간 선택을 운영자가 대신 눌러 버리면 그 사람이 하지 않은 일이 그 사람 이름으로 남는다.
      * 대리 조작은 이 값이 참인 사용자에게만 열어 둔다.
      *
-     * <p>{@code false} 를 기본값으로 두어서, 화면에서 등록하는 기존 사용자는 컬럼이 늘어도
-     * 그대로 진짜 참가자로 남는다.
+     * <p><b>DB 기본값을 함께 박아 둔다.</b> 이 컬럼을 모르는 코드가 사용자를 넣을 때
+     * (이 브랜치를 아직 받지 않은 다른 작업 브랜치, 손으로 쓰는 INSERT) 컬럼을 빼고 보내는데,
+     * 기본값이 없으면 MySQL 이 "Field 'admin_managed' doesn't have a default value" 로 거절한다.
+     * 컬럼 하나 늘렸다고 남의 브랜치가 안 도는 일은 없어야 한다.
      */
     @Column(nullable = false)
+    @ColumnDefault("0")
     private boolean adminManaged = false;
 
     private User(UUID id, String username, boolean adminManaged) {
