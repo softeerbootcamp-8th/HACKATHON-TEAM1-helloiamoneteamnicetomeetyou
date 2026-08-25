@@ -7,6 +7,18 @@
  */
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
+/**
+ * 백엔드가 모든 응답을 감싸는 공통 형식.
+ * 형식 자체는 `.claude/skills/oneteam-development/references/contracts.md` 가 기준이다.
+ */
+export type CommonResponse<T> = {
+  success: boolean
+  data?: T
+  code?: number
+  message?: string
+  errors?: { field: string; message: string }[]
+}
+
 export class ApiError extends Error {
   readonly status: number
 
