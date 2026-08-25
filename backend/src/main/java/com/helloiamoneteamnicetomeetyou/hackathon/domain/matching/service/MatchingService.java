@@ -14,6 +14,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
 
 import java.util.*;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
@@ -41,10 +42,10 @@ public class MatchingService {
      */
     @Async("matchingExecutor")
     @Transactional
-    public void runMatching(Long userId) {
-        Map<Long, Long> earliestReg = new HashMap<>();
-        Map<Long, Map<Long, Integer>> toThem = buildToThem(userId, earliestReg);
-        Map<Long, Map<Long, Integer>> toMe   = buildToMe(userId);
+    public void runMatching(UUID userId) {
+        Map<UUID, Long> earliestReg = new HashMap<>();
+        Map<UUID, Map<Long, Integer>> toThem = buildToThem(userId, earliestReg);
+        Map<UUID, Map<Long, Integer>> toMe   = buildToMe(userId);
         if (toThem.isEmpty() || toMe.isEmpty()) return;
 
         User myUser = userRepository.findById(userId).orElseThrow();
@@ -63,16 +64,16 @@ public class MatchingService {
      */
     private Optional<Exchange> tryOneToOne(
             User myUser,
-            Map<Long, Map<Long, Integer>> toThem,
-            Map<Long, Map<Long, Integer>> toMe,
-            Map<Long, Long> earliestReg
+            Map<UUID, Map<Long, Integer>> toThem,
+            Map<UUID, Map<Long, Integer>> toMe,
+            Map<UUID, Long> earliestReg
     ) {
-        Set<Long> candidates = toThem.keySet().stream()
+        Set<UUID> candidates = toThem.keySet().stream()
                 .filter(toMe::containsKey)
                 .collect(Collectors.toSet());
         if (candidates.isEmpty()) return Optional.empty();
 
-        Long bestId = selectBest(candidates, toThem, toMe, earliestReg);
+        UUID bestId = selectBest(candidates, toThem, toMe, earliestReg);
         Map<Long, Integer> give    = toThem.get(bestId);
         Map<Long, Integer> receive = toMe.get(bestId);
         int exchangeQty = Math.min(sum(give), sum(receive));
@@ -86,16 +87,16 @@ public class MatchingService {
      * 기준 1: score(= min(내가 줄 총량, 내가 받을 총량))가 높은 후보 우선.
      * 기준 2: score 동점이면 want 아이템을 먼저 등록한 후보 우선 (earliestReg 최솟값).
      */
-    private Long selectBest(
-            Set<Long> candidates,
-            Map<Long, Map<Long, Integer>> toThem,
-            Map<Long, Map<Long, Integer>> toMe,
-            Map<Long, Long> earliestReg
+    private UUID selectBest(
+            Set<UUID> candidates,
+            Map<UUID, Map<Long, Integer>> toThem,
+            Map<UUID, Map<Long, Integer>> toMe,
+            Map<UUID, Long> earliestReg
     ) {
         return candidates.stream()
-                .max(Comparator.<Long>comparingInt(id -> score(id, toThem, toMe))
+                .max(Comparator.<UUID>comparingInt(id -> score(id, toThem, toMe))
                                .thenComparing(Comparator.comparingLong(
-                                       (Long id) -> earliestReg.getOrDefault(id, Long.MAX_VALUE)
+                                       (UUID id) -> earliestReg.getOrDefault(id, Long.MAX_VALUE)
                                ).reversed()))
                 .orElseThrow();
     }
@@ -106,7 +107,7 @@ public class MatchingService {
      */
     private Exchange createExchange(
             User myUser,
-            Long bestId,
+            UUID bestId,
             Map<Long, Integer> give,
             Map<Long, Integer> receive
     ) {
@@ -148,22 +149,22 @@ public class MatchingService {
      */
     private Optional<Exchange> tryThreeWay(
             User myUser,
-            Map<Long, Map<Long, Integer>> toThem,
-            Map<Long, Map<Long, Integer>> toMe,
-            Map<Long, Long> earliestReg
+            Map<UUID, Map<Long, Integer>> toThem,
+            Map<UUID, Map<Long, Integer>> toMe,
+            Map<UUID, Long> earliestReg
     ) {
         if (toThem.isEmpty() || toMe.isEmpty()) return Optional.empty();
 
         // 추가 쿼리: B → C (B ∈ toThem, C ∈ toMe)
         // bToC: bId → cId → { itemId → qty }
-        Map<Long, Map<Long, Map<Long, Integer>>> bToC = buildBToC(toThem.keySet(), toMe.keySet());
+        Map<UUID, Map<UUID, Map<Long, Integer>>> bToC = buildBToC(toThem.keySet(), toMe.keySet());
         if (bToC.isEmpty()) return Optional.empty();
 
         // B는 want를 먼저 등록한 순서(earliestReg 최솟값)로 선정, C는 첫 번째
-        Long bId = bToC.keySet().stream()
+        UUID bId = bToC.keySet().stream()
                 .min(Comparator.comparingLong(id -> earliestReg.getOrDefault(id, Long.MAX_VALUE)))
                 .orElseThrow();
-        Long cId = bToC.get(bId).keySet().iterator().next();
+        UUID cId = bToC.get(bId).keySet().iterator().next();
 
         // 각 방향에서 교환할 아이템 1개씩 결정
         Long aToBItemId = toThem.get(bId).keySet().iterator().next();
@@ -181,8 +182,8 @@ public class MatchingService {
      */
     private Exchange createThreeWayExchange(
             User myUser,
-            Long bId,
-            Long cId,
+            UUID bId,
+            UUID cId,
             Long aToBItemId,
             Long bToCItemId,
             Long cToAItemId
@@ -227,10 +228,10 @@ public class MatchingService {
      * 결과: candidateId → { itemId → qty }
      * 부수효과: earliestReg에 후보별 최초 want 등록 ID(최솟값)를 기록한다 (동점 tiebreaker용).
      */
-    private Map<Long, Map<Long, Integer>> buildToThem(Long myUserId, Map<Long, Long> earliestReg) {
-        Map<Long, Map<Long, Integer>> result = new LinkedHashMap<>();
+    private Map<UUID, Map<Long, Integer>> buildToThem(UUID myUserId, Map<UUID, Long> earliestReg) {
+        Map<UUID, Map<Long, Integer>> result = new LinkedHashMap<>();
         for (Object[] row : userWantItemRepository.findToThemData(myUserId)) {
-            Long candidateId = toLong(row[0]);
+            UUID candidateId = toUUID(row[0]);
             Long itemId      = toLong(row[1]);
             int  qty         = toInt(row[2]);
             Long wantId      = toLong(row[3]);
@@ -245,10 +246,10 @@ public class MatchingService {
      * SQL의 JOIN + LEAST로 per-item 수량 cap까지 처리한다.
      * 결과: candidateId → { itemId → qty }
      */
-    private Map<Long, Map<Long, Integer>> buildToMe(Long myUserId) {
-        Map<Long, Map<Long, Integer>> result = new LinkedHashMap<>();
+    private Map<UUID, Map<Long, Integer>> buildToMe(UUID myUserId) {
+        Map<UUID, Map<Long, Integer>> result = new LinkedHashMap<>();
         for (Object[] row : userHaveItemRepository.findToMeData(myUserId)) {
-            Long candidateId = toLong(row[0]);
+            UUID candidateId = toUUID(row[0]);
             Long itemId      = toLong(row[1]);
             int  qty         = toInt(row[2]);
             result.computeIfAbsent(candidateId, k -> new LinkedHashMap<>()).put(itemId, qty);
@@ -260,11 +261,11 @@ public class MatchingService {
      * 쿼리 C (3인 전용): B가 C에게 줄 수 있는 아이템과 수량을 조회한다.
      * 결과: bId → cId → { itemId → qty }
      */
-    private Map<Long, Map<Long, Map<Long, Integer>>> buildBToC(Set<Long> bIds, Set<Long> cIds) {
-        Map<Long, Map<Long, Map<Long, Integer>>> result = new LinkedHashMap<>();
+    private Map<UUID, Map<UUID, Map<Long, Integer>>> buildBToC(Set<UUID> bIds, Set<UUID> cIds) {
+        Map<UUID, Map<UUID, Map<Long, Integer>>> result = new LinkedHashMap<>();
         for (Object[] row : userHaveItemRepository.findBToCData(bIds, cIds)) {
-            Long bId    = toLong(row[0]);
-            Long cId    = toLong(row[1]);
+            UUID bId    = toUUID(row[0]);
+            UUID cId    = toUUID(row[1]);
             Long itemId = toLong(row[2]);
             int  qty    = toInt(row[3]);
             result.computeIfAbsent(bId, k -> new LinkedHashMap<>())
@@ -282,7 +283,7 @@ public class MatchingService {
      * 1대1 후보의 score를 계산한다.
      * score = min(내가 후보에게 줄 총량, 후보가 나에게 줄 총량).
      */
-    private int score(Long id, Map<Long, Map<Long, Integer>> toThem, Map<Long, Map<Long, Integer>> toMe) {
+    private int score(UUID id, Map<UUID, Map<Long, Integer>> toThem, Map<UUID, Map<Long, Integer>> toMe) {
         int toThemTotal = toThem.getOrDefault(id, Map.of()).values().stream().mapToInt(i -> i).sum();
         int toMeTotal   = toMe.getOrDefault(id, Map.of()).values().stream().mapToInt(i -> i).sum();
         return Math.min(toThemTotal, toMeTotal);
@@ -313,6 +314,7 @@ public class MatchingService {
         return m.values().stream().mapToInt(i -> i).sum();
     }
 
+    private UUID toUUID(Object o) { return UUID.fromString(o.toString()); }
     private Long toLong(Object o) { return ((Number) o).longValue(); }
     private int  toInt(Object o)  { return ((Number) o).intValue(); }
 }
