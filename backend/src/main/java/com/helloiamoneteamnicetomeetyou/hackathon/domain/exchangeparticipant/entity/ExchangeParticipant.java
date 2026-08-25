@@ -44,6 +44,23 @@ public class ExchangeParticipant {
     @Column(nullable = false, updatable = false)
     private LocalDateTime joinedAt;
 
+    private ExchangeParticipant(Exchange exchange, User user, ParticipantStatus status) {
+        this.exchange = exchange;
+        this.user = user;
+        this.status = status;
+        this.joinedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 이미 수락한 참가자로 넣는다.
+     *
+     * <p>찔러보기가 수락된 교환은 두 사람의 뜻이 이미 확인된 상태다. 보낸 쪽은 제안할 때,
+     * 받은 쪽은 카드를 고를 때 수락한 것이라 {@code PENDING} 을 거칠 일이 없다.
+     */
+    public static ExchangeParticipant accepted(Exchange exchange, User user) {
+        return new ExchangeParticipant(exchange, user, ParticipantStatus.ACCEPTED);
+    }
+
     /**
      * 어드민이 더미 사용자 대신 수락한다.
      *

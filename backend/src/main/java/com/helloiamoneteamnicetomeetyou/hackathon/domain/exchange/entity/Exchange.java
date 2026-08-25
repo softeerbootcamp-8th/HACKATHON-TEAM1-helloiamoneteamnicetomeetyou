@@ -46,6 +46,22 @@ public class Exchange {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    private Exchange(ExchangeType type) {
+        this.type = type;
+        this.status = ExchangeStatus.PENDING;
+        this.createdAt = LocalDateTime.now();
+    }
+
+    /**
+     * 두 사람 사이의 교환을 만든다. 찔러보기가 수락된 순간이 여기다.
+     *
+     * <p>{@code zone} 과 {@code exchangeTime} 은 비워 둔다. 어디서 언제 만날지는 성사된 뒤에
+     * 두 사람이 약속 화면에서 정하는 것이라, 만드는 시점에는 알 수 없다.
+     */
+    public static Exchange oneToOne() {
+        return new Exchange(ExchangeType.ONE_TO_ONE);
+    }
+
     /**
      * 부스 운영자가 막힌 교환을 끊는다.
      *
