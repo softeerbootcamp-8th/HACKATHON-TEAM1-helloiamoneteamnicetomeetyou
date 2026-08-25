@@ -1,4 +1,4 @@
-<!-- PWA 아이콘 원본. Figma(Page 1)의 TRADIT 레몬 심볼을 512 정사각 캔버스에 올린 것이다.
+<!-- PWA 아이콘 원본. Figma(Page 1)의 NearLy 레몬 심볼을 512 정사각 캔버스에 올린 것이다.
      이 파일만 갈아끼우고 `pnpm generate-pwa-assets` 를 돌리면 아이콘 전체가 다시 만들어진다.
      안드로이드가 아이콘을 원형으로 깎으므로 가장자리 여백을 줄이지 않는다. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
