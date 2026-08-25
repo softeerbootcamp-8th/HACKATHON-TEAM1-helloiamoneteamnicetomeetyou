@@ -8,13 +8,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
-@AutoConfigureMockMvc
+// JPA 가 들어온 뒤로 @SpringBootTest 는 실제 MySQL 을 찾는다. CORS 는 웹 계층 설정이라
+// 웹 슬라이스만 띄운다. @WebMvcTest 는 WebMvcConfigurer 를 그대로 집어 온다.
+@WebMvcTest
 @DisplayName("CORS 설정")
 class CorsConfigTest {
 
