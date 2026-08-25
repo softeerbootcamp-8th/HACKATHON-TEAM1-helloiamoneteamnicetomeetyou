@@ -27,7 +27,22 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
         """, nativeQuery = true)
     List<Object[]> findToMeData(@Param("myUserId") Long myUserId);
 
-    // createExchange에서 B의 UserHaveItem 엔티티 로드 (quantityLeft 감소용)
+    // 3인 교환 쿼리: B가 C에게 줄 수 있는 아이템과 수량 (B ∈ bIds, C ∈ cIds)
+    @Query(value = """
+        SELECT uhi.user_id, uwi.user_id,
+               uhi.item_id,
+               LEAST(uhi.quantity_left, uwi.quantity) AS qty
+        FROM user_have_items uhi
+        JOIN user_want_items uwi ON uwi.item_id = uhi.item_id
+        WHERE uhi.user_id IN :bIds
+          AND uwi.user_id IN :cIds
+          AND uhi.user_id != uwi.user_id
+          AND uhi.status = 'LEFT'
+          AND uhi.quantity_left > 0
+        """, nativeQuery = true)
+    List<Object[]> findBToCData(@Param("bIds") Set<Long> bIds, @Param("cIds") Set<Long> cIds);
+
+    // createExchange에서 UserHaveItem 엔티티 로드 (quantityLeft 감소용)
     @Query("SELECT uhi FROM UserHaveItem uhi JOIN FETCH uhi.item WHERE uhi.user.id = :userId AND uhi.item.id IN :itemIds AND uhi.status = 'LEFT' AND uhi.quantityLeft > 0")
     List<UserHaveItem> findByUserIdAndItemIds(@Param("userId") Long userId, @Param("itemIds") Set<Long> itemIds);
 }
