@@ -38,13 +38,25 @@ public class MatchingService {
     private final ExchangeItemRepository exchangeItemRepository;
 
     /**
-     * 1대1 교환 매칭 진행.
-     * 보유·희망 아이템이 하나라도 없으면 매칭 불가.
-     * 매칭 성공 시 Exchange를 생성하고 반환한다.
-     * 실패 시 Optional.empty() → 호출부에서 3인 교환으로 폴백.
+     * 교환 매칭 진행. 1대1 매칭을 먼저 시도하고, 실패하면 3인 교환으로 폴백한다.
+     * 비동기로 호출되므로 폴백 로직을 내부에서 처리한다.
      */
     @Transactional
-    public Optional<Exchange> runMatching(
+    public void runMatching(
+            User myUser,
+            List<UserHaveItem> myHaveItems,
+            List<UserWantItem> myWantItems
+    ) {
+        tryOneToOne(myUser, myHaveItems, myWantItems)
+                .or(() -> tryThreeWay(myUser, myHaveItems, myWantItems));
+    }
+
+    /**
+     * 1대1 교환 매칭 시도.
+     * 보유·희망 아이템이 하나라도 없으면 매칭 불가.
+     * 성공 시 Exchange 반환, 실패 시 Optional.empty().
+     */
+    private Optional<Exchange> tryOneToOne(
             User myUser,
             List<UserHaveItem> myHaveItems,
             List<UserWantItem> myWantItems
@@ -63,6 +75,21 @@ public class MatchingService {
 
         Long bestId = selectBest(candidates, toThem, toMe, earliestReg);
         return Optional.of(createExchange(myUser, bestId, myHaveItems, toThem.get(bestId), toMe.get(bestId)));
+    }
+
+    /**
+     * 3인 교환 매칭 시도. (미구현)
+     * A→B→C→A 사이클을 탐색하여 교환을 생성한다.
+     * findToThemData, findToMeData를 재활용하고 중간 노드 B의 교환 가능 상대를 추가 조회한다.
+     * createExchange는 참여자 3명, ExchangeItem 방향 A→B, B→C, C→A로 확장 필요.
+     */
+    private Optional<Exchange> tryThreeWay(
+            User myUser,
+            List<UserHaveItem> myHaveItems,
+            List<UserWantItem> myWantItems
+    ) {
+        // TODO: 3인 교환 구현
+        return Optional.empty();
     }
 
     /**
