@@ -9,10 +9,29 @@
 .
 ├── backend/    Spring Boot 4 · Java 21 · Gradle
 ├── frontend/   React 19 · TypeScript · Vite · Tailwind CSS
-└── .github/workflows/
-    ├── deploy-backend.yml   main push 시 backend/ 가 바뀌었으면 EC2 로 배포
-    └── ci-frontend.yml      PR 에서 frontend/ 포맷·린트·빌드 확인
+├── .claude/    개발 지침과 슬래시 커맨드 (Claude Code 설정)
+└── .github/
+    ├── ISSUE_TEMPLATE/, PULL_REQUEST_TEMPLATE.md
+    └── workflows/
+        ├── deploy-backend.yml   main push 시 backend/ 가 바뀌었으면 EC2 로 배포
+        └── ci-frontend.yml      PR 에서 frontend/ 포맷·린트·빌드 확인
 ```
+
+<br>
+
+## 개발 컨벤션
+
+브랜치, 커밋, 이슈, PR 규칙과 영역별 코딩 컨벤션은 아래 문서에 있습니다.
+
+| 문서 | 내용 |
+|---|---|
+| [`CLAUDE.md`](./CLAUDE.md) | 공통 규칙과 개발 프로세스 (브랜치, 커밋, 이슈, PR) |
+| [`backend/CLAUDE.md`](./backend/CLAUDE.md) | 패키지 구조, DTO, 예외, 네이밍, 테스트 |
+| [`frontend/CLAUDE.md`](./frontend/CLAUDE.md) | 폴더 구조, API 호출, 화면 상태, 네이밍 |
+| [`.claude/skills/oneteam-development/`](./.claude/skills/oneteam-development/) | API 응답 형식과 영역별 상세 지침 |
+
+브랜치는 `main ← dev ← {be\|fe}/{타입}/{이슈번호}-{기능}` 순서로 따고, 커밋과 이슈,
+PR 제목은 모두 `feat(be): 주문 생성 API 구현` 형식(Conventional Commits)으로 씁니다.
 
 <br>
 
