@@ -63,15 +63,11 @@ export function PlaceSelect() {
               className="absolute -translate-x-1/2 -translate-y-1/2 text-center"
               style={{ left: `${zone.x}%`, top: `${zone.y}%` }}
             >
-              <span
+              <PinIcon
                 className={
-                  zone.selectable
-                    ? 'flex size-7 items-center justify-center rounded-full bg-ink text-white'
-                    : 'flex size-6 items-center justify-center rounded-full bg-neutral-300 text-white'
+                  zone.selectable ? 'mx-auto size-8 text-ink' : 'mx-auto size-7 text-neutral-300'
                 }
-              >
-                <PinIcon className={zone.selectable ? 'size-4' : 'size-3.5'} />
-              </span>
+              />
               <span className="mt-1 block text-[10px] text-neutral-400">
                 {zone.selectable ? '중앙' : zone.name}
               </span>

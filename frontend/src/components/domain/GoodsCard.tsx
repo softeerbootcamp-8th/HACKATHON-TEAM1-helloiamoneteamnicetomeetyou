@@ -9,31 +9,45 @@ type Size = 'sm' | 'md' | 'lg'
 
 // 데스크톱은 화면이 넓어서 같은 크기로 두면 카드가 유난히 작아 보인다.
 const TILE: Record<Size, string> = {
-  sm: 'h-[62px] text-[15px] md:h-[70px] md:text-[16px]',
-  md: 'h-[74px] text-[17px] md:h-[88px] md:text-[20px]',
-  lg: 'h-[92px] text-[20px] md:h-[104px] md:text-[23px]',
+  sm: 'h-[66px] text-[15px] md:h-[74px] md:text-[16px]',
+  md: 'h-[90px] text-[17px] md:h-[100px] md:text-[20px]',
+  lg: 'h-[100px] text-[20px] md:h-[112px] md:text-[23px]',
 }
 
 /**
- * 카드 앞면. 굿즈 이미지를 브랜드색 빛무리 위에 얹는다.
+ * 카드 앞면. 브랜드색 빛무리 위에 굿즈 이미지를 얹는다.
+ *
+ * 시안에서 이미지는 회색 타일보다 크게 그려져 위아래 양옆으로 삐져나온다(타일 80x72 에
+ * 이미지 96x96). 타일 안에 가두면 차가 작아 보이고 빛무리도 번지지 않아서, 타일만
+ * 배경으로 깔고 이미지는 그 위를 덮게 둔다.
  *
  * 이미지를 못 받아오면 약칭 글자가 대신 남는다. 현장 와이파이가 느릴 때 카드가 통째로
  * 비어 보이는 것보다는 낫다.
  */
-export function GoodsFace({ item, size = 'md' }: { item: Item; size?: Size }) {
+export function GoodsFace({
+  item,
+  size = 'md',
+  className,
+}: {
+  item: Item
+  size?: Size
+  className?: string
+}) {
   const [failed, setFailed] = useState(false)
 
   return (
     <div
       className={cn(
-        'relative flex w-full items-center justify-center overflow-hidden rounded-xl bg-tile font-bold text-ink',
+        'relative flex w-full items-center justify-center font-bold text-ink',
         TILE[size],
+        className,
       )}
     >
+      <span aria-hidden className="absolute inset-0 rounded-xl bg-tile ring-1 ring-line" />
       <span
         aria-hidden
-        className="absolute size-[70%] rounded-full blur-[14px]"
-        style={{ background: 'radial-gradient(circle, #2cb3ed 0%, #2cb3ed00 70%)' }}
+        className="absolute size-[52%] rounded-full blur-[10px]"
+        style={{ background: 'radial-gradient(circle, #2cb3edb0 0%, #2cb3ed00 72%)' }}
       />
       {failed ? (
         <span className="relative">{item.code}</span>
@@ -45,7 +59,7 @@ export function GoodsFace({ item, size = 'md' }: { item: Item; size?: Size }) {
           loading="lazy"
           draggable={false}
           onError={() => setFailed(true)}
-          className="relative size-full object-contain p-1.5 select-none"
+          className="absolute -top-[17%] -left-[10%] h-[133%] w-[120%] max-w-none object-contain select-none"
         />
       )}
     </div>
@@ -120,7 +134,13 @@ export function GoodsCard({
         <div className={cn(disabled && 'grayscale')}>
           <GoodsFace item={item} size={size} />
         </div>
-        <p className="mt-2 text-center text-[12px] leading-tight font-bold text-ink">{item.name}</p>
+        {/*
+          이름 자리를 두 줄로 잡아 둔다. 길이에 따라 늘어나게 두면 'AVANTE N Facelift'
+          한 장만 키가 커져서 격자가 어긋난다.
+        */}
+        <p className="mt-2 flex h-[30px] items-center justify-center text-center text-[12px] leading-tight font-bold text-ink">
+          <span className="line-clamp-2">{item.name}</span>
+        </p>
       </motion.button>
 
       {selected && qty !== undefined && (

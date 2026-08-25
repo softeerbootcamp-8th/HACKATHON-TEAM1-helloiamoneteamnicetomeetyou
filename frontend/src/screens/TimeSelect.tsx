@@ -285,7 +285,8 @@ function TimeRow({
             whileTap={isBlocked ? undefined : { scale: 0.86 }}
             animate={{ backgroundColor: background }}
             transition={springSnap}
-            className="h-[30px] rounded-[7px]"
+            // 내가 고르는 줄은 시안에서 상대 줄의 두 배 높이다. 손가락이 닿는 자리라 넓다.
+            className="h-[64px] rounded-[9px]"
           />
         )
       })}

@@ -28,7 +28,7 @@ export function RadarUser({ user, hovered, pending, burst = false, onSelect, ind
       initial={{ opacity: 0, scale: 0.6 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ ...springSnap, delay: 0.08 * index }}
-      className="relative w-[76px] md:w-[92px]"
+      className="relative w-[90px] md:w-[104px]"
     >
       {burst && (
         <span aria-hidden className="pointer-events-none absolute inset-0 z-20">

@@ -42,10 +42,11 @@ export function CardStack({ topItemId, count, className, lifted = false }: Props
       <motion.div
         animate={{ rotate: lifted ? -3 : -6, scale: lifted ? 1.06 : 1 }}
         transition={springSnap}
-        className="absolute inset-0 rounded-2xl bg-white p-2.5 shadow-[0_10px_26px_rgba(0,0,0,0.16)]"
+        className="absolute inset-0 flex flex-col rounded-2xl bg-white p-2.5 pb-4 shadow-[0_10px_26px_rgba(0,0,0,0.16)]"
       >
-        <GoodsFace item={item} size="md" />
-        <p className="mt-1.5 text-center text-[12px] leading-tight font-bold tracking-tight text-ink md:text-[13px]">
+        {/* 앞면이 남는 자리를 다 쓴다. 높이를 고정해 두면 이름 밑이 통째로 빈다. */}
+        <GoodsFace item={item} size="md" className="min-h-0 flex-1" />
+        <p className="mt-2 shrink-0 text-center text-[12px] leading-tight font-bold tracking-tight text-ink md:text-[13px]">
           {item.name}
         </p>
       </motion.div>
