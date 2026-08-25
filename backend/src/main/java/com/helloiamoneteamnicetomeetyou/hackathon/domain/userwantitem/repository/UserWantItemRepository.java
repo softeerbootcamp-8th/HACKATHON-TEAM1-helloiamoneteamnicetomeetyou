@@ -2,6 +2,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repositor
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.entity.UserWantItem;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -17,6 +18,8 @@ public interface UserWantItemRepository extends JpaRepository<UserWantItem, Long
     List<UserWantItem> findAllByUserId(UUID userId);
 
     boolean existsByUserIdAndItemId(UUID userId, Long itemId);
+
+    Optional<UserWantItem> findByUserIdAndItemId(UUID userId, Long itemId);
 
     /** 이 카드를 찾는 사람들. */
     @Query("""

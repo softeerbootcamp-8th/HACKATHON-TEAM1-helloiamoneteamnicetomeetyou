@@ -103,7 +103,7 @@ public class AdminSeedService {
 
             // 앞사람이 내 카드를 찾게 한다. 마지막 사람의 카드는 첫 사람이 찾아서 고리가 닫힌다.
             User seeker = members.get((i + caseSize - 1) % caseSize);
-            userWantItemRepository.save(UserWantItem.of(seeker, owned));
+            userWantItemRepository.save(UserWantItem.of(seeker, owned, 1));
         }
 
         return caseSize;

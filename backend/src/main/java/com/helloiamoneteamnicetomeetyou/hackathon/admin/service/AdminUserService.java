@@ -193,13 +193,18 @@ public class AdminUserService {
         userHaveItemRepository.deleteById(haveId);
     }
 
-    /** 희망 카드를 붙인다. 수량 개념이 없어서 이미 있으면 아무것도 하지 않는다. */
+    /**
+     * 희망 카드를 붙인다. 이미 있으면 아무것도 하지 않는다.
+     *
+     * <p>어드민 화면에는 아직 찾는 개수를 넣는 자리가 없어서 1 로 만든다. 사용자용
+     * {@code POST /api/want-items} 는 개수를 받는다.
+     */
     @Transactional
     public void addWantItem(UUID userId, Long itemId) {
         if (userWantItemRepository.existsByUserIdAndItemId(userId, itemId)) {
             return;
         }
-        userWantItemRepository.save(UserWantItem.of(findUser(userId), findItem(itemId)));
+        userWantItemRepository.save(UserWantItem.of(findUser(userId), findItem(itemId), 1));
     }
 
     @Transactional
