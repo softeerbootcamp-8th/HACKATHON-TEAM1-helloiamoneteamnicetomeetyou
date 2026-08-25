@@ -57,7 +57,7 @@ public class UserHaveItem {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public static UserHaveItem create(User user, Item item, int quantity) {
+    public static UserHaveItem of(User user, Item item, Integer quantity) {
         UserHaveItem userHaveItem = new UserHaveItem();
         userHaveItem.user = user;
         userHaveItem.item = item;
@@ -87,17 +87,18 @@ public class UserHaveItem {
         this.status = ItemStatus.LEFT;
     }
 
-    private UserHaveItem(User user, Item item, Integer quantity) {
-        this.user = user;
-        this.item = item;
-        this.quantity = quantity;
-    }
-
-    public static UserHaveItem of(User user, Item item, Integer quantity) {
-        return new UserHaveItem(user, item, quantity);
-    }
-
+    /**
+     * 수량을 바꾸고 남은 수량도 같은 만큼 움직인다.
+     *
+     * <p>남은 수량을 그대로 두면 어드민에서 카드를 더 붙여도 매칭에 잡히지 않는다.
+     * 이미 예약 중이면 상태는 건드리지 않는다.
+     */
     public void changeQuantity(Integer quantity) {
+        int delta = quantity - this.quantity;
         this.quantity = quantity;
+        this.quantityLeft = Math.clamp(this.quantityLeft + delta, 0, quantity);
+        if (this.status != ItemStatus.RESERVED) {
+            this.status = this.quantityLeft > 0 ? ItemStatus.LEFT : ItemStatus.OUT;
+        }
     }
 }

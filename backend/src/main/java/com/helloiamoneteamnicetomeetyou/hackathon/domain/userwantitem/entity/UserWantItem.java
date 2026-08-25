@@ -39,20 +39,12 @@ public class UserWantItem {
     @Column(nullable = false)
     private Integer quantity;
 
-    public static UserWantItem create(User user, Item item, int quantity) {
+    /** 희망 카드는 수량 개념이 없어서 항상 1 로 둔다. */
+    public static UserWantItem of(User user, Item item) {
         UserWantItem userWantItem = new UserWantItem();
         userWantItem.user = user;
         userWantItem.item = item;
-        userWantItem.quantity = quantity;
+        userWantItem.quantity = 1;
         return userWantItem;
-    }
-
-    private UserWantItem(User user, Item item) {
-        this.user = user;
-        this.item = item;
-    }
-
-    public static UserWantItem of(User user, Item item) {
-        return new UserWantItem(user, item);
     }
 }
