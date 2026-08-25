@@ -202,7 +202,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           # 배포가 걸려도 러너를 물고 있지 않게 자른다.
           command_timeout: 5m
-          envs: IMAGE,GHCR_USER,GHCR_TOKEN
+          envs: IMAGE,GHCR_USER,GHCR_TOKEN,DB_URL,DB_USERNAME,DB_PASSWORD
           # script_stop 은 이 액션의 입력이 아니다(Unexpected input 경고).
           # 스크립트 첫 줄의 set -euo pipefail 이 같은 역할을 한다.
           script: |
@@ -235,6 +235,9 @@ jobs:
             #
             # MaxRAMPercentage=70 × 640m = 힙 448m.
             JVM_OPTS="-XX:MaxRAMPercentage=70.0 -XX:+UseG1GC"
+            # 컨테이너 기본 타임존은 UTC 다. 명시하지 않으면 LocalDateTime.now() 가 UTC 로 찍혀
+            # RDS 에 9시간 어긋난 값이 저장된다. JDBC URL 의 serverTimezone 과 같은 값으로 맞춘다.
+            JVM_OPTS="$JVM_OPTS -Duser.timezone=Asia/Seoul"
             JVM_OPTS="$JVM_OPTS -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/dumps/heapdump-%p.hprof"
             JVM_OPTS="$JVM_OPTS -Xlog:gc*,gc+heap=debug:file=/dumps/gc.log:time,uptime,level,tags:filecount=5,filesize=20m"
 
@@ -252,6 +255,9 @@ jobs:
               -v /home/ubuntu/app/dumps:/dumps \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e JAVA_OPTS="$JVM_OPTS" \
+              -e DB_URL="$DB_URL" \
+              -e DB_USERNAME="$DB_USERNAME" \
+              -e DB_PASSWORD="$DB_PASSWORD" \
               "$IMAGE"
 
             # 배포를 fire-and-forget 으로 두지 않는다. 안 뜨면 로그를 남기고 워크플로를 실패시킨다.
@@ -272,6 +278,11 @@ jobs:
           IMAGE: ${{ needs.build.outputs.image }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # RDS 접속 정보. application.yml 의 prod 프로파일이 이 이름 그대로 ${DB_URL} 로 읽는다.
+          # 값이 비면 앱이 부팅 단계에서 placeholder 미해결로 죽고 health check 가 배포를 실패시킨다.
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
 
   notify:
     name: Notify Slack
