@@ -19,7 +19,6 @@ export function NeedsSelect() {
       ctaLabel="교환하러 가기"
       allowEmpty
       disabledItemIds={state.have.map((s) => s.itemId)}
-      disabledNote="내놓기로 했어요"
       selections={state.needs}
       submitting={submitting}
       submitError={error}

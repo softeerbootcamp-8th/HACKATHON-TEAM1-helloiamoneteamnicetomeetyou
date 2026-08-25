@@ -13,9 +13,8 @@ type Props = {
   ctaLabel: string
   /** Needs 는 아무것도 안 골라도 넘어갈 수 있다. */
   allowEmpty: boolean
-  /** 고를 수 없는 아이템과 그 이유. 내놓기로 한 굿즈를 다시 찾을 수는 없다. */
+  /** 고를 수 없는 아이템. 내놓기로 한 굿즈를 다시 찾을 수는 없다. */
   disabledItemIds?: string[]
-  disabledNote?: string
   selections: Selection[]
   /** 서버에 보내는 중. 두 번 눌려 두 번 등록되는 것을 막는다. */
   submitting?: boolean
@@ -40,7 +39,6 @@ export function SelectScreen({
   ctaLabel,
   allowEmpty,
   disabledItemIds = [],
-  disabledNote,
   selections,
   submitting = false,
   submitError,
@@ -62,7 +60,7 @@ export function SelectScreen({
         <div className="flex items-start justify-between pt-3">
           <div>
             <h2 className="text-[17px] font-bold text-ink">{heading}</h2>
-            <p className="mt-1 text-[12px] text-neutral-400">꾹 눌러서 선택취소</p>
+            <p className="mt-1 text-[12px] text-neutral-400">여러장 선택할 수 있어요</p>
           </div>
           <motion.p
             key={total}
@@ -92,7 +90,6 @@ export function SelectScreen({
                       item={item}
                       selected={Boolean(picked)}
                       disabled={blocked}
-                      note={blocked ? disabledNote : undefined}
                       qty={picked?.qty}
                       onClick={() => onToggle(item.id)}
                       onIncrease={() => onChangeQty(item.id, (picked?.qty ?? 0) + 1)}

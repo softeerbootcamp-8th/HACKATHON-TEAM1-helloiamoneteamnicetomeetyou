@@ -1,17 +1,27 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, type ReactNode } from 'react'
 
+import { cn } from '@/lib/cn'
 import { easeOut, springSheet } from '@/lib/motion'
+
+type DialogAction = {
+  label: string
+  onClick: () => void
+}
 
 type Props = {
   open: boolean
   title: string
   description?: string
-  confirmLabel: string
-  cancelLabel: string
-  /** 위험한 쪽이 아래 흰 버튼이다. 시안의 "취소할게요" 자리다. */
-  onConfirm: () => void
-  onCancel: () => void
+  /**
+   * 위쪽 채워진 버튼. 시안에서 이 자리는 화면마다 뜻이 다르다.
+   * 거절하기 모달은 "아니요"(검정), 교환 파토 모달은 "네"(브랜드색)가 여기 온다.
+   */
+  primary: DialogAction & { tone?: 'ink' | 'brand' }
+  /** 아래쪽 흰 버튼 */
+  secondary: DialogAction
+  /** 바깥을 누르거나 Esc 를 눌렀을 때. 대개 아무것도 하지 않고 닫는 쪽이다. */
+  onDismiss: () => void
   children?: ReactNode
 }
 
@@ -23,20 +33,19 @@ export function Dialog({
   open,
   title,
   description,
-  confirmLabel,
-  cancelLabel,
-  onConfirm,
-  onCancel,
+  primary,
+  secondary,
+  onDismiss,
   children,
 }: Props) {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel()
+      if (e.key === 'Escape') onDismiss()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, onCancel])
+  }, [open, onDismiss])
 
   return (
     <AnimatePresence>
@@ -51,7 +60,7 @@ export function Dialog({
           <button
             type="button"
             aria-label="닫기"
-            onClick={onCancel}
+            onClick={onDismiss}
             className="absolute inset-0 bg-black/35"
           />
           <motion.div
@@ -70,18 +79,21 @@ export function Dialog({
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.97 }}
-                onClick={onCancel}
-                className="h-[52px] w-full rounded-full bg-ink text-[16px] font-bold text-white"
+                onClick={primary.onClick}
+                className={cn(
+                  'h-[52px] w-full rounded-full text-[16px] font-bold text-white',
+                  primary.tone === 'brand' ? 'bg-brand' : 'bg-ink',
+                )}
               >
-                {cancelLabel}
+                {primary.label}
               </motion.button>
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.97 }}
-                onClick={onConfirm}
+                onClick={secondary.onClick}
                 className="h-[52px] w-full rounded-full border border-neutral-200 bg-white text-[16px] font-bold text-ink"
               >
-                {confirmLabel}
+                {secondary.label}
               </motion.button>
             </div>
           </motion.div>
