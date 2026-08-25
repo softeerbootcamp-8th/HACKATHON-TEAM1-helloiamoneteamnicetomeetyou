@@ -2,7 +2,6 @@ import { motion } from 'motion/react'
 
 import { GoodsCard } from '@/components/domain/GoodsCard'
 import { Button } from '@/components/ui/Button'
-import { StatusBar } from '@/components/ui/StatusBar'
 import { TopBar } from '@/components/ui/TopBar'
 import { staggerChild, staggerParent } from '@/lib/motion'
 import { GOODS } from '@/mocks/data'
@@ -43,7 +42,6 @@ export function SelectScreen({
 
   return (
     <div className="flex h-full flex-col">
-      <StatusBar />
       <TopBar title={title} onBack={onBack} />
 
       <div className="flex-1 overflow-y-auto px-5 no-scrollbar">

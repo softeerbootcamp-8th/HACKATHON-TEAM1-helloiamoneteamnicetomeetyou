@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { PinIcon } from '@/components/ui/icons'
-import { StatusBar } from '@/components/ui/StatusBar'
 import { TopBar } from '@/components/ui/TopBar'
 import { springSnap } from '@/lib/motion'
 import { FIXED_ZONE, ZONES } from '@/mocks/data'
@@ -22,7 +21,6 @@ export function PlaceSelect() {
 
   return (
     <div className="flex h-full flex-col">
-      <StatusBar />
       <TopBar onBack={() => navigate('/match')} onClose={() => setCancelOpen(true)} />
 
       <div className="flex-1 overflow-y-auto px-6 no-scrollbar">
@@ -47,10 +45,20 @@ export function PlaceSelect() {
           </div>
 
           {ZONES.map((zone) => (
-            <motion.div
+            <motion.button
+              type="button"
               key={zone.id}
+              onClick={() =>
+                dispatch({
+                  type: 'toast',
+                  message: zone.selectable
+                    ? `${FIXED_ZONE.name}에서 교환해요`
+                    : '이번 행사는 중앙 포토존에서만 교환할 수 있어요',
+                })
+              }
               initial={{ opacity: 0, y: -8, scale: 0.7 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
+              whileTap={{ scale: 0.88 }}
               transition={springSnap}
               className="absolute -translate-x-1/2 -translate-y-1/2 text-center"
               style={{ left: `${zone.x}%`, top: `${zone.y}%` }}
@@ -67,15 +75,20 @@ export function PlaceSelect() {
               <span className="mt-1 block text-[10px] text-neutral-400">
                 {zone.selectable ? '중앙' : zone.name}
               </span>
-            </motion.div>
+            </motion.button>
           ))}
         </div>
 
-        <motion.div
+        <motion.button
+          type="button"
+          onClick={() =>
+            dispatch({ type: 'toast', message: `${FIXED_ZONE.name}으로 정해져 있어요` })
+          }
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
+          whileTap={{ scale: 0.98 }}
           transition={{ ...springSnap, delay: 0.1 }}
-          className="mt-5 flex items-center gap-3 rounded-2xl border-2 border-ink bg-neutral-50 p-3.5"
+          className="mt-5 flex w-full items-center gap-3 rounded-2xl border-2 border-ink bg-neutral-50 p-3.5 text-left"
         >
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand text-ink">
             <PinIcon className="size-5" />
@@ -84,7 +97,10 @@ export function PlaceSelect() {
             <p className="text-[15px] font-bold text-ink">{FIXED_ZONE.name}</p>
             <p className="text-[12px] text-neutral-400">{FIXED_ZONE.location}</p>
           </div>
-        </motion.div>
+          <span className="ml-auto flex size-6 items-center justify-center rounded-full bg-ink text-[12px] text-white">
+            ✓
+          </span>
+        </motion.button>
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">

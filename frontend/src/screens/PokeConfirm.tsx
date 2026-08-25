@@ -4,7 +4,6 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { CardStack } from '@/components/domain/CardStack'
 import { GoodsFace } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
-import { StatusBar } from '@/components/ui/StatusBar'
 import { springSnap } from '@/lib/motion'
 import { ALL_WAITING, itemById } from '@/mocks/data'
 import { useStore } from '@/store/useStore'
@@ -23,7 +22,6 @@ export function PokeConfirm() {
   if (!target) {
     return (
       <div className="flex h-full flex-col">
-        <StatusBar />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8">
           <p className="text-[15px] text-neutral-500">상대를 찾을 수 없어요.</p>
           <Button onClick={() => navigate('/home')}>홈으로</Button>
@@ -39,8 +37,6 @@ export function PokeConfirm() {
 
   return (
     <div className="flex h-full flex-col">
-      <StatusBar />
-
       <div className="flex-1 overflow-y-auto px-6 pt-6 no-scrollbar">
         <h1 className="text-[26px] font-extrabold tracking-[-0.02em] text-ink">찔러보기 확인</h1>
         <p className="mt-2 text-[13px] text-neutral-400">상대에게 교환 요청을 보냅니다.</p>

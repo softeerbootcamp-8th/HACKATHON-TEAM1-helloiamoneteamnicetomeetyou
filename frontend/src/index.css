@@ -159,6 +159,38 @@ body {
   }
 }
 
+@keyframes tradit-burst {
+  0% {
+    transform: scale(0.75);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+
+@keyframes tradit-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes tradit-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes tradit-lemon {
   0%,
   100% {
@@ -192,6 +224,15 @@ body {
 }
 @utility anim-glow {
   animation: tradit-glow 2.6s ease-in-out infinite;
+}
+@utility anim-burst {
+  animation: tradit-burst 0.62s ease-out forwards;
+}
+@utility anim-pop {
+  animation: tradit-pop 0.5s ease-out;
+}
+@utility anim-sweep {
+  animation: tradit-sweep 9s linear infinite;
 }
 @utility anim-lemon {
   animation: tradit-lemon 5s ease-in-out infinite;

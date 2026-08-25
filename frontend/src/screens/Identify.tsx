@@ -42,12 +42,14 @@ export function Identify() {
           transition={{ ...springSnap, delay: 0.05 }}
           className="relative"
         >
-          <span
+          {/* Figma 시안의 레몬을 그대로 내보낸 것이다. 빛무리도 이 안에 들어 있다. */}
+          <img
+            src="/lemon.svg"
+            alt=""
             aria-hidden
-            className="anim-glow absolute inset-[-35%] rounded-full blur-3xl"
-            style={{ background: 'radial-gradient(circle, #d6ff4bcc 0%, #d6ff4b00 70%)' }}
+            className="anim-lemon w-[260px] max-w-[70vw] select-none"
+            draggable={false}
           />
-          <div className="anim-lemon relative text-[150px] leading-none">🍋</div>
         </motion.div>
 
         <motion.h1

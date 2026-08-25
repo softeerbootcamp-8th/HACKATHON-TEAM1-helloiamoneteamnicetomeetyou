@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router'
 import { Button, TextButton } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { ClockIcon } from '@/components/ui/icons'
-import { StatusBar } from '@/components/ui/StatusBar'
 import { TopBar } from '@/components/ui/TopBar'
 import { cn } from '@/lib/cn'
 import { tick } from '@/lib/haptics'
@@ -35,7 +34,6 @@ export function TimeSelect() {
   if (!appt || !match) {
     return (
       <div className="flex h-full flex-col">
-        <StatusBar />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
           <p className="text-[15px] text-neutral-500">진행 중인 약속이 없어요.</p>
           <Button onClick={() => navigate('/home')}>홈으로</Button>
@@ -61,7 +59,6 @@ export function TimeSelect() {
 
   return (
     <div className="flex h-full flex-col">
-      <StatusBar />
       <TopBar onBack={() => navigate('/place')} onClose={() => setCancelOpen(true)} />
 
       <div className="flex-1 overflow-y-auto px-6 no-scrollbar">

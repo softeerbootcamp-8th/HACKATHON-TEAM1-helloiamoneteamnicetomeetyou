@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { Button, TextButton } from '@/components/ui/Button'
-import { StatusBar } from '@/components/ui/StatusBar'
 import { springSnap } from '@/lib/motion'
 import { itemById } from '@/mocks/data'
 import { useStore } from '@/store/useStore'
@@ -29,8 +28,6 @@ export function Complete() {
 
   return (
     <div className="flex h-full flex-col">
-      <StatusBar />
-
       <div className="flex flex-1 flex-col items-center justify-center px-6">
         <motion.h1
           initial={{ opacity: 0, y: 14 }}

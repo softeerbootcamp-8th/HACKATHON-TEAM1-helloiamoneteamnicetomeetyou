@@ -35,13 +35,15 @@ export function AppShell() {
   // 첫 화면과 홈은 뒤로 갈 곳이 없다. 여기서 밀리면 앱이 꺼진 것처럼 보인다.
   const canSwipeBack = location.pathname !== '/' && location.pathname !== '/home'
 
+  // 데스크톱에서 판이 화면보다 커지면 페이지가 세로로 스크롤된다. 바깥을 화면 높이에
+  // 묶고 판은 남는 높이를 채우게 해서, 창을 줄여도 스크롤이 생기지 않게 한다.
   return (
-    <div className="flex min-h-full items-center justify-center bg-neutral-100 md:p-6">
+    <div className="flex h-[100dvh] items-center justify-center overflow-hidden bg-neutral-100 md:p-10 lg:p-14">
       <div
         className={cn(
-          'relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white',
-          'md:h-[860px] md:rounded-[32px] md:shadow-[0_24px_70px_rgba(0,0,0,0.14)]',
-          wide ? 'md:max-w-[1040px]' : 'md:max-w-[420px]',
+          'relative flex h-full w-full flex-col overflow-hidden bg-white',
+          'md:max-h-[880px] md:rounded-[32px] md:shadow-[0_24px_70px_rgba(0,0,0,0.14)]',
+          wide ? 'md:max-w-[1080px]' : 'md:max-w-[420px]',
         )}
       >
         <AnimatePresence mode="popLayout" custom={back} initial={false}>

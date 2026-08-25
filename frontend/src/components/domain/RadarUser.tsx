@@ -11,11 +11,13 @@ type Props = {
   hovered: boolean
   /** 이미 찔러보기를 보내고 답을 기다리는 중인지 */
   pending: boolean
+  /** 방금 이 사람에게 카드를 놓았는지. 고리가 한 번 터진다. */
+  burst?: boolean
   index: number
 }
 
 /** 레이더 위에 서 있는 상대 한 명. */
-export function RadarUser({ user, hovered, pending, index }: Props) {
+export function RadarUser({ user, hovered, pending, burst = false, index }: Props) {
   const item = itemById(user.itemId)
 
   return (
@@ -26,6 +28,13 @@ export function RadarUser({ user, hovered, pending, index }: Props) {
       transition={{ ...springSnap, delay: 0.08 * index }}
       className="relative w-[76px]"
     >
+      {burst && (
+        <span
+          aria-hidden
+          className="anim-burst pointer-events-none absolute inset-0 z-20 rounded-2xl border-[3px] border-brand"
+        />
+      )}
+
       {hovered && (
         <motion.span
           initial={{ opacity: 0, y: 6, scale: 0.8 }}
@@ -59,6 +68,13 @@ export function RadarUser({ user, hovered, pending, index }: Props) {
             ···
           </span>
         )}
+        {burst && (
+          <span
+            aria-hidden
+            className="anim-burst pointer-events-none absolute inset-0 z-20 rounded-2xl border-[3px] border-brand"
+          />
+        )}
+
         {hovered && (
           <span className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-ink text-[10px] text-white">
             ✓

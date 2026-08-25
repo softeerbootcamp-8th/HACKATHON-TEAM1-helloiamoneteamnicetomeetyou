@@ -1,10 +1,9 @@
 import { motion } from 'motion/react'
-import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router'
 
 import { GoodsCard, GoodsFace } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
-import { StatusBar } from '@/components/ui/StatusBar'
 import { staggerChild, staggerParent } from '@/lib/motion'
 import { itemById } from '@/mocks/data'
 import { useStore } from '@/store/useStore'
@@ -12,14 +11,24 @@ import { useStore } from '@/store/useStore'
 /** 받은 교환 요청. 상대의 묶음에서 한 장을 고른다. */
 export function PokeReceived() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
   const { state, dispatch } = useStore()
   const incoming = state.incomingPoke
-  const [chosen, setChosen] = useState<string | null>(incoming?.offeredItemIds[0] ?? null)
+  const [picked, setPicked] = useState<string | null>(null)
+  const demo = params.get('demo')
+
+  // 주소로 바로 열었을 때 화면을 볼 수 있게 상태를 심어 준다.
+  useEffect(() => {
+    if (demo && !incoming) dispatch({ type: 'seed-demo', kind: 'incoming' })
+  }, [demo, incoming, dispatch])
+
+  // 아직 아무것도 안 골랐으면 첫 장을 고른 것으로 본다. effect 로 setState 하지 않고
+  // 렌더할 때 계산하면 상태가 하나 줄어든다.
+  const chosen = picked ?? incoming?.offeredItemIds[0] ?? null
 
   if (!incoming) {
     return (
       <div className="flex h-full flex-col">
-        <StatusBar />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
           <p className="text-[15px] text-neutral-500">받은 교환 요청이 없어요.</p>
           <Button onClick={() => navigate('/home')}>홈으로</Button>
@@ -30,8 +39,6 @@ export function PokeReceived() {
 
   return (
     <div className="flex h-full flex-col">
-      <StatusBar />
-
       <div className="flex-1 overflow-y-auto px-6 pt-6 no-scrollbar">
         <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink">
           상대가 교환을 요청했어요
@@ -66,7 +73,7 @@ export function PokeReceived() {
                 <GoodsCard
                   item={itemById(id)}
                   selected={chosen === id}
-                  onClick={() => setChosen(id)}
+                  onClick={() => setPicked(id)}
                 />
               </motion.div>
             ))}

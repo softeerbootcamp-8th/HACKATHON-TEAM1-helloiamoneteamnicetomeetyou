@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router'
 import { GoodsFace } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
 import { PinIcon } from '@/components/ui/icons'
-import { StatusBar } from '@/components/ui/StatusBar'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
 import { itemById, ZONES } from '@/mocks/data'
@@ -20,7 +19,6 @@ export function Appointment() {
   if (!appt || !match || appt.stage === 'place') {
     return (
       <div className="flex h-full flex-col">
-        <StatusBar />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
           <p className="text-[15px] text-neutral-500">확정된 약속이 없어요.</p>
           <Button onClick={() => navigate('/home')}>홈으로</Button>
@@ -34,8 +32,6 @@ export function Appointment() {
 
   return (
     <div className="flex h-full flex-col">
-      <StatusBar />
-
       <div className="flex-1 overflow-y-auto px-6 pt-8 no-scrollbar">
         <motion.h1
           initial={{ opacity: 0, y: 12 }}

@@ -1,11 +1,10 @@
 import { motion } from 'motion/react'
-import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router'
 
 import { GoodsFace } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
-import { StatusBar } from '@/components/ui/StatusBar'
 import { springSnap } from '@/lib/motion'
 import { itemById, MY_IDENTITY } from '@/mocks/data'
 import { useStore } from '@/store/useStore'
@@ -16,14 +15,20 @@ import { useStore } from '@/store/useStore'
  */
 export function MatchResult() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
   const { state, dispatch } = useStore()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const match = state.match
+  const demo = params.get('demo')
+
+  // 주소로 바로 열었을 때 화면을 볼 수 있게 상태를 심어 준다.
+  useEffect(() => {
+    if (demo === '3way' && !match) dispatch({ type: 'seed-demo', kind: 'three-way' })
+  }, [demo, match, dispatch])
 
   if (!match) {
     return (
       <div className="flex h-full flex-col">
-        <StatusBar />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
           <p className="text-[15px] text-neutral-500">진행 중인 매칭이 없어요.</p>
           <Button onClick={() => navigate('/home')}>홈으로</Button>
@@ -46,8 +51,6 @@ export function MatchResult() {
 
   return (
     <div className="flex h-full flex-col">
-      <StatusBar />
-
       <div className="flex-1 overflow-y-auto px-6 pt-8 no-scrollbar">
         <motion.h1
           initial={{ opacity: 0, y: 12 }}

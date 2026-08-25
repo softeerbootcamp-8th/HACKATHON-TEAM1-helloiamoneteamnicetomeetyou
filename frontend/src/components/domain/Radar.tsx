@@ -9,7 +9,8 @@ export function RadarRings() {
           style={{ scale, animationDelay: `${i * 0.5}s` }}
         />
       ))}
-      <span className="sweep-glow absolute aspect-square w-[86%] rounded-full" />
+      {/* 빛무리가 한 방향으로 계속 돈다. 레이더가 훑고 있다는 느낌을 주는 자리다. */}
+      <span className="anim-sweep sweep-glow absolute aspect-square w-[86%] rounded-full" />
     </div>
   )
 }

@@ -4,16 +4,13 @@ import { useNavigate } from 'react-router'
 
 import { CardStack } from '@/components/domain/CardStack'
 import { BottomSheet } from '@/components/domain/BottomSheet'
-import { Drawer } from '@/components/domain/Drawer'
 import { GoodsFace } from '@/components/domain/GoodsCard'
 import { RadarRings } from '@/components/domain/Radar'
-import { RADAR_SLOTS } from '@/components/domain/radarSlots'
 import { RadarUser } from '@/components/domain/RadarUser'
-import { BellIcon, ClockIcon, MenuIcon, SparkleIcon } from '@/components/ui/icons'
-import { StatusBar } from '@/components/ui/StatusBar'
+import { BellIcon, ClockIcon, SparkleIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { tick } from '@/lib/haptics'
-import { easeOut, springSheet, springSnap, staggerChild, staggerParent } from '@/lib/motion'
+import { springSheet, springSnap, staggerChild, staggerParent } from '@/lib/motion'
 import { ALL_WAITING, itemById, ZONES } from '@/mocks/data'
 import { radarUsers, sortedWaitingList } from '@/store/matching'
 import { useStore } from '@/store/useStore'
@@ -22,10 +19,11 @@ export function Home() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [drawerOpen, setDrawerOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [hovered, setHovered] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
+  // 방금 카드를 놓은 상대. 고리가 한 번 터지고 나서 찔러보기 확인 화면으로 넘어간다.
+  const [burstOn, setBurstOn] = useState<string | null>(null)
   const radarRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -84,7 +82,13 @@ export function Home() {
     setHovered(null)
     if (!target) return
     tick([10, 40, 14])
-    navigate(`/poke/confirm?to=${target}`)
+    // 놓자마자 화면이 바뀌면 무슨 일이 일어났는지 안 보인다. 고리가 한 번 터지는
+    // 동안만 붙잡아 두고 넘어간다.
+    setBurstOn(target)
+    window.setTimeout(() => {
+      setBurstOn(null)
+      navigate(`/poke/confirm?to=${target}`)
+    }, 420)
   }
 
   const banner = (() => {
@@ -108,6 +112,7 @@ export function Home() {
     if (state.match) {
       return {
         tone: 'white' as const,
+        celebrate: state.match.origin === 'poke',
         title:
           state.match.origin === 'poke' ? '찔러보기가 성사됐어요!' : '서로의 니즈가 매칭됐어요!',
         body: '탭하여 확인',
@@ -125,53 +130,62 @@ export function Home() {
     return null
   })()
 
+  /**
+   * 레이더는 정사각형 무대 안에 그린다. 예전에는 세로로 늘어나는 칸에 백분율로 카드를
+   * 붙였는데, 칸 높이가 화면마다 달라서 카드가 원에서 벗어나 서로 겹쳤다.
+   * 이제 원 둘레를 각도로 나눠 앉히므로 어느 화면에서도 배치가 같다.
+   */
   const radarPanel = (
-    <div ref={radarRef} className="relative min-h-0 flex-1 pb-[104px] md:pb-6">
-      <RadarRings />
+    <div
+      ref={radarRef}
+      className="relative flex min-h-0 flex-1 flex-col items-center justify-center px-4 pt-6 pb-[96px] md:pt-2 md:pb-4"
+    >
+      <div className="relative aspect-square w-full max-w-[380px] shrink-0">
+        <RadarRings />
 
-      {radar.map((user, i) => {
-        const slot = RADAR_SLOTS[i]
-        return (
-          <div
-            key={user.id}
-            className="absolute"
-            style={{
-              top: slot.top,
-              bottom: slot.bottom,
-              left: slot.left,
-              right: slot.right,
-              transform: `translate(${slot.x}, ${slot.y})`,
-            }}
+        {radar.map((user, i) => {
+          const angle = (-90 + i * (360 / Math.max(radar.length, 1))) * (Math.PI / 180)
+          const radius = 38
+          return (
+            <div
+              key={user.id}
+              className="absolute -translate-x-1/2 -translate-y-1/2"
+              style={{
+                left: `${50 + radius * Math.cos(angle)}%`,
+                top: `${50 + radius * Math.sin(angle)}%`,
+              }}
+            >
+              <RadarUser
+                user={user}
+                index={i}
+                hovered={hovered === user.id}
+                pending={pendingTarget === user.id}
+                burst={burstOn === user.id}
+              />
+            </div>
+          )
+        })}
+
+        <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+          <p className="mb-1 text-center text-[11px] font-bold text-neutral-500">내 카드</p>
+          <motion.div
+            drag
+            dragSnapToOrigin
+            dragMomentum={false}
+            dragTransition={{ bounceStiffness: 480, bounceDamping: 30 }}
+            transition={springSnap}
+            onDragStart={() => setDragging(true)}
+            onDrag={onDrag}
+            onDragEnd={onDragEnd}
+            whileDrag={{ zIndex: 60, cursor: 'grabbing' }}
+            className="cursor-grab touch-none"
           >
-            <RadarUser
-              user={user}
-              index={i}
-              hovered={hovered === user.id}
-              pending={pendingTarget === user.id}
-            />
-          </div>
-        )
-      })}
-
-      <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
-        <p className="mb-1 text-center text-[11px] font-bold text-neutral-500">내 카드</p>
-        <motion.div
-          drag
-          dragSnapToOrigin
-          dragMomentum={false}
-          dragTransition={{ bounceStiffness: 480, bounceDamping: 30 }}
-          transition={springSnap}
-          onDragStart={() => setDragging(true)}
-          onDrag={onDrag}
-          onDragEnd={onDragEnd}
-          whileDrag={{ zIndex: 60, cursor: 'grabbing' }}
-          className="cursor-grab touch-none"
-        >
-          <CardStack topItemId={topItemId} count={Math.max(haveCount, 1)} lifted={dragging} />
-        </motion.div>
+            <CardStack topItemId={topItemId} count={Math.max(haveCount, 1)} lifted={dragging} />
+          </motion.div>
+        </div>
       </div>
 
-      <p className="absolute inset-x-0 bottom-[84px] text-center text-[12px] text-neutral-400 md:bottom-3">
+      <p className="mt-5 shrink-0 text-center text-[12px] text-neutral-400">
         {dragging
           ? '놓아주면 찔러보기가 전송돼요'
           : '내 카드 묶음을 상대 카드 위에 끌어서 놓아보세요'}
@@ -221,8 +235,6 @@ export function Home() {
 
   return (
     <div className="flex h-full flex-col">
-      <StatusBar />
-
       <header className="flex shrink-0 items-center justify-between px-5 pt-2">
         <h1 className="text-[23px] font-extrabold tracking-[-0.02em] text-ink">교환 대기장소</h1>
         <div className="flex items-center gap-1">
@@ -237,15 +249,6 @@ export function Home() {
             {state.notifications.length > 0 && (
               <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-brand" />
             )}
-          </motion.button>
-          <motion.button
-            type="button"
-            aria-label="메뉴"
-            onClick={() => setDrawerOpen(true)}
-            whileTap={{ scale: 0.88 }}
-            className="flex size-10 items-center justify-center text-ink"
-          >
-            <MenuIcon className="size-[22px]" />
           </motion.button>
         </div>
       </header>
@@ -283,7 +286,12 @@ export function Home() {
                   : 'bg-white shadow-[0_4px_18px_rgba(0,0,0,0.10)]',
               )}
             >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand text-ink">
+              <span
+                className={cn(
+                  'flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand text-ink',
+                  'celebrate' in banner && banner.celebrate && 'anim-pop',
+                )}
+              >
                 {banner.tone === 'brand' ? (
                   <ClockIcon className="size-5" />
                 ) : (
@@ -319,64 +327,41 @@ export function Home() {
         </AnimatePresence>
       </div>
 
-      {/* 모바일: 레이더 위 + 바텀시트. 데스크톱: 왼쪽 레이더 + 오른쪽 목록. */}
-      <div className="relative flex min-h-0 flex-1 md:hidden">
-        {radarPanel}
-        <AnimatePresence>
-          {sheetOpen && (
-            <motion.button
-              type="button"
-              aria-label="목록 접기"
-              onClick={() => setSheetOpen(false)}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={easeOut}
-              className="absolute inset-0 z-20 bg-black/25"
-            />
-          )}
-        </AnimatePresence>
-        <BottomSheet
-          open={sheetOpen}
-          onOpenChange={setSheetOpen}
-          peek={72}
-          height={460}
-          header={
-            <div className="flex items-baseline justify-between">
-              <span className="text-[17px] font-extrabold text-ink">전체리스트</span>
-              <span className="text-[12px] text-neutral-400">{list.length}명 대기 중</span>
-            </div>
-          }
-        >
-          {listPanel}
-        </BottomSheet>
-      </div>
-
-      <div className="hidden min-h-0 flex-1 gap-6 px-6 pt-3 pb-6 md:flex">
-        <div className="relative flex min-h-0 flex-1 flex-col rounded-3xl bg-neutral-50/60">
+      {/*
+        레이더는 한 번만 그린다. 예전에는 모바일용과 데스크톱용으로 두 벌을 그렸는데,
+        같은 JSX 에 붙은 ref 가 나중에 마운트된 (화면에 없는) 쪽을 가리키는 바람에
+        끌어놓기 충돌 판정이 항상 빗나갔다.
+      */}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row md:gap-7 md:px-7 md:pb-7">
+        <div className="relative min-h-0 flex-1 md:rounded-3xl md:bg-neutral-50/70">
           {radarPanel}
         </div>
-        <aside className="flex w-[360px] shrink-0 flex-col">
+
+        <aside className="hidden w-[340px] shrink-0 flex-col md:flex">
           <div className="flex items-baseline justify-between px-1 pb-3">
             <h2 className="text-[17px] font-extrabold text-ink">전체리스트</h2>
-            <span className="text-[12px] text-neutral-400">{list.length}명 대기 중</span>
+            <span className="text-[12px] text-neutral-400">전체 {list.length}개</span>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1 no-scrollbar">{listPanel}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1 pb-2 no-scrollbar">{listPanel}</div>
         </aside>
-      </div>
 
-      <Drawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        have={state.have}
-        needs={state.needs}
-        onEditHave={() => navigate('/have')}
-        onEditNeeds={() => navigate('/needs')}
-        onReset={() => {
-          dispatch({ type: 'reset' })
-          navigate('/')
-        }}
-      />
+        <div className="md:hidden">
+          <BottomSheet
+            open={sheetOpen}
+            onOpenChange={setSheetOpen}
+            peek={72}
+            height={460}
+            header={
+              <div className="flex items-baseline justify-between">
+                <span className="text-[17px] font-extrabold text-ink">전체리스트</span>
+                <span className="text-[12px] text-neutral-400">전체 {list.length}개</span>
+              </div>
+            }
+          >
+            {listPanel}
+          </BottomSheet>
+        </div>
+      </div>
 
       <NotificationSheet
         open={notifOpen}
@@ -393,6 +378,10 @@ export function Home() {
   )
 }
 
+/**
+ * 알림. 모바일에서는 아래에서 올라오는 시트, 데스크톱에서는 종 아래에 붙는 판이다.
+ * 넓은 화면에서 바텀시트가 올라오는 것은 데스크톱 앱에서 쓰지 않는 방식이라 어색하다.
+ */
 function NotificationSheet({
   open,
   onClose,
@@ -404,6 +393,28 @@ function NotificationSheet({
   notifications: { id: string; kind: string; title: string; body: string }[]
   onSelect: (kind: string) => void
 }) {
+  const body =
+    notifications.length === 0 ? (
+      <p className="py-10 text-center text-[13px] text-neutral-400">아직 알림이 없어요</p>
+    ) : (
+      <ul className="mt-3 space-y-2 overflow-y-auto no-scrollbar">
+        {notifications.map((n) => (
+          <li key={n.id}>
+            <motion.button
+              type="button"
+              onClick={() => onSelect(n.kind)}
+              whileTap={{ scale: 0.97 }}
+              transition={springSnap}
+              className="w-full rounded-2xl bg-neutral-50 p-3.5 text-left"
+            >
+              <p className="text-[14px] font-bold text-ink">{n.title}</p>
+              <p className="text-[12px] text-neutral-400">{n.body}</p>
+            </motion.button>
+          </li>
+        ))}
+      </ul>
+    )
+
   return (
     <AnimatePresence>
       {open && (
@@ -415,37 +426,20 @@ function NotificationSheet({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-40 bg-black/30"
+            className="absolute inset-0 z-40 bg-black/30 md:bg-black/10"
           />
+
+          {/* 모바일: 바텀시트 */}
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={springSheet}
-            className="absolute inset-x-0 bottom-0 z-50 max-h-[62%] rounded-t-[26px] bg-white p-5 shadow-2xl"
+            className="absolute inset-x-0 bottom-0 z-50 max-h-[62%] rounded-t-[26px] bg-white p-5 shadow-2xl md:hidden"
           >
             <span aria-hidden className="mx-auto mb-4 block h-1 w-9 rounded-full bg-neutral-200" />
             <h2 className="text-[18px] font-extrabold text-ink">알림</h2>
-            {notifications.length === 0 ? (
-              <p className="py-10 text-center text-[13px] text-neutral-400">아직 알림이 없어요</p>
-            ) : (
-              <ul className="mt-3 space-y-2 overflow-y-auto no-scrollbar">
-                {notifications.map((n) => (
-                  <li key={n.id}>
-                    <motion.button
-                      type="button"
-                      onClick={() => onSelect(n.kind)}
-                      whileTap={{ scale: 0.97 }}
-                      transition={springSnap}
-                      className="w-full rounded-2xl bg-neutral-50 p-3.5 text-left"
-                    >
-                      <p className="text-[14px] font-bold text-ink">{n.title}</p>
-                      <p className="text-[12px] text-neutral-400">{n.body}</p>
-                    </motion.button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {body}
             <motion.button
               type="button"
               onClick={onClose}
@@ -455,6 +449,30 @@ function NotificationSheet({
             >
               닫기
             </motion.button>
+          </motion.div>
+
+          {/* 데스크톱: 종 아래에 붙는 판 */}
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={springSheet}
+            className="absolute top-16 right-7 z-50 hidden max-h-[70%] w-[340px] origin-top-right flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-[0_18px_50px_rgba(0,0,0,0.18)] md:flex"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-[17px] font-extrabold text-ink">알림</h2>
+              <motion.button
+                type="button"
+                aria-label="닫기"
+                onClick={onClose}
+                whileTap={{ scale: 0.85 }}
+                transition={springSnap}
+                className="text-[20px] font-light text-neutral-400"
+              >
+                ✕
+              </motion.button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">{body}</div>
           </motion.div>
         </>
       )}

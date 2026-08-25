@@ -48,6 +48,7 @@ export type Action =
   | { type: 'reset' }
   | { type: 'toast'; message: string | null }
   | { type: 'read-notification'; id: string }
+  | { type: 'seed-demo'; kind: 'three-way' | 'incoming' }
 
 let notifSeq = 0
 function notify(
@@ -200,6 +201,7 @@ export function reducer(state: State, action: Action): State {
           '찔러보기가 성사됐어요!',
           `${target.nickname}님이 수락했어요`,
         ),
+        toast: `🎉 ${target.nickname}님이 교환을 수락했어요!`,
       }
     }
 
@@ -346,6 +348,50 @@ export function reducer(state: State, action: Action): State {
         autoMatching: state.needs.length > 0,
         toast: '거래를 취소했어요',
       }
+
+    case 'seed-demo': {
+      // 특정 화면을 바로 열어 볼 수 있게 상태를 심어 준다. 주소로만 들어올 수 있고
+      // 실제 흐름에서는 쓰이지 않는다.
+      const have = state.have.length > 0 ? state.have : [{ itemId: 'nv74', qty: 2 }]
+
+      if (action.kind === 'three-way') {
+        const giver = ALL_WAITING.find((u) => u.id === 'u3')
+        const receiver = ALL_WAITING.find((u) => u.id === 'u6')
+        if (!giver || !receiver) return state
+        return {
+          ...state,
+          onboarded: true,
+          have,
+          needs: state.needs.length > 0 ? state.needs : [{ itemId: 'i5n', qty: 1 }],
+          autoMatching: false,
+          appointment: null,
+          match: {
+            kind: 'THREE_WAY',
+            giver,
+            receiver,
+            giveItemId: 'nv74',
+            receiveItemId: 'i5n',
+            middleItemId: 'pony',
+            origin: 'auto',
+          },
+        }
+      }
+
+      const from = ALL_WAITING.find((u) => u.id === 'u1')
+      if (!from) return state
+      return {
+        ...state,
+        onboarded: true,
+        have,
+        autoMatching: false,
+        match: null,
+        incomingPoke: {
+          fromUserId: from.id,
+          wantItemId: have[0].itemId,
+          offeredItemIds: ['i5n', 'sf', 'cas'],
+        },
+      }
+    }
 
     case 'read-notification':
       return { ...state, notifications: state.notifications.filter((n) => n.id !== action.id) }

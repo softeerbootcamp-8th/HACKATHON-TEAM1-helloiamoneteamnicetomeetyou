@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router'
 import { CardStack } from '@/components/domain/CardStack'
 import { RadarRings } from '@/components/domain/Radar'
 import { Button } from '@/components/ui/Button'
-import { StatusBar } from '@/components/ui/StatusBar'
 import { springPage, springSnap } from '@/lib/motion'
 import { ALL_WAITING } from '@/mocks/data'
 import { useStore } from '@/store/useStore'
@@ -20,8 +19,6 @@ export function Onboarding() {
 
   return (
     <div className="flex h-full flex-col">
-      <StatusBar />
-
       <div className="flex-1 overflow-y-auto px-6 pt-4 no-scrollbar">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
