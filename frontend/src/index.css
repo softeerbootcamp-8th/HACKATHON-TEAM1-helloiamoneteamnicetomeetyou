@@ -232,7 +232,7 @@ body {
   animation: tradit-pop 0.5s ease-out;
 }
 @utility anim-sweep {
-  animation: tradit-sweep 9s linear infinite;
+  animation: tradit-sweep 3s linear infinite;
 }
 @utility anim-lemon {
   animation: tradit-lemon 5s ease-in-out infinite;

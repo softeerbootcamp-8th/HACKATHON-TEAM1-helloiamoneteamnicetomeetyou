@@ -138,21 +138,27 @@ export function Home() {
   const radarPanel = (
     <div
       ref={radarRef}
-      className="relative flex min-h-0 flex-1 flex-col items-center justify-center px-4 pt-6 pb-[96px] md:pt-2 md:pb-4"
+      className="relative flex min-h-0 flex-1 flex-col px-3 pt-4 pb-[84px] md:rounded-3xl md:bg-neutral-50/70 md:px-4 md:pt-2 md:pb-4"
     >
-      <div className="relative aspect-square w-full max-w-[380px] shrink-0">
+      {/*
+        무대는 남는 공간을 그대로 쓴다. 정사각형으로 잡아 두었더니 폭에 막혀 아래쪽이
+        통째로 비고 카드끼리도 붙어 보였다. 이제 세로로 긴 화면에서는 타원이 된다.
+      */}
+      <div className="relative mx-auto min-h-0 w-full max-w-[560px] flex-1">
         <RadarRings />
 
         {radar.map((user, i) => {
           const angle = (-90 + i * (360 / Math.max(radar.length, 1))) * (Math.PI / 180)
-          const radius = 38
+          // 가로와 세로 반지름을 따로 둬서 화면이 길수록 위아래로 더 벌어지게 한다.
+          const radiusX = 37
+          const radiusY = 36
           return (
             <div
               key={user.id}
               className="absolute -translate-x-1/2 -translate-y-1/2"
               style={{
-                left: `${50 + radius * Math.cos(angle)}%`,
-                top: `${50 + radius * Math.sin(angle)}%`,
+                left: `${50 + radiusX * Math.cos(angle)}%`,
+                top: `${50 + radiusY * Math.sin(angle)}%`,
               }}
             >
               <RadarUser
@@ -238,6 +244,19 @@ export function Home() {
       <header className="flex shrink-0 items-center justify-between px-5 pt-2">
         <h1 className="text-[23px] font-extrabold tracking-[-0.02em] text-ink">교환 대기장소</h1>
         <div className="flex items-center gap-1">
+          {/*
+            목데이터만으로는 삼자 교환과 받은 요청을 보기 어려워서 넣어 둔 확인용 버튼이다.
+            실제 서비스에서는 서버가 보내 주는 상황이라 그때 빼면 된다.
+          */}
+          <DemoButton
+            label="요청받기"
+            onClick={() => dispatch({ type: 'seed-demo', kind: 'incoming' })}
+          />
+          <DemoButton
+            label="3인 매칭"
+            onClick={() => dispatch({ type: 'seed-demo', kind: 'three-way' })}
+          />
+
           <motion.button
             type="button"
             aria-label="알림"
@@ -333,9 +352,7 @@ export function Home() {
         끌어놓기 충돌 판정이 항상 빗나갔다.
       */}
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row md:gap-7 md:px-7 md:pb-7">
-        <div className="relative min-h-0 flex-1 md:rounded-3xl md:bg-neutral-50/70">
-          {radarPanel}
-        </div>
+        {radarPanel}
 
         <aside className="hidden w-[340px] shrink-0 flex-col md:flex">
           <div className="flex items-baseline justify-between px-1 pb-3">
@@ -375,6 +392,21 @@ export function Home() {
         }}
       />
     </div>
+  )
+}
+
+/** 확인용 버튼. 목데이터로는 잘 안 나오는 상황을 손으로 만들어 볼 수 있게 한다. */
+function DemoButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      whileTap={{ scale: 0.92 }}
+      transition={springSnap}
+      className="rounded-full border border-dashed border-neutral-300 px-2.5 py-1 text-[11px] font-semibold text-neutral-400"
+    >
+      {label}
+    </motion.button>
   )
 }
 
