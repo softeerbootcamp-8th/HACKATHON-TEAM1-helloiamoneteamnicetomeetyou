@@ -1,0 +1,1700 @@
+/*
+  어드민 화면 스타일.
+
+  프론트(frontend/src/index.css)의 디자인 토큰을 그대로 옮겼다. 부스 시연 중에 어드민 화면도
+  같이 보여 줄 수 있어서 두 화면이 같은 인상이어야 한다.
+
+  Tailwind 를 쓰지 않은 것은 백엔드에 빌드 단계를 하나 더 만들지 않기 위해서고, CDN 을 걸지
+  않은 것은 부스 네트워크가 흔들릴 때 화면이 통째로 무너지기 때문이다. 폰트도 있으면 쓰고
+  없으면 시스템 폰트로 떨어지게 두었다.
+*/
+
+/* ==========================================================================
+   색상 토큰
+
+   색은 전부 여기에만 있다. 테마를 바꿀 때 이 블록만 갈아끼우면 화면 전체가 따라온다.
+   아래 규칙들에는 색 리터럴을 쓰지 않는다.
+   ========================================================================== */
+:root {
+  /*
+    시안(Figma Page 1 / 디자인 수정)의 파란색이다. hsl(198, 84%, 55%) 이고 나머지 셋은
+    같은 색상각에서 밝기만 옮긴 값이다.
+
+    --brand 는 채우는 자리(버튼 배경, 점, 선택된 알약)에 쓰고, 글자와 링크에는 --brand-strong
+    을 쓴다. --brand 위에 글자를 얹으면 흰 바탕에서 대비가 4:1 을 못 넘어서 읽기 힘들다.
+  */
+  --brand: #2cb3ed;
+  --brand-strong: #1081b2;
+  --brand-soft: #e8f7fd;
+  --brand-ring: rgba(44, 179, 237, 0.28);
+
+  --ink: #111111;
+  --ink-sub: #4a4f57;
+  --muted: #9aa0a8;
+
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --tile: #eef0f4;
+  --disabled: #f1f1f0;
+  --line: #ececec;
+  --line-strong: #dfe2e7;
+
+  --danger: #ff5a5a;
+  --danger-soft: #ffefef;
+  --warn: #ff9f2e;
+  --warn-soft: #fff4e5;
+
+  --overlay: rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 1px 2px rgba(17, 17, 17, 0.04), 0 2px 8px rgba(17, 17, 17, 0.04);
+  --shadow-md: 0 4px 16px rgba(17, 17, 17, 0.08);
+  --shadow-lg: 0 18px 48px rgba(17, 17, 17, 0.18);
+
+  /* 손가락 밑에서 바로 반응하는 것. frontend 의 springSnap 자리다. */
+  --snap: 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* 사라지는 것은 빠르게. 기다리게 하면 답답하다. */
+  --out: 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* 시트나 다이얼로그처럼 무게감이 있어야 하는 것. */
+  --sheet: 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ==========================================================================
+   바탕
+   ========================================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui,
+    'Apple SD Gothic Neo', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
+}
+
+button {
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+/* ==========================================================================
+   굵은 글씨를 어디에 쓰는가
+
+   전부 굵으면 아무것도 안 굵은 것과 같다. 굵기는 세 단으로만 쓴다.
+
+     700  그 줄이나 화면이 무엇인지 가리키는 이름 하나
+          (목록의 사람 이름, 카드 이름, 상세 화면의 제목)
+     600  눌러서 무언가 일어나는 것과 지금 고른 것
+          (버튼, 선택된 탭, 묶음 제목)
+     500  나머지 전부. 설명, 라벨, 배지, 부가 숫자
+
+   새 규칙을 쓸 때 700 을 붙이려면 "이 줄에서 이것 말고 이름이 또 있나" 를 먼저 본다.
+   ========================================================================== */
+
+/* ==========================================================================
+   레이아웃 — 위에 탭, 아래는 왼쪽 목록과 오른쪽 상세
+
+   화면이 한 장이다. 목록에서 고르면 오른쪽이 바뀔 뿐 페이지를 넘어가지 않는다.
+   부스에서는 관람객을 앞에 세워 두고 조작하기 때문에 왕복이 그대로 시간이 된다.
+   ========================================================================== */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 60px;
+  padding: 0 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.brandmark {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.brandmark .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 0 4px var(--brand-ring);
+}
+
+.brandmark .tag {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--tile);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.tabs a {
+  padding: 8px 14px;
+  border-radius: 10px;
+  color: var(--ink-sub);
+  font-size: 14.5px;
+  font-weight: 500;
+  transition: background var(--out), color var(--out), transform var(--snap);
+}
+
+.tabs a:hover {
+  background: var(--bg);
+}
+
+.tabs a:active {
+  transform: scale(0.96);
+}
+
+.tabs a.on {
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+/* 상단 오른쪽의 주 동작 하나. 어느 탭에 있든 여기서 사용자를 만들러 간다. */
+.top-cta {
+  margin-left: auto;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  align-items: start;
+  min-height: calc(100vh - 60px);
+}
+
+/* 폭을 가득 쓴다. 오른쪽에 애매한 여백이 남으면 목록이 좁아 보인다. */
+.full {
+  padding: 20px 22px 60px;
+}
+
+.page-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.page-title h1 {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.pick-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pick-desc {
+  margin: 4px 0 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* --- 왼쪽 목록 --------------------------------------------------------- */
+.pane-list {
+  position: sticky;
+  top: 60px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 60px);
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+
+.pane-head {
+  padding: 15px 18px 11px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.pane-head b {
+  color: var(--ink-sub);
+  font-weight: 600;
+}
+
+.pane-add {
+  float: right;
+  color: var(--brand-strong);
+  font-weight: 600;
+}
+
+.pane-add:hover {
+  text-decoration: underline;
+}
+
+.pick-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 10px 14px;
+}
+
+.pane-foot {
+  padding: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+/* 목록 아래 폼의 작은 라벨. 입력이 무엇인지 한 줄로 말해 준다. */
+
+/* 목록 한 줄. 통째로 링크라 어디를 눌러도 열린다. */
+.pick {
+  position: relative;
+  display: block;
+  padding: 10px 12px;
+  border-radius: 12px;
+  transition: background var(--out), transform var(--snap);
+  animation: row-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pick:hover {
+  background: var(--bg);
+}
+
+.pick:active {
+  transform: scale(0.985);
+}
+
+.pick.on {
+  background: var(--brand-soft);
+}
+
+.pick-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14.5px;
+}
+
+.pick-main b {
+  font-weight: 700;
+}
+
+.pick-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* 접속 중 표시. 색 하나로 끝내고 글자를 늘리지 않는다. */
+.live-dot {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand);
+  animation: blink 1.6s ease-in-out infinite;
+}
+
+/* --- 오른쪽 상세 ------------------------------------------------------- */
+.pane-detail {
+  padding: 20px 22px 60px;
+  max-width: 1000px;
+  animation: page-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.detail-head h1 {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.title-input {
+  max-width: 260px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* 상세 안의 묶음 하나. 카드보다 가벼운 테두리라 화면이 답답해지지 않는다. */
+.box {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.box + .box,
+.grid-2 + .box,
+.box + .grid-2 {
+  margin-top: 14px;
+}
+
+/*
+  나란히 놓인 상자에는 위 규칙을 적용하지 않는다.
+
+  인접 형제 선택자는 그리드 칸을 구분하지 않아서, 오른쪽 칸에 놓인 상자도 "바로 앞 상자"
+  뒤에 온다는 이유로 margin-top 을 받는다. 그러면 왼쪽과 오른쪽 상자의 시작 줄이 어긋난다.
+*/
+.grid-2 > .box {
+  margin-top: 0;
+}
+
+.box-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /*
+    높이를 못박는다. 나란히 놓인 두 묶음의 머리에 들어가는 것이 다르면(한쪽에만 수량 칸이
+    있다든지) 머리 높이가 달라지고, 그러면 두 상자의 본문 시작 줄이 어긋나 보인다.
+  */
+  min-height: 56px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.box-head b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.box-head form {
+  margin-left: auto;
+}
+
+.box-head .hint {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.box-body {
+  padding: 14px 16px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+/* 한 줄에 늘어놓는 입력들. 목록 머리에 붙는 추가 폼이 전부 이 모양이다. */
+.inline-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inline-form.grow {
+  flex: 1;
+}
+
+/* 약속 화면의 참가자 알약들. */
+.party {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.party-one {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.party-one > a {
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   버튼 — 시안의 알약 버튼
+
+   누르는 느낌이 반드시 있어야 한다. 화면에 마우스가 있어도 눌린 티가 나야 방금 눌렀는지
+   아닌지를 헷갈리지 않는다.
+   ========================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: transform var(--snap), background var(--out), box-shadow var(--out), opacity var(--out);
+}
+
+.btn:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 4px var(--brand-ring);
+}
+
+.btn.brand {
+  background: var(--brand);
+  color: var(--surface);
+}
+
+.btn.brand:hover {
+  background: var(--brand-strong);
+}
+
+.btn.outline {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+
+.btn.outline:hover {
+  background: var(--bg);
+}
+
+.btn.ghost {
+  background: transparent;
+  color: var(--muted);
+}
+
+.btn.ghost:hover {
+  background: var(--bg);
+  color: var(--ink-sub);
+}
+
+.btn.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.btn.danger:hover {
+  background: var(--danger);
+  color: var(--surface);
+}
+
+.btn.sm {
+  height: 34px;
+  padding: 0 13px;
+  font-size: 13px;
+}
+
+.btn.wide {
+  width: 100%;
+}
+
+.btn:disabled {
+  background: var(--disabled);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 아이콘만 있는 작은 원형 버튼. 수량 스테퍼와 줄 삭제에 쓴다. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink-sub);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  transition: transform var(--snap), background var(--out), color var(--out);
+}
+
+.icon-btn:hover {
+  background: var(--bg);
+}
+
+.icon-btn:active {
+  transform: scale(0.88);
+}
+
+.icon-btn.danger:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--surface);
+}
+
+/* ==========================================================================
+   입력
+   ========================================================================== */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.input,
+select.input {
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14.5px;
+  transition: border-color var(--out), box-shadow var(--out);
+  appearance: none;
+}
+
+select.input {
+  padding-right: 34px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 20px, calc(100% - 12px) 20px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.input::placeholder {
+  color: var(--muted);
+}
+
+.input:focus {
+  outline: 0;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px var(--brand-ring);
+}
+
+.input.narrow {
+  width: 72px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 목록 머리에 붙는 폼은 줄 하나에 들어가야 해서 한 단계 작다. */
+.input.sm,
+select.input.sm {
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+
+select.input.sm {
+  padding-right: 28px;
+  background-position: calc(100% - 15px) 15px, calc(100% - 10px) 15px;
+  max-width: 190px;
+}
+
+.input.sm.narrow {
+  width: 60px;
+}
+
+/* 수량 스테퍼 가운데 칸. */
+.input.qty {
+  width: 52px;
+  height: 30px;
+  padding: 0;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+
+.form-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.form-row .field {
+  flex: 1;
+  min-width: 150px;
+}
+
+.form-row .field.grow-2 {
+  flex: 2;
+}
+
+/* ==========================================================================
+   목록
+
+   한꺼번에 나타나면 싸구려로 보인다. 순서대로 뜨게 한다.
+   ========================================================================== */
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 20px;
+  border-top: 1px solid var(--line);
+  transition: background var(--out);
+  animation: row-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.rows > .row:first-child {
+  border-top: 0;
+}
+
+.row:hover {
+  background: var(--bg);
+}
+
+a.row {
+  color: inherit;
+}
+
+.row.linked:active {
+  transform: scale(0.995);
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.row .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.row .title {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.row .meta {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.row .actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 카드 앞면. 굿즈 이미지가 아직 없어서 프론트처럼 약칭을 초록 빛무리 위에 얹는다. */
+.chip-card {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--tile);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.chip-card::before {
+  content: '';
+  position: absolute;
+  width: 70%;
+  height: 70%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--brand) 0%, transparent 70%);
+  filter: blur(9px);
+}
+
+.chip-card span {
+  position: relative;
+}
+
+.chip-card img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ==========================================================================
+   배지
+   ========================================================================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--tile);
+  color: var(--ink-sub);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.badge.brand {
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+
+.badge.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.badge.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.badge.live::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand);
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ==========================================================================
+   빈 상태
+   ========================================================================== */
+.empty {
+  padding: 44px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.empty strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--ink-sub);
+  font-size: 15px;
+}
+
+/* 상세 안에서는 빈 칸도 한 줄이면 된다. */
+.empty.sm {
+  padding: 18px 16px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.empty .dim {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ==========================================================================
+   토스트 — 아래에서 밀려 올라오고 스스로 사라진다
+   ========================================================================== */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  z-index: 90;
+  max-width: 420px;
+  padding: 14px 22px;
+  border-radius: 16px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-50%);
+  animation: toast-in var(--sheet) both;
+}
+
+.toast.danger {
+  background: var(--danger);
+}
+
+.toast.gone {
+  animation: toast-out var(--out) both;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 22px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(0.98);
+  }
+}
+
+/* ==========================================================================
+   다이얼로그
+
+   반드시 닫힌다. 바깥을 누르는 것, Esc, 취소 버튼 셋 다 닫는 길이다. 하나라도 막히면
+   쓰는 사람이 갇힌다.
+   ========================================================================== */
+dialog.sheet {
+  padding: 0;
+  border: 0;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  width: min(420px, calc(100vw - 40px));
+  color: var(--ink);
+}
+
+dialog.sheet::backdrop {
+  background: var(--overlay);
+  animation: fade-in var(--out) both;
+}
+
+dialog.sheet[open] {
+  animation: sheet-in var(--sheet) both;
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+dialog.sheet .sheet-body {
+  padding: 24px 24px 20px;
+}
+
+dialog.sheet h3 {
+  font-size: 19px;
+  font-weight: 600;
+}
+
+dialog.sheet p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+dialog.sheet .sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 24px 24px;
+}
+
+/* ==========================================================================
+   화면 전체가 뜰 때
+   ========================================================================== */
+.main > * {
+  animation: page-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   로그인
+   ========================================================================== */
+.login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.login .card {
+  width: min(380px, 100%);
+  padding: 34px 30px 30px;
+  border-radius: 26px;
+  box-shadow: var(--shadow-md);
+  animation: sheet-in var(--sheet) both;
+}
+
+.login .logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.login h1 {
+  margin-top: 20px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.login p.hint {
+  margin: 7px 0 24px;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.login form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login .error {
+  margin-top: 14px;
+  padding: 11px 14px;
+  border-radius: 13px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+  animation: shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* 비밀번호가 틀렸을 때. 글자를 읽기 전에 틀렸다는 것이 먼저 전달된다. */
+@keyframes shake {
+  10%,
+  90% {
+    transform: translateX(-2px);
+  }
+  20%,
+  80% {
+    transform: translateX(3px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-5px);
+  }
+  40%,
+  60% {
+    transform: translateX(5px);
+  }
+}
+
+/* ==========================================================================
+   좁은 화면 — 부스에서 태블릿으로 볼 때
+   ========================================================================== */
+@media (max-width: 1000px) {
+  .top {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    gap: 10px;
+  }
+
+  .top-actions {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  /* 좁아지면 목록이 위로 눕고 상세가 아래로 간다. 옆에 나란히 두면 둘 다 못 읽는다. */
+  .split {
+    grid-template-columns: 1fr;
+  }
+
+  .pane-list {
+    position: static;
+    height: auto;
+    max-height: 260px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .pane-detail {
+    padding: 16px 14px 60px;
+  }
+
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 모션을 줄이겠다고 한 사람에게는 전환을 걷어낸다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* ==========================================================================
+   왼쪽 목록 두 벌
+
+   글자를 줄이고 그림으로 바꾼다. 부스에서 목록을 훑을 때 읽고 있을 시간이 없다.
+   ========================================================================== */
+.pick-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pick-row b {
+  font-size: 14.5px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 실제 사용자에게만 붙인다. 대부분이 더미라 더미마다 달면 아무 의미가 없다. */
+.tag-real {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.pick .live-dot {
+  position: static;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+/* 내놓는 것 → 찾는 것. 화살표 하나로 방향이 읽힌다. */
+.trade {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+}
+
+.trade-side {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.trade-arrow {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.trade-none {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* 목록 안의 아주 작은 카드 얼굴. */
+.chip-card.xs {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.chip-card.xs::before {
+  filter: blur(6px);
+}
+
+/* 찾는 쪽은 테두리만. 내놓는 것과 한눈에 갈려야 한다. */
+.chip-card.xs.ghost {
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  color: var(--muted);
+}
+
+.chip-card.xs.ghost::before {
+  display: none;
+}
+
+/* --- 카드 목록 --- */
+.pick.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pick.item .item-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.pick.item b {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.counts {
+  display: flex;
+  gap: 8px;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* 라벨과 숫자가 갈라져서 두 줄이 되면 무슨 숫자인지 알 수 없다. */
+.counts > span {
+  white-space: nowrap;
+}
+
+.counts b {
+  display: inline;
+  color: var(--ink-sub);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 0 이면 이 카드는 아무리 기다려도 짝이 안 난다. 숫자에 바로 표시한다. */
+.counts .zero,
+.counts .zero b {
+  color: var(--danger);
+}
+
+.pick.dead {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+
+/* ==========================================================================
+   카드 고르는 칸 (사용자 추가)
+   ========================================================================== */
+.picker header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.input.search {
+  width: 150px;
+}
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  user-select: none;
+  text-align: center;
+  transition: border-color var(--out), background var(--out), transform var(--snap);
+}
+
+.tile input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tile:hover {
+  border-color: var(--line-strong);
+}
+
+.tile:active {
+  transform: scale(0.96);
+}
+
+/* 카드 앞면. 목록의 것보다 크게 둬서 무엇인지 바로 보이게 한다. */
+.tile-face {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--tile);
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.tile-face::before {
+  content: '';
+  position: absolute;
+  width: 70%;
+  height: 70%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--brand) 0%, transparent 70%);
+  filter: blur(9px);
+}
+
+.tile-face > span,
+.tile-face > img {
+  position: relative;
+}
+
+.tile-face img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tile-name {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--ink-sub);
+}
+
+.tile-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: none;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--surface);
+  font-size: 10px;
+  line-height: 17px;
+}
+
+.tile:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.tile:has(input:checked) .tile-name {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.tile:has(input:checked) .tile-check {
+  display: block;
+}
+
+.tile:has(input:focus-visible) {
+  box-shadow: 0 0 0 4px var(--brand-ring);
+}
+
+/* 검색에 안 걸린 것 */
+.tile.hidden {
+  display: none;
+}
+
+/* ==========================================================================
+   매칭 케이스 고르기
+   ========================================================================== */
+.case-pick {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 620px;
+}
+
+.case {
+  position: relative;
+  display: block;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color var(--out), background var(--out), transform var(--snap);
+}
+
+.case input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.case:active {
+  transform: scale(0.985);
+}
+
+.case:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.case-body b {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+/* 고리 모양을 글로 설명하지 않고 그려 준다. */
+.case-flow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 9px 0 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.case-flow i {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--tile);
+  color: var(--ink-sub);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.case:has(input:checked) .case-flow i {
+  background: var(--brand);
+  color: var(--surface);
+}
+
+.case-desc {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.policy {
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   교환 목록
+
+   한 건이 카드 하나다. 표로 만들면 참가자가 2명일 때와 3명일 때 줄 높이가 달라져서
+   눈이 계속 다시 맞춰야 한다.
+   ========================================================================== */
+.seg {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--tile);
+  width: fit-content;
+}
+
+.seg a {
+  padding: 7px 13px;
+  border-radius: 9px;
+  color: var(--ink-sub);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background var(--out), color var(--out);
+}
+
+.seg a b {
+  margin-left: 3px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.seg a:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.seg a.on {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.seg a.on b {
+  color: var(--brand-strong);
+}
+
+.ex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+
+.ex {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  animation: row-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ex.st-in_progress {
+  border-left-color: var(--brand);
+}
+.ex.st-completed {
+  border-left-color: var(--brand-strong);
+}
+.ex.st-cancelled {
+  border-left-color: var(--danger);
+}
+.ex.st-pending {
+  border-left-color: var(--warn);
+}
+
+.ex > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 0;
+}
+
+.ex-id {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ex-state {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.ex-size {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--tile);
+  color: var(--ink-sub);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.ex-people {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 14px;
+}
+
+.ex-person {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+}
+
+.ex-person > a {
+  font-weight: 600;
+}
+
+.ex-person > a:hover {
+  text-decoration: underline;
+}
+
+.ex-ps {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.ex-ps.accepted {
+  color: var(--brand-strong);
+}
+.ex-ps.rejected {
+  color: var(--danger);
+}
+.ex-ps.pending {
+  margin-right: auto;
+}
+
+.ex > footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.ex-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ex-acts {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+@media (max-width: 1000px) {
+  .case-pick,
+  .picker header {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .input.search {
+    width: 100%;
+  }
+}

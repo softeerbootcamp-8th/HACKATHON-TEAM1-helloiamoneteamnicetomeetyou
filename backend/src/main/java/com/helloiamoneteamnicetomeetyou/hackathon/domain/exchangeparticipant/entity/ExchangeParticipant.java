@@ -43,4 +43,19 @@ public class ExchangeParticipant {
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime joinedAt;
+
+    /**
+     * 어드민이 더미 사용자 대신 수락한다.
+     *
+     * <p>더미 사용자는 화면을 들고 있는 사람이 없어서 스스로 수락할 수가 없다. 부스에서 참가자가
+     * 더미에게 찔러보기를 하면 어드민이 여기를 눌러 흐름을 이어 준다.
+     */
+    public void accept() {
+        this.status = ParticipantStatus.ACCEPTED;
+    }
+
+    /** 어드민이 더미 사용자 대신 거절한다. 거절 흐름도 시연에서 보여 줘야 한다. */
+    public void reject() {
+        this.status = ParticipantStatus.REJECTED;
+    }
 }
