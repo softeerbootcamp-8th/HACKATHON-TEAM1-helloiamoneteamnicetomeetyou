@@ -20,10 +20,12 @@ import java.util.*;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MatchingService {
@@ -50,6 +52,7 @@ public class MatchingService {
         Map<UUID, Long> earliestReg = new HashMap<>();
         Map<UUID, Map<Long, Integer>> toThem = buildToThem(userId, earliestReg);
         Map<UUID, Map<Long, Integer>> toMe   = buildToMe(userId);
+
         if (toThem.isEmpty() || toMe.isEmpty()) return;
 
         User myUser = userRepository.findById(userId).orElseThrow();
@@ -237,7 +240,7 @@ public class MatchingService {
      */
     private Map<UUID, Map<Long, Integer>> buildToThem(UUID myUserId, Map<UUID, Long> earliestReg) {
         Map<UUID, Map<Long, Integer>> result = new LinkedHashMap<>();
-        for (Object[] row : userWantItemRepository.findToThemData(myUserId)) {
+        for (Object[] row : userWantItemRepository.findToThemData(myUserId.toString())) {
             UUID candidateId = toUUID(row[0]);
             Long itemId      = toLong(row[1]);
             int  qty         = toInt(row[2]);
@@ -255,7 +258,7 @@ public class MatchingService {
      */
     private Map<UUID, Map<Long, Integer>> buildToMe(UUID myUserId) {
         Map<UUID, Map<Long, Integer>> result = new LinkedHashMap<>();
-        for (Object[] row : userHaveItemRepository.findToMeData(myUserId)) {
+        for (Object[] row : userHaveItemRepository.findToMeData(myUserId.toString())) {
             UUID candidateId = toUUID(row[0]);
             Long itemId      = toLong(row[1]);
             int  qty         = toInt(row[2]);
@@ -270,7 +273,7 @@ public class MatchingService {
      */
     private Map<UUID, Map<UUID, Map<Long, Integer>>> buildBToC(Set<UUID> bIds, Set<UUID> cIds) {
         Map<UUID, Map<UUID, Map<Long, Integer>>> result = new LinkedHashMap<>();
-        for (Object[] row : userHaveItemRepository.findBToCData(bIds, cIds)) {
+        for (Object[] row : userHaveItemRepository.findBToCData(toStrings(bIds), toStrings(cIds))) {
             UUID bId    = toUUID(row[0]);
             UUID cId    = toUUID(row[1]);
             Long itemId = toLong(row[2]);
@@ -331,6 +334,11 @@ public class MatchingService {
         for (User participant : participants) {
             sseEventPublisher.toUser(participant.getId(), SseEventType.MATCH_SUGGESTED, dtos);
         }
+    }
+
+    /** 네이티브 쿼리의 user_id 는 varchar(36) 이라 UUID 가 아니라 문자열로 넘겨야 한다. */
+    private Set<String> toStrings(Set<UUID> ids) {
+        return ids.stream().map(UUID::toString).collect(Collectors.toSet());
     }
 
     private UUID toUUID(Object o) { return UUID.fromString(o.toString()); }

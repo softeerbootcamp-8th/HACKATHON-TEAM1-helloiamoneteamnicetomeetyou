@@ -2,8 +2,11 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.re
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
 import java.util.List;
+import java.util.UUID;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ExchangeParticipantRepository extends JpaRepository<ExchangeParticipant, Long> {
 

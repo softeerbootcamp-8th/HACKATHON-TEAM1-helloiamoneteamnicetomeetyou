@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface UserWantItemRepository extends JpaRepository<UserWantItem, Long> {
 
@@ -12,7 +13,13 @@ public interface UserWantItemRepository extends JpaRepository<UserWantItem, Long
     @Query("SELECT uwi FROM UserWantItem uwi JOIN FETCH uwi.item WHERE uwi.user.id = :userId")
     List<UserWantItem> findByUserId(@Param("userId") UUID userId);
 
-    // 쿼리 A: 내 보유 아이템을 원하는 후보와 교환 가능 수량 (LEAST로 cap)
+    /**
+     * 쿼리 A: 내 보유 아이템을 원하는 후보와 교환 가능 수량 (LEAST로 cap)
+     *
+     * <p>userId 를 UUID 가 아니라 String 으로 받는다. user_id 컬럼은 varchar(36) 인데,
+     * 네이티브 쿼리에는 매핑 정보가 없어서 UUID 를 넘기면 Hibernate 가 binary(16) 으로
+     * 바인딩한다. 그러면 비교가 전부 어긋나 결과가 0건이 된다.
+     */
     @Query(value = """
         SELECT uwi.user_id, uwi.item_id,
                LEAST(my_uhi.quantity_left, uwi.quantity) AS qty,
@@ -31,7 +38,7 @@ public interface UserWantItemRepository extends JpaRepository<UserWantItem, Long
           )
         ORDER BY my_uhi.created_at ASC
         """, nativeQuery = true)
-    List<Object[]> findToThemData(@Param("myUserId") UUID myUserId);
+    List<Object[]> findToThemData(@Param("myUserId") String myUserId);
     @Query("""
             select w from UserWantItem w
             join fetch w.item
