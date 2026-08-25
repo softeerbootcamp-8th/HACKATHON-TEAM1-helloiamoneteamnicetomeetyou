@@ -13,6 +13,9 @@ type Props = {
   ctaLabel: string
   /** Needs 는 아무것도 안 골라도 넘어갈 수 있다. */
   allowEmpty: boolean
+  /** 고를 수 없는 아이템과 그 이유. 내놓기로 한 굿즈를 다시 찾을 수는 없다. */
+  disabledItemIds?: string[]
+  disabledNote?: string
   selections: Selection[]
   onBack: () => void
   onToggle: (itemId: string) => void
@@ -30,6 +33,8 @@ export function SelectScreen({
   heading,
   ctaLabel,
   allowEmpty,
+  disabledItemIds = [],
+  disabledNote,
   selections,
   onBack,
   onToggle,
@@ -71,11 +76,14 @@ export function SelectScreen({
             >
               {goods.items.map((item) => {
                 const picked = selections.find((s) => s.itemId === item.id)
+                const blocked = disabledItemIds.includes(item.id)
                 return (
                   <motion.div key={item.id} variants={staggerChild}>
                     <GoodsCard
                       item={item}
                       selected={Boolean(picked)}
+                      disabled={blocked}
+                      note={blocked ? disabledNote : undefined}
                       qty={picked?.qty}
                       onClick={() => onToggle(item.id)}
                       onIncrease={() => onChangeQty(item.id, (picked?.qty ?? 0) + 1)}

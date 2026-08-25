@@ -13,11 +13,13 @@ type Props = {
   pending: boolean
   /** 방금 이 사람에게 카드를 놓았는지. 고리가 한 번 터진다. */
   burst?: boolean
+  /** 카드를 눌렀을 때. 끌어놓기 말고 그냥 눌러서도 찔러볼 수 있어야 한다. */
+  onSelect?: () => void
   index: number
 }
 
 /** 레이더 위에 서 있는 상대 한 명. */
-export function RadarUser({ user, hovered, pending, burst = false, index }: Props) {
+export function RadarUser({ user, hovered, pending, burst = false, onSelect, index }: Props) {
   const item = itemById(user.itemId)
 
   return (
@@ -54,12 +56,17 @@ export function RadarUser({ user, hovered, pending, burst = false, index }: Prop
 
       {/* 떠다니는 것은 CSS 가 맡고, 손가락이 올라왔을 때의 확대만 motion 이 맡는다.
           둘을 한 요소에 겹치면 transform 이 서로를 덮어써서 하나가 죽는다. */}
-      <motion.div
+      <motion.button
+        type="button"
+        onClick={onSelect}
+        disabled={pending || !onSelect}
+        aria-label={`${user.nickname}님에게 찔러보기`}
+        whileTap={pending ? undefined : { scale: 0.94 }}
         animate={{ scale: hovered ? 1.08 : 1 }}
         transition={springSnap}
         style={{ animationDelay: `${index * 0.4}s` }}
         className={cn(
-          'rounded-2xl bg-white p-2 shadow-[0_4px_16px_rgba(0,0,0,0.10)]',
+          'block w-full rounded-2xl bg-white p-2 shadow-[0_4px_16px_rgba(0,0,0,0.10)]',
           !hovered && !pending && 'anim-float-sm',
           hovered && 'ring-2 ring-ink',
           pending && 'opacity-45 grayscale',
@@ -79,7 +86,7 @@ export function RadarUser({ user, hovered, pending, burst = false, index }: Prop
             ✓
           </span>
         )}
-      </motion.div>
+      </motion.button>
     </motion.div>
   )
 }

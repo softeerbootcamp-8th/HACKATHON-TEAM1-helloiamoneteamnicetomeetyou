@@ -32,6 +32,16 @@ export function AppShell() {
   }
 
   const wide = WIDE_ROUTES.has(location.pathname)
+
+  /**
+   * 뒤로 갈 기록이 없을 때 navigate(-1) 을 부르면 앱 밖으로 나가서 빈 화면이 뜬다.
+   * 새로고침 직후나 주소로 바로 들어온 경우가 그렇다. 그때는 갈 만한 화면으로 보낸다.
+   */
+  const goBack = () => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
+    if (idx > 0) navigate(-1)
+    else navigate(state.setupDone ? '/home' : '/', { replace: true })
+  }
   // 첫 화면과 홈은 뒤로 갈 곳이 없다. 여기서 밀리면 앱이 꺼진 것처럼 보인다.
   const canSwipeBack = location.pathname !== '/' && location.pathname !== '/home'
 
@@ -62,7 +72,7 @@ export function AppShell() {
           </motion.div>
         </AnimatePresence>
 
-        {canSwipeBack && <SwipeBackEdge onBack={() => navigate(-1)} />}
+        {canSwipeBack && <SwipeBackEdge onBack={goBack} />}
 
         <Toast message={state.toast} />
       </div>

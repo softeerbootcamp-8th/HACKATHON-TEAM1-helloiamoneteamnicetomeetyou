@@ -14,6 +14,8 @@ export function NeedsSelect() {
       heading="찾는 굿즈를 선택하세요"
       ctaLabel="교환하러 가기"
       allowEmpty
+      disabledItemIds={state.have.map((s) => s.itemId)}
+      disabledNote="내놓기로 했어요"
       selections={state.needs}
       onBack={() => navigate('/have')}
       onToggle={(itemId) => dispatch({ type: 'toggle-need', itemId })}

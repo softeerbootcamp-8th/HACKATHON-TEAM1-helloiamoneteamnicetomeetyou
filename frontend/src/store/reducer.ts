@@ -5,6 +5,7 @@ import type { ActiveMatch, IncomingPoke, State } from './types'
 
 export const initialState: State = {
   onboarded: false,
+  setupDone: false,
   have: [],
   needs: [],
   autoMatching: false,
@@ -93,10 +94,21 @@ export function reducer(state: State, action: Action): State {
     case 'onboarded':
       return { ...state, onboarded: true }
 
-    case 'toggle-have':
-      return { ...state, have: bump(state.have, action.itemId, 1) }
-    case 'set-have-qty':
-      return { ...state, have: setQty(state.have, action.itemId, action.qty) }
+    // 내놓기로 한 굿즈는 찾는 굿즈에서 빠진다. 뒤로 가서 Have 를 고쳤을 때
+    // Needs 에 같은 것이 남아 있으면 화면에는 못 고르는데 개수에는 잡힌다.
+    case 'toggle-have': {
+      const have = bump(state.have, action.itemId, 1)
+      return { ...state, have, needs: state.needs.filter((n) => n.itemId !== action.itemId) }
+    }
+    case 'set-have-qty': {
+      const have = setQty(state.have, action.itemId, action.qty)
+      const stillHave = have.some((h) => h.itemId === action.itemId)
+      return {
+        ...state,
+        have,
+        needs: stillHave ? state.needs.filter((n) => n.itemId !== action.itemId) : state.needs,
+      }
+    }
     case 'clear-have':
       return { ...state, have: state.have.filter((s) => s.itemId !== action.itemId) }
 
@@ -110,7 +122,7 @@ export function reducer(state: State, action: Action): State {
     case 'enter-home': {
       // 약속이 있으면 자동 매칭을 돌리지 않는다.
       const canMatch = !state.appointment && !state.match && state.needs.length > 0
-      return { ...state, autoMatching: canMatch }
+      return { ...state, autoMatching: canMatch, setupDone: true }
     }
 
     case 'auto-match-tick': {
@@ -362,6 +374,7 @@ export function reducer(state: State, action: Action): State {
         return {
           ...state,
           onboarded: true,
+          setupDone: true,
           have,
           needs: state.needs.length > 0 ? state.needs : [{ itemId: 'i5n', qty: 1 }],
           autoMatching: false,
@@ -384,6 +397,7 @@ export function reducer(state: State, action: Action): State {
       return {
         ...state,
         onboarded: true,
+        setupDone: true,
         have,
         autoMatching: false,
         match: null,

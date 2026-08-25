@@ -38,6 +38,9 @@ export function GoodsFace({ item, size = 'md' }: { item: Item; size?: Size }) {
 type CardProps = {
   item: Item
   selected?: boolean
+  /** 고를 수 없는 상태. 이유는 note 로 알려 준다. */
+  disabled?: boolean
+  note?: string
   qty?: number
   showKo?: boolean
   size?: Size
@@ -55,6 +58,8 @@ type CardProps = {
 export function GoodsCard({
   item,
   selected = false,
+  disabled = false,
+  note,
   qty,
   showKo = true,
   size = 'md',
@@ -80,22 +85,31 @@ export function GoodsCard({
       className={cn(
         'rounded-2xl bg-white p-2.5 shadow-[0_2px_10px_rgba(0,0,0,0.06)]',
         selected ? 'ring-2 ring-ink' : 'ring-1 ring-neutral-100',
+        disabled && 'opacity-45',
       )}
     >
       <motion.button
         type="button"
         onClick={onClick}
-        onPointerDown={startPress}
+        onPointerDown={disabled ? undefined : startPress}
         onPointerUp={endPress}
         onPointerLeave={endPress}
-        whileTap={{ scale: 0.95 }}
+        disabled={disabled}
+        whileTap={disabled ? undefined : { scale: 0.95 }}
         transition={springSnap}
-        className="w-full text-left"
+        className="w-full text-left disabled:cursor-not-allowed"
         aria-pressed={selected}
+        aria-disabled={disabled}
       >
-        <GoodsFace item={item} size={size} />
+        <div className={cn(disabled && 'grayscale')}>
+          <GoodsFace item={item} size={size} />
+        </div>
         <p className="mt-2 text-center text-[12px] font-bold text-ink">{item.name}</p>
-        {showKo && <p className="text-center text-[11px] text-neutral-400">{item.nameKo}</p>}
+        {note ? (
+          <p className="text-center text-[10px] leading-tight text-neutral-400">{note}</p>
+        ) : (
+          showKo && <p className="text-center text-[11px] text-neutral-400">{item.nameKo}</p>
+        )}
       </motion.button>
 
       {selected && qty !== undefined && (

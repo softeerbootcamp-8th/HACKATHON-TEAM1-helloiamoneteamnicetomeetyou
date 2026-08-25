@@ -24,7 +24,12 @@ export function Home() {
   const [dragging, setDragging] = useState(false)
   // 방금 카드를 놓은 상대. 고리가 한 번 터지고 나서 찔러보기 확인 화면으로 넘어간다.
   const [burstOn, setBurstOn] = useState<string | null>(null)
+  // 밀어서 치운 배너. 내용이 바뀌면 다시 뜬다.
+  const [dismissedBanner, setDismissedBanner] = useState<string | null>(null)
+  const bannerDragRef = useRef(false)
   const radarRef = useRef<HTMLDivElement>(null)
+  // 끌었는지 기억해 둔다. 끌고 난 뒤 따라오는 click 을 걸러내는 데 쓴다.
+  const draggedRef = useRef(false)
 
   useEffect(() => {
     dispatch({ type: 'enter-home' })
@@ -77,19 +82,26 @@ export function Home() {
     setHovered(next)
   }
 
+  /**
+   * 찔러보기로 넘어간다. 끌어다 놓아도, 상대 카드를 그냥 눌러도 여기로 온다.
+   * 화면이 바로 바뀌면 무슨 일이 일어났는지 안 보여서 물결이 퍼지는 동안 붙잡아 둔다.
+   */
+  const sendPokeTo = (targetId: string) => {
+    if (pendingTarget === targetId) return
+    tick([10, 40, 14])
+    setBurstOn(targetId)
+    window.setTimeout(() => {
+      setBurstOn(null)
+      navigate(`/poke/confirm?to=${targetId}`)
+    }, 700)
+  }
+
   const onDragEnd = () => {
     setDragging(false)
     const target = hovered
     setHovered(null)
     if (!target) return
-    tick([10, 40, 14])
-    // 놓자마자 화면이 바뀌면 무슨 일이 일어났는지 안 보인다. 물결이 퍼지는 동안
-    // 붙잡아 두고 넘어간다. 끝까지 기다리지는 않는다. 그러면 답답해진다.
-    setBurstOn(target)
-    window.setTimeout(() => {
-      setBurstOn(null)
-      navigate(`/poke/confirm?to=${target}`)
-    }, 700)
+    sendPokeTo(target)
   }
 
   const banner = (() => {
@@ -168,23 +180,53 @@ export function Home() {
                 hovered={hovered === user.id}
                 pending={pendingTarget === user.id}
                 burst={burstOn === user.id}
+                onSelect={() => sendPokeTo(user.id)}
               />
             </div>
           )
         })}
 
         <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
-          <p className="mb-1 text-center text-[11px] font-bold text-neutral-500">내 카드</p>
+          <motion.button
+            type="button"
+            onClick={() => navigate('/have')}
+            whileTap={{ scale: 0.94 }}
+            transition={springSnap}
+            className="mx-auto mb-1 flex items-center gap-0.5 text-[11px] font-bold text-neutral-500"
+          >
+            내 카드
+            <span className="text-[13px] text-neutral-300">›</span>
+          </motion.button>
+
+          {/*
+            끌면 찔러보기, 그냥 누르면 내 카드 편집으로 간다. 끌고 난 뒤에도 click 이
+            따라오기 때문에 끌었는지를 기억해 두고 그 click 은 버린다.
+          */}
           <motion.div
             drag
             dragSnapToOrigin
             dragMomentum={false}
             dragTransition={{ bounceStiffness: 480, bounceDamping: 30 }}
             transition={springSnap}
-            onDragStart={() => setDragging(true)}
+            onDragStart={() => {
+              draggedRef.current = true
+              setDragging(true)
+            }}
             onDrag={onDrag}
-            onDragEnd={onDragEnd}
+            onDragEnd={(event, info) => {
+              onDragEnd()
+              window.setTimeout(() => {
+                draggedRef.current = false
+              }, 0)
+              void event
+              void info
+            }}
+            onClick={() => {
+              if (draggedRef.current) return
+              navigate('/have')
+            }}
             whileDrag={{ zIndex: 60, cursor: 'grabbing' }}
+            data-my-cards
             className="cursor-grab touch-none"
           >
             <CardStack topItemId={topItemId} count={Math.max(haveCount, 1)} lifted={dragging} />
@@ -195,7 +237,7 @@ export function Home() {
       <p className="mt-5 shrink-0 text-center text-[12px] text-neutral-400">
         {dragging
           ? '놓아주면 찔러보기가 전송돼요'
-          : '내 카드 묶음을 상대 카드 위에 끌어서 놓아보세요'}
+          : '상대 카드를 누르거나, 내 카드 묶음을 끌어다 놓아보세요'}
       </p>
     </div>
   )
@@ -313,18 +355,44 @@ export function Home() {
             </motion.span>
           )}
 
-          {banner && (
+          {banner && banner.title !== dismissedBanner && (
             <motion.button
               key={banner.title}
               type="button"
-              onClick={banner.onClick}
+              drag
+              dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+              dragElastic={{ left: 0.5, right: 0.5, top: 0.5, bottom: 0.05 }}
+              dragMomentum={false}
+              dragSnapToOrigin
+              onDragStart={() => {
+                bannerDragRef.current = true
+              }}
+              onDragEnd={(_, info) => {
+                // 옆으로 밀거나 위로 올리면 치운다. 아래로는 안 치운다.
+                const flung =
+                  Math.abs(info.offset.x) > 90 ||
+                  Math.abs(info.velocity.x) > 500 ||
+                  info.offset.y < -60 ||
+                  info.velocity.y < -500
+                if (flung) {
+                  tick(10)
+                  setDismissedBanner(banner.title)
+                }
+                window.setTimeout(() => {
+                  bannerDragRef.current = false
+                }, 0)
+              }}
+              onClick={() => {
+                if (bannerDragRef.current) return
+                banner.onClick()
+              }}
               initial={{ opacity: 0, y: -12, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.98 }}
+              exit={{ opacity: 0, y: -10, scale: 0.98 }}
               transition={springSheet}
               whileTap={{ scale: 0.98 }}
               className={cn(
-                'flex w-full items-center gap-3 rounded-2xl p-3.5 text-left',
+                'flex w-full cursor-grab touch-pan-y items-center gap-3 rounded-2xl p-3.5 text-left active:cursor-grabbing',
                 banner.tone === 'brand'
                   ? 'border border-brand bg-brand/10'
                   : 'bg-white shadow-[0_4px_18px_rgba(0,0,0,0.10)]',
@@ -520,21 +588,18 @@ function NotificationSheet({
     notifications.length === 0 ? (
       <p className="py-10 text-center text-[13px] text-neutral-400">아직 알림이 없어요</p>
     ) : (
-      <>
-        <ul className="mt-3 space-y-2">
-          <AnimatePresence initial={false}>
-            {notifications.map((n) => (
-              <NotificationRow
-                key={n.id}
-                notification={n}
-                onSelect={onSelect}
-                onDismiss={onDismiss}
-              />
-            ))}
-          </AnimatePresence>
-        </ul>
-        <p className="mt-3 text-center text-[11px] text-neutral-300">왼쪽으로 밀면 지워져요</p>
-      </>
+      <ul className="mt-3 space-y-2">
+        <AnimatePresence initial={false}>
+          {notifications.map((n) => (
+            <NotificationRow
+              key={n.id}
+              notification={n}
+              onSelect={onSelect}
+              onDismiss={onDismiss}
+            />
+          ))}
+        </AnimatePresence>
+      </ul>
     )
 
   return (

@@ -44,6 +44,11 @@ export type ActiveMatch = MatchResult & { origin: 'auto' | 'poke' }
 
 export type State = {
   onboarded: boolean
+  /**
+   * 교환 대기장소까지 한 번이라도 갔는지. 처음 등록 중인지 나중에 고치는 중인지를
+   * 이걸로 가른다. Have 화면의 뒤로가기가 어디로 갈지가 달라진다.
+   */
+  setupDone: boolean
   have: Selection[]
   needs: Selection[]
   /** 자동 매칭이 돌고 있는지. 약속이 있으면 돌지 않는다. */
