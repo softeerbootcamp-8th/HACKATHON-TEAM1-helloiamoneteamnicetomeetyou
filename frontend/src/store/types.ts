@@ -3,7 +3,7 @@ import type { MatchResult } from './matching'
 export type Selection = { itemId: string; qty: number }
 
 export type NotificationKind =
-  'match' | 'poke-received' | 'poke-accepted' | 'poke-rejected' | 'time-request'
+  'match' | 'poke-received' | 'poke-accepted' | 'poke-rejected' | 'time-request' | 'time-matched'
 
 export type AppNotification = {
   id: string
@@ -30,6 +30,12 @@ export type IncomingPoke = {
 export type AppointmentStage = 'place' | 'time-waiting' | 'time-conflict' | 'confirmed' | 'arrived'
 
 export type Appointment = {
+  id: string
+  /**
+   * 이 약속이 성사시킨 교환. 약속마다 상대와 카드가 다르기 때문에 약속이 들고 있는다.
+   * 약속을 동시에 두 개 이상 잡을 수 있어서 화면 전역에 하나만 둘 수가 없다.
+   */
+  match: ActiveMatch
   stage: AppointmentStage
   zoneId: string
   mySlots: number[]
@@ -60,7 +66,10 @@ export type State = {
   incomingPoke: IncomingPoke | null
   /** 매칭이 도는 동안 들어온 찔러보기는 끝날 때까지 알리지 않는다. */
   heldIncoming: IncomingPoke | null
-  appointment: Appointment | null
+  /** 진행 중이거나 확정된 약속들. 현재 시간에서 가까운 순으로 화면에 깔린다. */
+  appointments: Appointment[]
+  /** 지금 장소·시간·약속 화면이 다루고 있는 약속 */
+  activeAppointmentId: string | null
   notifications: AppNotification[]
   /** 교환으로 얻은 카드 */
   collection: string[]

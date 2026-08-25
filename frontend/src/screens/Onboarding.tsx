@@ -62,7 +62,7 @@ export function Onboarding() {
             transition={{ ...springSnap, delay: 0.24 }}
           >
             <div className="anim-float">
-              <CardStack topItemId="sf" count={3} className="w-[150px]" />
+              <CardStack topItemId="avn" count={3} className="w-[168px]" />
             </div>
           </motion.div>
         </div>
