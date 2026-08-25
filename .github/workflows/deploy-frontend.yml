@@ -1,0 +1,97 @@
+name: Deploy Frontend to Vercel
+
+# 조직에 Vercel GitHub App 을 설치하려면 org owner 승인이 필요한데(앱이 members:read 같은
+# 조직 권한을 요구한다), 우리는 레포 권한만 있다. 그래서 앱 연동 대신 토큰으로 배포한다.
+# 누가 push 하든 이 워크플로가 도는 것이라 배포에 개인 계정 로그인이 필요하지 않다.
+on:
+  push:
+    branches: [main, dev]
+    # 모노레포라 백엔드만 바뀐 push 로는 프론트를 재배포하지 않는다.
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+  # 리뷰어가 화면을 눈으로 보고 리뷰할 수 있도록 PR 에도 미리보기를 올린다.
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+  # 배포만 다시 돌리고 싶을 때 Actions 탭에서 수동 실행한다.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-deploy-${{ github.ref }}
+  # 미리보기는 앞선 실행을 취소해도 되지만, main 프로덕션 배포는 끝까지 보낸다.
+  cancel-in-progress: ${{ github.ref_name != 'main' }}
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      # Vercel CLI 는 이 세 값을 환경변수로 읽는다. 명령줄에 --token 을 붙이면 실행 로그에
+      # 그대로 찍힐 수 있어서 환경변수로만 넘긴다.
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # 모노레포라 루트에 package.json 이 없다. 어느 걸 보고 pnpm 버전을 정할지 짚어 준다.
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: 토큰이 있는지 확인
+        # 여기서 whoami 나 teams ls 로 토큰을 검사하지 않는다. 프로젝트 스코프 토큰은 그 둘을
+        # 정상적으로 거부하기 때문에, 멀쩡한 토큰을 잘못된 것으로 판정하게 된다.
+        # 토큰이 실제로 쓸 수 있는지는 아래 pull 단계가 판정한다.
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::VERCEL_TOKEN 시크릿이 없습니다. 저장소 Settings > Secrets and variables > Actions 에 추가하세요."
+            exit 1
+          fi
+
+      - name: 배포 대상 결정
+        id: target
+        # main push 만 프로덕션이다. dev push 와 PR 은 미리보기로 올린다.
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_name }}" = "main" ]; then
+            echo "flag=--prod" >> "$GITHUB_OUTPUT"
+            echo "environment=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "flag=" >> "$GITHUB_OUTPUT"
+            echo "environment=preview" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Vercel 에 등록된 환경변수(VITE_API_BASE_URL 등)와 빌드 설정을 내려받는다.
+      - name: Vercel 설정과 환경변수 내려받기
+        # 실패하면 대부분 토큰 문제라서, 원인 후보를 로그에 같이 남긴다.
+        run: |
+          if ! npx --yes vercel@latest pull --yes --environment=${{ steps.target.outputs.environment }}; then
+            echo "::error::Vercel 프로젝트 설정을 가져오지 못했습니다. VERCEL_TOKEN 이 이 프로젝트($VERCEL_PROJECT_ID)에 접근할 수 있는지 확인하세요. 토큰 Scope 를 특정 프로젝트 하나로 잡았다면 그 프로젝트가 맞는지, 아니면 All Projects 나 Full Account 로 다시 발급해야 합니다."
+            exit 1
+          fi
+
+
+      - run: npx --yes vercel@latest build ${{ steps.target.outputs.flag }}
+
+      # --prebuilt: 위에서 만든 산출물을 그대로 올린다. Vercel 쪽에서 다시 빌드하지 않는다.
+      - name: 배포하고 URL 을 요약에 남긴다
+        run: |
+          url=$(npx --yes vercel@latest deploy --prebuilt ${{ steps.target.outputs.flag }})
+          echo "$url"
+          echo "### 배포 완료 (${{ steps.target.outputs.environment }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "$url" >> "$GITHUB_STEP_SUMMARY"
