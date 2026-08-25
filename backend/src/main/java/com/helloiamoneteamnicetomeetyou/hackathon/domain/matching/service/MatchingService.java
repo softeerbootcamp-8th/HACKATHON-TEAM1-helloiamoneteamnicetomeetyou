@@ -7,7 +7,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.Exc
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.repository.ExchangeParticipantRepository;
-import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.dto.ExchangeMatchedItemDto;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.dto.MatchSuggestedResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
@@ -142,7 +142,7 @@ public class MatchingService {
             hi.reserve();
         });
         exchangeItemRepository.saveAll(items);
-        notifyParticipants(items, List.of(myUser, bestUser));
+        notifyParticipants(exchange, items, List.of(myUser, bestUser));
         return exchange;
     }
 
@@ -224,7 +224,7 @@ public class MatchingService {
         bHaveItem.reserve();
         cHaveItem.reserve();
 
-        notifyParticipants(items, List.of(myUser, userB, userC));
+        notifyParticipants(exchange, items, List.of(myUser, userB, userC));
         return exchange;
     }
 
@@ -324,15 +324,18 @@ public class MatchingService {
         return m.values().stream().mapToInt(i -> i).sum();
     }
 
-    private void notifyParticipants(List<ExchangeItem> items, List<User> participants) {
-        List<ExchangeMatchedItemDto> dtos = items.stream()
-                .map(ei -> new ExchangeMatchedItemDto(
-                        ei.getFromUser().getId(),
-                        ei.getToUser().getId(),
-                        ei.getItem().getName()))
-                .toList();
+    /**
+     * 참여자 한 명당 한 번, 그 사람 관점으로 정리한 매칭 결과를 보낸다.
+     *
+     * <p>같은 교환이라도 사람마다 주는 카드와 받는 카드가 다르다. 전원에게 같은 목록을 보내고
+     * 각자 걸러 쓰게 하면 그 해석이 클라이언트마다 다시 구현된다.
+     */
+    private void notifyParticipants(Exchange exchange, List<ExchangeItem> items, List<User> participants) {
         for (User participant : participants) {
-            sseEventPublisher.toUser(participant.getId(), SseEventType.MATCH_SUGGESTED, dtos);
+            sseEventPublisher.toUser(
+                    participant.getId(),
+                    SseEventType.MATCH_SUGGESTED,
+                    MatchSuggestedResponseDto.of(exchange, items, participant));
         }
     }
 
