@@ -36,8 +36,7 @@ export const springSheet: Transition = {
 export const easeOut: Transition = { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
 
 /**
- * 화면 전환. 새 화면이 오른쪽에서 밀고 들어오고 이전 화면은 왼쪽으로 조금 밀린다.
- * 뒤로 갈 때는 반대로 위에 있던 화면이 오른쪽으로 빠지면서 아래 화면이 드러난다.
+ * 모바일 화면 전환. 새 화면이 오른쪽에서 밀고 들어오고 이전 화면은 왼쪽으로 조금 밀린다.
  *
  * **투명도로 겹치지 않는다.** 두 화면을 동시에 반투명하게 두면 서로 비쳐서 잔상이 남는다.
  * 대신 z 순서를 방향에 따라 뒤집어서 한 장이 다른 장을 확실히 덮게 한다.
@@ -45,13 +44,45 @@ export const easeOut: Transition = { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
 export const pageVariants: Variants = {
   enter: (back: boolean) => ({
     x: back ? '-24%' : '100%',
+    opacity: 1,
     zIndex: back ? 0 : 2,
   }),
-  center: { x: '0%', zIndex: 1 },
+  center: { x: '0%', opacity: 1, zIndex: 1 },
   exit: (back: boolean) => ({
     x: back ? '100%' : '-24%',
+    opacity: 1,
     zIndex: back ? 2 : 0,
   }),
+}
+
+/**
+ * 데스크톱 화면 전환.
+ *
+ * 넓은 화면에서 화면 폭만큼 밀면 이동 거리가 1400px 을 넘어서, 전환 내내 두 화면이
+ * 나란히 보인다. 그래서 데스크톱에서는 조금만 움직이고 새 화면이 곧바로 덮게 한다.
+ * 뒤로 갈 때만 위에 있던 화면이 짧게 사라지면서 아래 화면을 드러낸다.
+ */
+export const pageVariantsWide: Variants = {
+  enter: (back: boolean) => ({
+    x: back ? -20 : 20,
+    opacity: 1,
+    zIndex: back ? 0 : 2,
+  }),
+  center: { x: 0, opacity: 1, zIndex: 1 },
+  exit: (back: boolean) => ({
+    x: back ? 20 : -20,
+    opacity: 0,
+    zIndex: back ? 2 : 0,
+  }),
+}
+
+/** 데스크톱 전환. 사라지는 것은 빠르게 지워야 겹쳐 보이는 시간이 짧다. */
+export const springPageWide: Transition = {
+  type: 'spring',
+  stiffness: 420,
+  damping: 40,
+  mass: 0.7,
+  opacity: { duration: 0.14 },
 }
 
 /** 리스트가 순서대로 뜨게 한다. 한꺼번에 나타나면 싸구려로 보인다. */

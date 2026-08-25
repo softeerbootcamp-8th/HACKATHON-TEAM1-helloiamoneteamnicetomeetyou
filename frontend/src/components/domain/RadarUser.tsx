@@ -28,7 +28,7 @@ export function RadarUser({ user, hovered, pending, burst = false, onSelect, ind
       initial={{ opacity: 0, scale: 0.6 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ ...springSnap, delay: 0.08 * index }}
-      className="relative w-[76px] md:w-[112px]"
+      className="relative w-[76px] md:w-[92px]"
     >
       {burst && (
         <span aria-hidden className="pointer-events-none absolute inset-0 z-20">
@@ -48,7 +48,7 @@ export function RadarUser({ user, hovered, pending, burst = false, onSelect, ind
           initial={{ opacity: 0, y: 6, scale: 0.8 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={springSnap}
-          className="absolute -top-8 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-bold whitespace-nowrap text-white md:text-[13px]"
+          className="absolute -top-8 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-bold whitespace-nowrap text-white md:text-[12px]"
         >
           찔러보기
         </motion.span>

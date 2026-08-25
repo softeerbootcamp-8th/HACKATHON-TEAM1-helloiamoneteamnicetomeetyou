@@ -9,7 +9,7 @@ type Size = 'sm' | 'md' | 'lg'
 
 // 데스크톱은 화면이 넓어서 같은 크기로 두면 카드가 유난히 작아 보인다.
 const TILE: Record<Size, string> = {
-  sm: 'h-[62px] text-[15px] md:h-[86px] md:text-[19px]',
+  sm: 'h-[62px] text-[15px] md:h-[70px] md:text-[16px]',
   md: 'h-[74px] text-[17px] md:h-[88px] md:text-[20px]',
   lg: 'h-[92px] text-[20px] md:h-[104px] md:text-[23px]',
 }

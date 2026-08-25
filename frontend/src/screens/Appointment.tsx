@@ -19,7 +19,7 @@ export function Appointment() {
 
   if (!appt || !match || appt.stage === 'place') {
     return (
-      <div className="flex h-full flex-col">
+      <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
           <p className="text-[15px] text-neutral-500">확정된 약속이 없어요.</p>
           <Button onClick={() => navigate('/home')}>홈으로</Button>
@@ -32,7 +32,7 @@ export function Appointment() {
   const isThreeWay = match.kind === 'THREE_WAY'
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
       <div className="flex-1 overflow-y-auto px-6 pt-8 no-scrollbar">
         <motion.h1
           initial={{ opacity: 0, y: 12 }}

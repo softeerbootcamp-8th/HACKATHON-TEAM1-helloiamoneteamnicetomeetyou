@@ -1,13 +1,12 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
 import { Toast } from '@/components/ui/Toast'
-import { cn } from '@/lib/cn'
-import { pageVariants, springPage } from '@/lib/motion'
+import { pageVariants, pageVariantsWide, springPage, springPageWide } from '@/lib/motion'
 import { useStore } from '@/store/useStore'
 
-import { routeIndex, WIDE_ROUTES } from './routes'
+import { routeIndex } from './routes'
 import { FrozenOutlet } from './FrozenOutlet'
 import { SwipeBackEdge } from './SwipeBackEdge'
 
@@ -25,14 +24,24 @@ export function AppShell() {
 
   // 라우트가 바뀐 그 렌더에서 방향을 정해야 첫 프레임부터 올바른 쪽에서 들어온다.
   // 렌더 중 state 를 고치는 것은 이 경우에 React 가 권하는 방식이다.
+  // 데스크톱인지에 따라 전환 방식이 다르다. 넓은 화면에서 화면 폭만큼 미는 것은
+  // 이동 거리가 너무 길어서 두 화면이 오래 같이 보인다.
+  const [wide, setWide] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const onChange = () => setWide(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
   const [prevIndex, setPrevIndex] = useState(index)
   const [back, setBack] = useState(false)
   if (prevIndex !== index) {
     setBack(index < prevIndex)
     setPrevIndex(index)
   }
-
-  const wide = WIDE_ROUTES.has(location.pathname)
 
   /**
    * 뒤로 갈 기록이 없을 때 navigate(-1) 을 부르면 앱 밖으로 나가서 빈 화면이 뜬다.
@@ -58,19 +67,17 @@ export function AppShell() {
           <motion.div
             key={location.pathname}
             custom={back}
-            variants={pageVariants}
+            variants={wide ? pageVariantsWide : pageVariants}
             initial="enter"
             animate="center"
             exit="exit"
-            transition={springPage}
+            transition={wide ? springPageWide : springPage}
             data-page-pane
             // 노치 바로 밑에 헤더가 붙어 보이지 않게 위쪽 여백을 여기서 한 번에 준다.
             // 배경이 없으면 전환 중에 뒤 화면이 비쳐서 잔상으로 보인다.
-            className={cn(
-              'absolute inset-0 flex flex-col bg-white pt-[max(0.75rem,env(safe-area-inset-top))] md:pt-0',
-              // 넓게 쓰는 화면이 아니면 데스크톱에서 가운데 기둥으로 모은다.
-              !wide && 'md:mx-auto md:w-full md:max-w-[560px]',
-            )}
+            // 판은 항상 화면 전체를 덮는다. 좁은 기둥으로 두면 옆으로 밀어도 화면 밖으로
+            // 나가지 않아서 전환 내내 두 판이 나란히 보인다. 내용의 폭은 화면이 각자 정한다.
+            className="absolute inset-0 flex flex-col bg-white pt-[max(0.75rem,env(safe-area-inset-top))] md:pt-0"
           >
             <FrozenOutlet />
           </motion.div>

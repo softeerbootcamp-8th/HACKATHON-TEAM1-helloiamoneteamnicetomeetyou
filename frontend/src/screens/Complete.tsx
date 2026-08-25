@@ -27,7 +27,7 @@ export function Complete() {
   const item = received ? itemById(received) : null
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
       <div className="flex flex-1 flex-col items-center justify-center px-6">
         <motion.h1
           initial={{ opacity: 0, y: 14 }}

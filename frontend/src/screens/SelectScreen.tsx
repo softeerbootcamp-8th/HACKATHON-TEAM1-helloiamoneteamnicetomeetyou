@@ -46,7 +46,7 @@ export function SelectScreen({
   const disabled = !allowEmpty && total === 0
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
       <TopBar title={title} onBack={onBack} />
 
       <div className="flex-1 overflow-y-auto px-5 no-scrollbar">
@@ -72,7 +72,7 @@ export function SelectScreen({
               variants={staggerParent}
               initial="hidden"
               animate="show"
-              className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4"
+              className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 md:gap-4"
             >
               {goods.items.map((item) => {
                 const picked = selections.find((s) => s.itemId === item.id)

@@ -23,7 +23,7 @@ export function CardStack({ topItemId, count, className, lifted = false }: Props
   const behind = Math.min(Math.max(count - 1, 0), 2)
 
   return (
-    <div className={cn('relative aspect-[112/140] w-[112px] md:w-[152px]', className)}>
+    <div className={cn('relative aspect-[112/140] w-[112px] md:w-[118px]', className)}>
       {Array.from({ length: behind }).map((_, i) => (
         <motion.div
           key={i}
@@ -44,7 +44,7 @@ export function CardStack({ topItemId, count, className, lifted = false }: Props
         className="absolute inset-0 rounded-2xl bg-white p-2.5 shadow-[0_10px_26px_rgba(0,0,0,0.16)]"
       >
         <div className="card-face h-[72%] w-full rounded-xl" />
-        <p className="mt-1.5 text-center text-[12px] font-bold tracking-tight text-ink md:text-[15px]">
+        <p className="mt-1.5 text-center text-[12px] font-bold tracking-tight text-ink md:text-[13px]">
           {item.name.toUpperCase()}
         </p>
       </motion.div>

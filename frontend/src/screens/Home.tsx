@@ -104,9 +104,14 @@ export function Home() {
     sendPokeTo(target)
   }
 
+  /**
+   * 위에 뜨는 배너. 밀어서 치울 수 있어서 무엇을 치웠는지 구분할 id 가 필요하다.
+   * 제목으로 구분하면 같은 문구의 새 알림이 와도 계속 숨어 있어서 버튼이 안 먹는 것처럼 보인다.
+   */
   const banner = (() => {
     if (appointment?.stage === 'confirmed') {
       return {
+        id: `appt-confirmed-${appointment.confirmedSlot}`,
         tone: 'brand' as const,
         title: `${appointment.confirmedLabel} ${zone?.name ?? ''}`,
         body: `${itemById(state.match?.giveItemId ?? topItemId).name} 거래`,
@@ -115,6 +120,7 @@ export function Home() {
     }
     if (appointment) {
       return {
+        id: `appt-${appointment.stage}`,
         tone: 'brand' as const,
         title:
           appointment.stage === 'time-conflict' ? '시간 조율 중이에요' : '약속을 잡는 중이에요',
@@ -123,7 +129,12 @@ export function Home() {
       }
     }
     if (state.match) {
+      const who =
+        state.match.kind === 'ONE_TO_ONE'
+          ? state.match.partner.id
+          : `${state.match.giver.id}-${state.match.receiver.id}`
       return {
+        id: `match-${state.match.origin}-${who}`,
         tone: 'white' as const,
         celebrate: state.match.origin === 'poke',
         title:
@@ -134,6 +145,7 @@ export function Home() {
     }
     if (state.incomingPoke) {
       return {
+        id: `poke-${state.incomingPoke.fromUserId}-${state.incomingPoke.wantItemId}`,
         tone: 'white' as const,
         title: '상대가 교환을 요청했어요',
         body: '탭하여 확인',
@@ -307,8 +319,8 @@ export function Home() {
   )
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex shrink-0 items-center justify-between px-5 pt-2 md:pt-3">
+    <div className="relative flex h-full flex-col">
+      <header className="flex shrink-0 items-center justify-between px-5 pt-2 md:px-10 md:pt-4">
         <h1 className="pl-1 text-[23px] font-extrabold tracking-[-0.02em] text-ink">
           교환 대기장소
         </h1>
@@ -341,7 +353,12 @@ export function Home() {
         </div>
       </header>
 
-      <div className="shrink-0 px-5 pt-2">
+      {/*
+        알림이 와도 아래가 밀리지 않게 한다.
+        모바일은 이 칸의 높이를 고정해서 "자동 매칭 중" 알약이든 배너든 같은 자리를 쓰고,
+        데스크톱은 아예 흐름에서 빼서 화면 위에 띄운다. 둘 다 레이더가 움직이지 않는다.
+      */}
+      <div className="min-h-[78px] shrink-0 px-5 pt-2 md:pointer-events-none md:absolute md:top-[76px] md:left-10 md:z-30 md:min-h-0 md:w-[360px] md:px-0 md:[&>*]:pointer-events-auto">
         <AnimatePresence mode="popLayout">
           {state.autoMatching && !banner && (
             <motion.span
@@ -357,9 +374,9 @@ export function Home() {
             </motion.span>
           )}
 
-          {banner && banner.title !== dismissedBanner && (
+          {banner && banner.id !== dismissedBanner && (
             <motion.button
-              key={banner.title}
+              key={banner.id}
               type="button"
               drag
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
@@ -378,7 +395,7 @@ export function Home() {
                   info.velocity.y < -500
                 if (flung) {
                   tick(10)
-                  setDismissedBanner(banner.title)
+                  setDismissedBanner(banner.id)
                 }
                 window.setTimeout(() => {
                   bannerDragRef.current = false
@@ -446,10 +463,10 @@ export function Home() {
         같은 JSX 에 붙은 ref 가 나중에 마운트된 (화면에 없는) 쪽을 가리키는 바람에
         끌어놓기 충돌 판정이 항상 빗나갔다.
       */}
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row md:gap-7 md:px-7 md:pb-7">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row md:gap-10 md:px-10 md:pb-8">
         {radarPanel}
 
-        <aside className="hidden w-[340px] shrink-0 flex-col md:flex">
+        <aside className="hidden w-[360px] shrink-0 flex-col md:flex lg:w-[420px]">
           <div className="flex items-baseline justify-between px-1 pb-3">
             <h2 className="text-[17px] font-extrabold text-ink">전체리스트</h2>
             <span className="text-[12px] text-neutral-400">전체 {list.length}개</span>

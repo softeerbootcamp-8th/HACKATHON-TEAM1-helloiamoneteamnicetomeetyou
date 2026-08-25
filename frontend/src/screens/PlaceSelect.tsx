@@ -20,7 +20,7 @@ export function PlaceSelect() {
   const [cancelOpen, setCancelOpen] = useState(false)
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
       <TopBar onBack={() => navigate('/match')} onClose={() => setCancelOpen(true)} />
 
       <div className="flex-1 overflow-y-auto px-6 no-scrollbar">

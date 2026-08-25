@@ -29,7 +29,7 @@ export function PokeReceived() {
 
   if (!incoming) {
     return (
-      <div className="flex h-full flex-col">
+      <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
           <p className="text-[15px] text-neutral-500">받은 교환 요청이 없어요.</p>
           <Button onClick={() => navigate('/home')}>홈으로</Button>
@@ -39,7 +39,7 @@ export function PokeReceived() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
       <div className="flex-1 overflow-y-auto px-6 pt-6 no-scrollbar">
         <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink">
           상대가 교환을 요청했어요
