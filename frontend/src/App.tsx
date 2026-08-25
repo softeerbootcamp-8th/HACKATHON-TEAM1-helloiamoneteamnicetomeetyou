@@ -120,9 +120,13 @@ function App() {
           {ping.status === 'error' && (
             <div className="space-y-2">
               <p className="text-rose-600 dark:text-rose-400">{ping.reason}</p>
-              <p className="text-neutral-500">
-                <code>cd backend &amp;&amp; ./gradlew bootRun</code> 으로 서버를 띄우면 연결됩니다.
-              </p>
+              {/* 로컬에서만 맞는 안내라 배포된 화면에는 띄우지 않는다. */}
+              {import.meta.env.DEV && (
+                <p className="text-neutral-500">
+                  <code>cd backend &amp;&amp; ./gradlew bootRun</code> 으로 서버를 띄우면
+                  연결됩니다.
+                </p>
+              )}
             </div>
           )}
         </div>
