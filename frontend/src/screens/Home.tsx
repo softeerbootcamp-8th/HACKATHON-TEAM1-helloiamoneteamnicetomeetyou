@@ -9,7 +9,7 @@ import { GoodsFace } from '@/components/domain/GoodsCard'
 import { PushOptInBanner } from '@/components/domain/PushOptInBanner'
 import { RadarRings } from '@/components/domain/Radar'
 import { RadarUser } from '@/components/domain/RadarUser'
-import { BellIcon, SparkleIcon } from '@/components/ui/icons'
+import { BellIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { tick } from '@/lib/haptics'
 import { springSheet, springSnap, staggerChild, staggerParent } from '@/lib/motion'
@@ -216,7 +216,7 @@ export function Home() {
 
         <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
           <p className="mb-1 text-center text-[11px] font-bold text-neutral-500 md:text-[14px]">
-            내 카드
+            {fanOpen ? `내 카드 ${state.have.length}종 ${haveCount}장` : '내 카드'}
           </p>
 
           {fanOpen ? (
@@ -471,14 +471,14 @@ export function Home() {
               whileTap={{ scale: 0.98 }}
               className="mt-2 flex w-full cursor-grab touch-pan-y items-center gap-3 rounded-2xl bg-white p-3.5 text-left shadow-[0_4px_18px_rgba(0,0,0,0.10)] active:cursor-grabbing"
             >
+              {/* 시안에서 이 자리는 단색 사각형이다. 안에 아이콘을 넣지 않는다. */}
               <span
+                aria-hidden
                 className={cn(
-                  'flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand text-white',
+                  'size-9 shrink-0 rounded-xl bg-alarm',
                   banner.celebrate && 'anim-pop',
                 )}
-              >
-                <SparkleIcon className="size-5" />
-              </span>
+              />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14px] font-bold text-ink">
                   {banner.title}
@@ -551,9 +551,17 @@ function WaitingStatusTag({ status }: { status: string }) {
   )
 }
 
+/** 부채꼴로 세울 종류 수. 시안이 세 장까지만 펼친다. */
+const FANNED_KINDS = 3
+/** 부채꼴 아래에 이름으로 풀어 줄 종류 수. 이보다 많으면 개수로만 알린다. */
+const CHIP_KINDS = 6
+
 /**
  * 눌러서 펼친 내 카드 묶음. 시안의 `4_v1`, `4_v2` 자리다.
- * 세 장까지는 부채꼴로 펼치고, 그보다 많으면 남은 장수를 왼쪽에 쌓아서 보여준다.
+ *
+ * 무엇을 몇 장 들고 있는지가 여기서 다 보여야 한다. 앞의 세 종류는 시안대로 부채꼴로
+ * 세우고, 부채꼴에 더 끼워 넣으면 이름이 서로 가려지기 때문에 나머지 종류는 아래에
+ * 이름과 장수를 붙인 칩으로 푼다.
  */
 function MyCardsFan({
   have,
@@ -562,29 +570,45 @@ function MyCardsFan({
   have: { itemId: string; qty: number }[]
   onEdit: () => void
 }) {
-  const shown = have.slice(0, 3)
-  const rest = have.slice(3).reduce((sum, s) => sum + s.qty, 0)
+  const fanned = have.slice(0, FANNED_KINDS)
+  const rest = have.slice(FANNED_KINDS)
+  const chips = rest.slice(0, CHIP_KINDS)
+  const hiddenKinds = rest.length - chips.length
+
+  if (fanned.length === 0) {
+    return (
+      <div className="w-[350px]">
+        <p className="py-10 text-center text-[12px] text-neutral-400">아직 고른 카드가 없어요</p>
+        <EditCardsButton onClick={onEdit} />
+      </div>
+    )
+  }
 
   return (
-    <div className="relative">
+    <div className="w-[350px]">
       <div className="flex items-end justify-center">
-        {rest > 0 && (
-          <div className="relative mr-[-46px] h-[132px] w-[64px]">
-            {Array.from({ length: Math.min(rest, 3) }).map((_, i) => (
+        {/*
+          남은 종류가 있다는 것을 옆에 쌓아서 알린다. 부채꼴 밑으로 완전히 들어가 버리면
+          잘린 카드처럼 보이기 때문에 왼쪽으로 삐져나오게 둔다. 무엇이 몇 장인지는
+          아래 칩이 말해 준다.
+        */}
+        {rest.length > 0 && (
+          <div className="relative z-0 mr-[-22px] h-[124px] w-[52px]">
+            {Array.from({ length: Math.min(rest.length, 3) }).map((_, i) => (
               <span
                 key={i}
                 aria-hidden
-                className="card-face absolute top-2 h-[112px] w-[58px] rounded-xl opacity-70 shadow-[0_4px_12px_rgba(0,0,0,0.10)]"
-                style={{ left: i * 7 }}
+                className="card-face absolute top-3 h-[104px] w-[42px] rounded-xl opacity-70 shadow-[0_4px_12px_rgba(0,0,0,0.10)]"
+                style={{ left: i * 6 }}
               />
             ))}
           </div>
         )}
 
-        {shown.map((selection, i) => {
+        {fanned.map((selection, i) => {
           // 가운데 카드를 가장 높이 세우고 양옆으로 눕힌다. 겹치는 카드가 이름을 가리면
           // 무엇을 들고 있는지 못 읽는다.
-          const fromCenter = i - (shown.length - 1) / 2
+          const fromCenter = i - (fanned.length - 1) / 2
           return (
             <motion.div
               key={selection.itemId}
@@ -599,23 +623,65 @@ function MyCardsFan({
               className="relative -mx-1.5"
             >
               <CardStack topItemId={selection.itemId} count={selection.qty} />
+              <QtyBadge qty={selection.qty} />
             </motion.div>
           )
         })}
       </div>
 
-      <motion.button
-        type="button"
-        onClick={onEdit}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ ...springSnap, delay: 0.1 }}
-        whileTap={{ scale: 0.95 }}
-        className="mx-auto mt-3 block rounded-full bg-ink px-4 py-2 text-[12px] font-bold text-white"
-      >
-        편집하기
-      </motion.button>
+      {chips.length > 0 && (
+        <motion.ul
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...springSnap, delay: 0.08 }}
+          // 부채꼴 카드가 z-index 를 쓰기 때문에 칩을 그 위로 올려야 가려지지 않는다.
+          className="relative z-20 mt-4 flex flex-wrap justify-center gap-1.5"
+        >
+          {chips.map((selection) => (
+            <li
+              key={selection.itemId}
+              className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-ink shadow-[0_2px_8px_rgba(0,0,0,0.10)]"
+            >
+              {itemById(selection.itemId).name}
+              <span className="ml-1 text-neutral-400">{selection.qty}장</span>
+            </li>
+          ))}
+          {hiddenKinds > 0 && (
+            <li className="rounded-full bg-ink px-2.5 py-1 text-[11px] font-bold text-white">
+              +{hiddenKinds}종
+            </li>
+          )}
+        </motion.ul>
+      )}
+
+      <EditCardsButton onClick={onEdit} />
     </div>
+  )
+}
+
+/** 카드에 붙는 장수 표시. 한 장이면 굳이 적지 않는다. */
+function QtyBadge({ qty }: { qty: number }) {
+  if (qty <= 1) return null
+  return (
+    <span className="absolute -top-1 right-0 rounded-full bg-ink px-1.5 py-0.5 text-[10px] font-bold text-white">
+      {qty}장
+    </span>
+  )
+}
+
+function EditCardsButton({ onClick }: { onClick: () => void }) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ ...springSnap, delay: 0.1 }}
+      whileTap={{ scale: 0.95 }}
+      className="mx-auto mt-4 block rounded-full bg-ink px-4 py-2 text-[12px] font-bold text-white"
+    >
+      편집하기
+    </motion.button>
   )
 }
 
@@ -690,9 +756,7 @@ function NotificationRow({
         transition={springSnap}
         className="relative flex w-full cursor-grab touch-pan-y items-center gap-3 rounded-2xl bg-neutral-50 p-3.5 text-left active:cursor-grabbing"
       >
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand text-white">
-          <SparkleIcon className="size-5" />
-        </span>
+        <span aria-hidden className="size-9 shrink-0 rounded-xl bg-alarm" />
         <span className="min-w-0 flex-1">
           <span className="block text-[14px] font-bold text-ink">{notification.title}</span>
           <span className="block text-[12px] text-neutral-400">{notification.body}</span>

@@ -13,6 +13,8 @@
   --color-navy: #002c5f;
   /* 상대가 고른 시간 칸. 내 칸(brand)보다 연해야 한 눈에 갈린다. */
   --color-partner: #aacae6;
+  /* 알림 카드 왼쪽의 단색 사각형. 시안이 이 자리만 다른 색으로 두고 있다. */
+  --color-alarm: #2ced90;
   --color-ink: #111111;
   --color-tile: #eef0f4;
   --color-disabled: #f1f1f0;
