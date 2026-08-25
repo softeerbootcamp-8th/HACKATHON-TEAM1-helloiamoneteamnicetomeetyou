@@ -35,4 +35,14 @@ public class UserHaveItem {
 
     @Column(nullable = false)
     private Integer quantity;
+
+    private UserHaveItem(User user, Item item, Integer quantity) {
+        this.user = user;
+        this.item = item;
+        this.quantity = quantity;
+    }
+
+    public static UserHaveItem of(User user, Item item, Integer quantity) {
+        return new UserHaveItem(user, item, quantity);
+    }
 }

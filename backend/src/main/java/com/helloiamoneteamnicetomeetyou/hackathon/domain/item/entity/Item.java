@@ -35,4 +35,14 @@ public class Item {
     private String description;
 
     private String imageUrl;
+
+    private Item(Booth booth, String name, String description) {
+        this.booth = booth;
+        this.name = name;
+        this.description = description;
+    }
+
+    public static Item of(Booth booth, String name, String description) {
+        return new Item(booth, name, description);
+    }
 }

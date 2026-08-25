@@ -25,4 +25,13 @@ public class Booth {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    private Booth(String name, String description) {
+        this.name = name;
+        this.description = description;
+    }
+
+    public static Booth of(String name, String description) {
+        return new Booth(name, description);
+    }
 }

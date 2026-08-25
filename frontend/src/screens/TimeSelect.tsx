@@ -7,10 +7,13 @@ import { Dialog } from '@/components/ui/Dialog'
 import { ClockIcon } from '@/components/ui/icons'
 import { TopBar } from '@/components/ui/TopBar'
 import { cn } from '@/lib/cn'
+import { confirmExchangeTime, resetTimeSlots, updateTimeSlots, type Exchange } from '@/lib/exchange'
 import { tick } from '@/lib/haptics'
 import { springSheet, springSnap } from '@/lib/motion'
-import { buildSlots, earliestOverlap, slotTimeLabel, SLOT_COUNT } from '@/store/time'
 import { useLastDefined } from '@/lib/useLastDefined'
+import { getDeviceId } from '@/store/identity'
+import { buildSlots, parseSlotBaseTime, slotTimeLabel } from '@/store/time'
+import { useCancelAppointment } from '@/store/use-cancel-appointment'
 import { useStore } from '@/store/useStore'
 
 /**
@@ -24,15 +27,19 @@ const OVERLAP_COLOR = '#111111'
 export function TimeSelect() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
+  const cancelAppointment = useCancelAppointment()
   const [cancelOpen, setCancelOpen] = useState(false)
-  // 시각은 화면에 들어온 순간으로 고정한다. 매 렌더마다 다시 계산하면 칸이 밀린다.
-  const [now] = useState(() => new Date())
-  const slots = useMemo(() => buildSlots(now), [now])
+  const [busy, setBusy] = useState(false)
+  const myUserId = useMemo(() => getDeviceId(), [])
 
   const appt = useLastDefined(state.appointment)
-  const match = useLastDefined(state.match)
 
-  if (!appt || !match) {
+  const slots = useMemo(
+    () => (appt ? buildSlots(parseSlotBaseTime(appt.slotBaseTime)) : []),
+    [appt],
+  )
+
+  if (!appt) {
     return (
       <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
@@ -43,19 +50,39 @@ export function TimeSelect() {
     )
   }
 
-  const partners = match.kind === 'ONE_TO_ONE' ? [match.partner] : [match.giver, match.receiver]
+  const partnerIds = Object.keys(appt.partnerSlots)
+  const matched = appt.overlapSlot !== null
+  const conflict = appt.allAnswered && !matched
+  const waiting = !appt.allAnswered
 
-  const answered = Object.keys(appt.partnerSlots).length > 0
-  const rows = [appt.mySlots, ...partners.map((p) => appt.partnerSlots[p.id] ?? [])]
-  const overlap = answered ? earliestOverlap(rows) : -1
-  const matched = overlap !== -1
-  const conflict = answered && !matched
+  /**
+   * 서버에 저장하고 결과로 화면을 맞춘다.
+   *
+   * 실패하면 마지막으로 성공한 상태를 다시 읽어 되돌린다. 화면만 바뀐 채로 남으면
+   * 상대에게는 안 보이는 칸이 나에게만 칠해져 있게 된다.
+   */
+  const run = async (action: () => Promise<Exchange>) => {
+    setBusy(true)
+    try {
+      const exchange = await action()
+      dispatch({ type: 'exchange-synced', exchange, myUserId })
+      return true
+    } catch {
+      dispatch({ type: 'toast', message: '잠시 후 다시 시도해주세요' })
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const toggle = (index: number) => {
     const next = appt.mySlots.includes(index)
       ? appt.mySlots.filter((i) => i !== index)
       : [...appt.mySlots, index].sort((a, b) => a - b)
-    dispatch({ type: 'set-my-slots', slots: next })
+
+    // 누른 즉시 칠한다. 서버 응답을 기다리면 손가락을 뗀 뒤에야 칸이 차서 눌린 느낌이 사라진다.
+    dispatch({ type: 'my-slots-picked', slots: next })
+    void run(() => updateTimeSlots(appt.exchangeId, myUserId, next))
   }
 
   return (
@@ -72,7 +99,7 @@ export function TimeSelect() {
 
         <span className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3.5 py-1.5 text-[12px] font-semibold text-neutral-600">
           <span className="size-1.5 rounded-full bg-ink" />
-          {partners.map((p) => p.nickname).join(', ')}님과 매칭
+          {partnerIds.map((id) => appt.partnerNames[id]).join(', ')}님과 매칭
         </span>
 
         <div className="mt-4 overflow-x-auto no-scrollbar">
@@ -94,19 +121,21 @@ export function TimeSelect() {
 
             <TimeRow
               label="나"
+              slotCount={appt.slotCount}
               slots={appt.mySlots}
               color={ROW_COLORS[0]}
-              overlap={overlap}
+              overlap={appt.overlapSlot}
               interactive
               onToggle={toggle}
             />
-            {partners.map((p, i) => (
+            {partnerIds.map((id, i) => (
               <TimeRow
-                key={p.id}
-                label={p.nickname}
-                slots={appt.partnerSlots[p.id] ?? []}
+                key={id}
+                label={appt.partnerNames[id]}
+                slotCount={appt.slotCount}
+                slots={appt.partnerSlots[id]}
                 color={ROW_COLORS[(i + 1) % ROW_COLORS.length]}
-                overlap={overlap}
+                overlap={appt.overlapSlot}
               />
             ))}
           </div>
@@ -132,7 +161,9 @@ export function TimeSelect() {
                 </span>
                 <div>
                   <p className="text-[16px] font-bold text-ink">
-                    {slotTimeLabel(slots, overlap, now)}에 만나요
+                    {appt.confirmedLabel ??
+                      slotTimeLabel(parseSlotBaseTime(appt.slotBaseTime), appt.overlapSlot ?? 0)}
+                    에 만나요
                   </p>
                   <p className="text-[12px] text-neutral-500">모두 되는 가장 빠른 시간</p>
                 </div>
@@ -159,13 +190,11 @@ export function TimeSelect() {
         {matched && (
           <Button
             variant="brand"
+            disabled={busy}
             onClick={() => {
-              dispatch({
-                type: 'confirm-time',
-                slot: overlap,
-                label: slotTimeLabel(slots, overlap, now),
+              void run(() => confirmExchangeTime(appt.exchangeId, myUserId)).then((ok) => {
+                if (ok) navigate('/appointment')
               })
-              navigate('/appointment')
             }}
           >
             약속 확정하기
@@ -174,23 +203,27 @@ export function TimeSelect() {
 
         {conflict && (
           <Button
+            disabled={busy}
             onClick={() => {
-              dispatch({ type: 'request-time-again' })
-              navigate('/home')
+              void run(() => resetTimeSlots(appt.exchangeId, myUserId)).then((ok) => {
+                if (!ok) return
+                dispatch({ type: 'request-time-again' })
+                navigate('/home')
+              })
             }}
           >
             시간 조율 요청하기
           </Button>
         )}
 
-        {!answered && (
+        {waiting && (
           <Button disabled>
             {appt.mySlots.length === 0 ? '가능한 시간을 골라주세요' : '아직 상대방을 기다려야 해요'}
           </Button>
         )}
 
         <TextButton onClick={() => navigate('/home')}>
-          {answered ? '홈으로' : '홈으로 가서 기다리기'}
+          {waiting ? '홈으로 가서 기다리기' : '홈으로'}
         </TextButton>
       </div>
 
@@ -202,7 +235,7 @@ export function TimeSelect() {
         onCancel={() => setCancelOpen(false)}
         onConfirm={() => {
           setCancelOpen(false)
-          dispatch({ type: 'cancel-appointment' })
+          void cancelAppointment()
           navigate('/home')
         }}
       />
@@ -212,6 +245,7 @@ export function TimeSelect() {
 
 function TimeRow({
   label,
+  slotCount,
   slots,
   color,
   overlap,
@@ -219,9 +253,10 @@ function TimeRow({
   onToggle,
 }: {
   label: string
+  slotCount: number
   slots: number[]
   color: string
-  overlap: number
+  overlap: number | null
   interactive?: boolean
   onToggle?: (index: number) => void
 }) {
@@ -230,7 +265,7 @@ function TimeRow({
       <span className="truncate pr-1 text-[11px] font-semibold text-neutral-500" title={label}>
         {label}
       </span>
-      {Array.from({ length: SLOT_COUNT }, (_, i) => {
+      {Array.from({ length: slotCount }, (_, i) => {
         const picked = slots.includes(i)
         const isOverlap = overlap === i && picked
         const background = isOverlap ? OVERLAP_COLOR : picked ? color : EMPTY_COLOR

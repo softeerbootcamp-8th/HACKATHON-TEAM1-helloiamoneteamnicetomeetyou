@@ -43,4 +43,22 @@ public class ExchangeParticipant {
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime joinedAt;
+
+    private ExchangeParticipant(Exchange exchange, User user, ParticipantStatus status) {
+        this.exchange = exchange;
+        this.user = user;
+        this.status = status;
+        this.joinedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 교환에 참가자를 넣는다.
+     *
+     * <p>{@code ACCEPTED} 로 시작한다. 지금은 매칭 결과 화면에서 수락한 사람들만 여기까지 오기
+     * 때문이다. 매칭 알고리즘이 붙어서 서버가 먼저 제안하게 되면 {@code PENDING} 으로 만들고
+     * 수락을 기다리는 흐름이 필요해진다.
+     */
+    public static ExchangeParticipant of(Exchange exchange, User user) {
+        return new ExchangeParticipant(exchange, user, ParticipantStatus.ACCEPTED);
+    }
 }

@@ -6,7 +6,7 @@ import { Dialog } from '@/components/ui/Dialog'
 import { tick } from '@/lib/haptics'
 import { springSnap } from '@/lib/motion'
 import { MY_IDENTITY } from '@/mocks/data'
-import { useStore } from '@/store/useStore'
+import { useCancelAppointment } from '@/store/use-cancel-appointment'
 
 /**
  * 서로를 찾는 화면. 같은 그림을 든 사람이 상대다.
@@ -14,7 +14,7 @@ import { useStore } from '@/store/useStore'
  */
 export function Identify() {
   const navigate = useNavigate()
-  const { dispatch } = useStore()
+  const cancelAppointment = useCancelAppointment()
   const [noShowOpen, setNoShowOpen] = useState(false)
   // 레몬을 누른 횟수. 누를 때마다 키가 바뀌어서 흔들림이 처음부터 다시 돈다.
   const [pokes, setPokes] = useState(0)
@@ -133,7 +133,7 @@ export function Identify() {
         onCancel={() => setNoShowOpen(false)}
         onConfirm={() => {
           setNoShowOpen(false)
-          dispatch({ type: 'cancel-appointment' })
+          void cancelAppointment()
           navigate('/home')
         }}
       />

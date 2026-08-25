@@ -31,10 +31,10 @@ public class User {
     private UUID id;
 
     /**
-     * 화면에 보여 줄 이름이다. 지금은 채우지 않는다.
+     * 화면에 보여 줄 이름이다. 약속 화면에서 상대 줄의 라벨이 된다.
      *
-     * <p>목업이 나오면 사용자를 무엇으로 표시할지 정해질 텐데, 그때까지 자리만 비워 둔다.
-     * 컬럼을 지웠다 다시 만드는 것보다 제약만 푸는 쪽이 변경이 작다.
+     * <p>등록할 때 클라이언트가 함께 보낸다. 아직 안 보낸 사용자가 있을 수 있어서 null 을 허용하고,
+     * 화면은 비어 있으면 "상대" 로 대신 보여 준다.
      */
     @Column(length = 50)
     private String username;
@@ -42,12 +42,27 @@ public class User {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    private User(UUID id) {
+    private User(UUID id, String username) {
         this.id = id;
+        this.username = username;
         this.createdAt = LocalDateTime.now();
     }
 
-    public static User of(UUID id) {
-        return new User(id);
+    public static User of(UUID id, String username) {
+        return new User(id, username);
+    }
+
+    /**
+     * 이름을 고친다. 빈 값이면 무시한다.
+     *
+     * <p>등록 API 가 멱등이라 앱을 열 때마다 불리는데, 그때 이름을 안 보낸 요청이 이미 있던 이름을
+     * 지워 버리면 상대 화면에서 이름이 사라진다.
+     */
+    public void changeUsername(String username) {
+        if (username == null || username.isBlank()) {
+            return;
+        }
+
+        this.username = username;
     }
 }

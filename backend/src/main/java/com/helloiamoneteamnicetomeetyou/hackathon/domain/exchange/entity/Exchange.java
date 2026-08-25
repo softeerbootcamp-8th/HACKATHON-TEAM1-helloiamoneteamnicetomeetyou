@@ -1,8 +1,11 @@
 package com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity;
 
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.TimeSlotGrid;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeStatus;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.entity.Zone;
+import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
+import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -41,8 +44,73 @@ public class Exchange {
     @Column(nullable = false, length = 50)
     private ExchangeStatus status;
 
+    /**
+     * 시간 선택 격자의 0번 칸이 가리키는 시각이다. 교환을 만들 때 서버가 한 번 정한다.
+     *
+     * <p>참가자들이 각자 자기 시계로 격자를 만들면 같은 칸 번호가 서로 다른 시각을 뜻하게 된다.
+     * 이 값을 함께 내려보내서 모두가 같은 격자를 보게 한다. 자세한 것은 {@link TimeSlotGrid} 에
+     * 적어 뒀다.
+     */
+    @Column(nullable = false)
+    private LocalDateTime slotBaseTime;
+
+    /** 확정된 만나는 시각. 아직 안 정해졌으면 null 이다. */
     private LocalDateTime exchangeTime;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    private Exchange(Zone zone, ExchangeType type, LocalDateTime slotBaseTime) {
+        this.zone = zone;
+        this.type = type;
+        this.status = ExchangeStatus.PENDING;
+        this.slotBaseTime = slotBaseTime;
+        this.createdAt = LocalDateTime.now();
+    }
+
+    public static Exchange of(Zone zone, ExchangeType type, LocalDateTime slotBaseTime) {
+        return new Exchange(zone, type, slotBaseTime);
+    }
+
+    public boolean isTimeConfirmed() {
+        return exchangeTime != null;
+    }
+
+    /**
+     * 만나는 시각을 정한다.
+     *
+     * <p>두 사람이 "약속 확정하기" 를 거의 동시에 누를 수 있어서, 이미 정해졌으면 막는다.
+     * 늦게 누른 쪽은 409 를 받고 화면을 다시 읽어 이미 정해진 시각을 보게 된다.
+     */
+    public void confirmTime(int slotIndex) {
+        if (isTimeConfirmed()) {
+            throw new ApplicationException(ErrorCode.EXCHANGE_TIME_ALREADY_CONFIRMED);
+        }
+
+        this.exchangeTime = TimeSlotGrid.timeOf(slotBaseTime, slotIndex);
+        this.status = ExchangeStatus.IN_PROGRESS;
+    }
+
+    /**
+     * 약속을 취소한다. 이미 취소됐으면 아무 일도 하지 않는다.
+     *
+     * <p>지우지 않고 상태만 바꾸는 것은, 상대 화면이 "취소됐다"를 읽을 수 있어야 하기 때문이다.
+     * 행이 사라지면 상대는 404 만 받고 왜 없어졌는지 알 수 없다.
+     */
+    public void cancel() {
+        this.status = ExchangeStatus.CANCELLED;
+        this.exchangeTime = null;
+    }
+
+    /**
+     * 시간을 처음부터 다시 고른다. 겹치는 칸이 없어서 조율을 요청할 때 부른다.
+     *
+     * <p>격자 시작점도 지금 기준으로 다시 잡는다. 그러지 않으면 한참 지난 뒤에 조율을 요청했을 때
+     * 이미 지나간 시각이 선택지로 남는다.
+     */
+    public void resetTime() {
+        this.exchangeTime = null;
+        this.status = ExchangeStatus.PENDING;
+        this.slotBaseTime = TimeSlotGrid.baseTimeFrom(LocalDateTime.now());
+    }
 }

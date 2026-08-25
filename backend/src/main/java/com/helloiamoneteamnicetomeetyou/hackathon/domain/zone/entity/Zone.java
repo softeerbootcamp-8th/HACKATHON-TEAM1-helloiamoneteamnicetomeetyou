@@ -33,4 +33,14 @@ public class Zone {
 
     @Column(length = 255)
     private String location;
+
+    private Zone(Booth booth, String name, String location) {
+        this.booth = booth;
+        this.name = name;
+        this.location = location;
+    }
+
+    public static Zone of(Booth booth, String name, String location) {
+        return new Zone(booth, name, location);
+    }
 }

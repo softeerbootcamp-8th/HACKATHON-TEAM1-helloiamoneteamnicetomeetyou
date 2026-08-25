@@ -6,9 +6,11 @@ import { GoodsFace } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { cn } from '@/lib/cn'
+import { createExchange } from '@/lib/exchange'
 import { springSnap } from '@/lib/motion'
 import { itemById, MY_IDENTITY } from '@/mocks/data'
 import { useLastDefined } from '@/lib/useLastDefined'
+import { getDeviceId } from '@/store/identity'
 import { useStore } from '@/store/useStore'
 
 /**
@@ -20,8 +22,51 @@ export function MatchResult() {
   const [params] = useSearchParams()
   const { state, dispatch } = useStore()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
   const match = useLastDefined(state.match)
   const demo = params.get('demo')
+
+  /**
+   * 교환을 서버에 만들고 약속 화면으로 넘어간다.
+   *
+   * 상대는 아직 화면이 목업으로 고르지만, 그 사람들은 서버에 실제로 있는 사용자다. 여기서
+   * 만들어진 교환에 시간과 장소가 붙고, 참가자들은 실시간으로 서로의 선택을 본다.
+   *
+   * 매칭이 서버로 옮겨가면 이 호출은 사라진다. 교환은 매칭 결과 알림으로 내려오게 된다.
+   */
+  const goToPlace = async () => {
+    // 뒤로 갔다 다시 들어온 경우다. 또 만들면 같은 상대와의 교환이 하나 더 생긴다.
+    if (state.appointment) {
+      navigate('/place')
+      return
+    }
+
+    if (!match || state.boothId === null) {
+      dispatch({ type: 'toast', message: '서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요' })
+      return
+    }
+
+    const partnerUserIds =
+      match.kind === 'ONE_TO_ONE'
+        ? [match.partner.userId]
+        : [match.giver.userId, match.receiver.userId]
+
+    setCreating(true)
+    try {
+      const myUserId = getDeviceId()
+      const exchange = await createExchange({
+        boothId: state.boothId,
+        type: match.kind === 'ONE_TO_ONE' ? 'ONE_TO_ONE' : 'MULTI_WAY',
+        participantUserIds: [myUserId, ...partnerUserIds],
+      })
+      dispatch({ type: 'exchange-synced', exchange, myUserId })
+      navigate('/place')
+    } catch {
+      dispatch({ type: 'toast', message: '교환을 시작하지 못했어요. 잠시 후 다시 시도해주세요' })
+    } finally {
+      setCreating(false)
+    }
+  }
 
   // 주소로 바로 열었을 때 화면을 볼 수 있게 상태를 심어 준다.
   useEffect(() => {
@@ -86,13 +131,8 @@ export function MatchResult() {
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
-        <Button
-          onClick={() => {
-            dispatch({ type: 'start-appointment' })
-            navigate('/place')
-          }}
-        >
-          교환 장소보기
+        <Button disabled={creating} onClick={() => void goToPlace()}>
+          {creating ? '교환을 시작하는 중' : '교환 장소보기'}
         </Button>
         <TextButton onClick={() => setConfirmOpen(true)}>거절하기</TextButton>
       </div>

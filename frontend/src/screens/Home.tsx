@@ -11,7 +11,7 @@ import { BellIcon, ClockIcon, SparkleIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { tick } from '@/lib/haptics'
 import { springSheet, springSnap, staggerChild, staggerParent } from '@/lib/motion'
-import { ALL_WAITING, itemById, ZONES } from '@/mocks/data'
+import { ALL_WAITING, itemById } from '@/mocks/data'
 import { radarUsers, sortedWaitingList, wantedFromMe } from '@/store/matching'
 import { useStore } from '@/store/useStore'
 
@@ -50,7 +50,6 @@ export function Home() {
   const pendingTarget =
     state.outgoingPoke?.status === 'pending' ? state.outgoingPoke.targetUserId : null
   const appointment = state.appointment
-  const zone = ZONES.find((z) => z.id === appointment?.zoneId)
 
   /** 끌고 있는 좌표로 어떤 상대 위에 있는지 찾는다. */
   const hitTest = (point: { x: number; y: number }): string | null => {
@@ -111,9 +110,9 @@ export function Home() {
   const banner = (() => {
     if (appointment?.stage === 'confirmed') {
       return {
-        id: `appt-confirmed-${appointment.confirmedSlot}`,
+        id: `appt-confirmed-${appointment.confirmedLabel}`,
         tone: 'brand' as const,
-        title: `${appointment.confirmedLabel} ${zone?.name ?? ''}`,
+        title: `${appointment.confirmedLabel} ${appointment.zone.name}`,
         body: `${itemById(state.match?.giveItemId ?? topItemId).name} 거래`,
         onClick: () => navigate('/appointment'),
       }

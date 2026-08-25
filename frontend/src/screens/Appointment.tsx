@@ -6,7 +6,7 @@ import { Button, TextButton } from '@/components/ui/Button'
 import { PinIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
-import { itemById, ZONES } from '@/mocks/data'
+import { itemById } from '@/mocks/data'
 import { useLastDefined } from '@/lib/useLastDefined'
 import { useStore } from '@/store/useStore'
 
@@ -17,7 +17,7 @@ export function Appointment() {
   const appt = useLastDefined(state.appointment)
   const match = useLastDefined(state.match)
 
-  if (!appt || !match || appt.stage === 'place') {
+  if (!appt || !match || (appt.stage !== 'confirmed' && appt.stage !== 'arrived')) {
     return (
       <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
@@ -28,7 +28,6 @@ export function Appointment() {
     )
   }
 
-  const zone = ZONES.find((z) => z.id === appt.zoneId)
   const isThreeWay = match.kind === 'THREE_WAY'
 
   return (
@@ -55,9 +54,9 @@ export function Appointment() {
           </span>
           <div>
             <p className="text-[16px] font-bold text-ink">
-              {appt.confirmedLabel} {zone?.name}
+              {appt.confirmedLabel} {appt.zone.name}
             </p>
-            <p className="text-[12px] text-neutral-400">{zone?.location}</p>
+            <p className="text-[12px] text-neutral-400">{appt.zone.location}</p>
           </div>
         </motion.div>
 

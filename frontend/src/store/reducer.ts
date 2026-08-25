@@ -1,10 +1,14 @@
-import { ALL_WAITING, FIXED_ZONE, itemById } from '@/mocks/data'
+import type { Exchange, Zone } from '@/lib/exchange'
+import { ALL_WAITING, itemById } from '@/mocks/data'
 
+import { toAppointment } from './appointment'
 import { findMatch, wantedFromMe, type MatchResult } from './matching'
 import type { ActiveMatch, IncomingPoke, State } from './types'
 
 export const initialState: State = {
   onboarded: false,
+  boothId: null,
+  zones: [],
   setupDone: false,
   have: [],
   needs: [],
@@ -38,10 +42,9 @@ export type Action =
   | { type: 'release-held-poke' }
   | { type: 'accept-incoming'; chosenItemId: string }
   | { type: 'reject-incoming' }
-  | { type: 'start-appointment' }
-  | { type: 'set-my-slots'; slots: number[] }
-  | { type: 'partner-slots-arrived'; slots: Record<string, number[]> }
-  | { type: 'confirm-time'; slot: number; label: string }
+  | { type: 'booth-loaded'; boothId: number; zones: Zone[] }
+  | { type: 'exchange-synced'; exchange: Exchange; myUserId: string }
+  | { type: 'my-slots-picked'; slots: number[] }
   | { type: 'request-time-again' }
   | { type: 'arrive' }
   | { type: 'complete' }
@@ -276,51 +279,45 @@ export function reducer(state: State, action: Action): State {
         toast: '교환 요청을 거절했어요',
       }
 
-    case 'start-appointment':
+    case 'booth-loaded':
+      return { ...state, boothId: action.boothId, zones: action.zones }
+
+    /**
+     * 서버에서 읽어 온 약속으로 갈아끼운다. 만들었을 때, 실시간 알림을 받았을 때,
+     * 화면에 들어왔을 때 모두 이 하나를 거친다.
+     */
+    case 'exchange-synced': {
+      // 상대가 취소한 경우다. 그대로 두면 오지 않을 약속을 계속 보여주게 된다.
+      if (action.exchange.status === 'CANCELLED') {
+        return {
+          ...state,
+          appointment: null,
+          match: null,
+          autoMatching: state.needs.length > 0,
+          toast: '교환이 취소됐어요',
+        }
+      }
+
       return {
         ...state,
-        appointment: {
-          stage: 'place',
-          zoneId: FIXED_ZONE.id,
-          mySlots: [],
-          partnerSlots: {},
-          confirmedSlot: null,
-          confirmedLabel: null,
-        },
+        appointment: toAppointment(action.exchange, action.myUserId, state.appointment?.stage),
         autoMatching: false,
       }
-
-    case 'set-my-slots': {
-      if (!state.appointment) return state
-      return {
-        ...state,
-        appointment: { ...state.appointment, mySlots: action.slots, stage: 'time-waiting' },
-      }
     }
 
-    case 'partner-slots-arrived': {
+    /**
+     * 칸을 눌렀을 때 화면을 먼저 바꾼다. 서버 응답을 기다렸다 칠하면 손가락을 뗀 뒤에야
+     * 칸이 차서 눌린 느낌이 사라진다. 저장이 실패하면 그때 다시 읽어 되돌린다.
+     */
+    case 'my-slots-picked': {
       if (!state.appointment) return state
-      return { ...state, appointment: { ...state.appointment, partnerSlots: action.slots } }
-    }
-
-    case 'confirm-time': {
-      if (!state.appointment) return state
-      return {
-        ...state,
-        appointment: {
-          ...state.appointment,
-          stage: 'confirmed',
-          confirmedSlot: action.slot,
-          confirmedLabel: action.label,
-        },
-      }
+      return { ...state, appointment: { ...state.appointment, mySlots: action.slots } }
     }
 
     case 'request-time-again': {
       if (!state.appointment) return state
       return {
         ...state,
-        appointment: { ...state.appointment, stage: 'time-conflict', partnerSlots: {} },
         notifications: notify(
           state,
           'time-request',

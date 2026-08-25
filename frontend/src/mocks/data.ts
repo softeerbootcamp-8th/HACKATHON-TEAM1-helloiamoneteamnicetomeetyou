@@ -25,6 +25,13 @@ export type Goods = {
 
 export type WaitingUser = {
   id: string
+  /**
+   * 서버 `users` 테이블의 UUID 다. 백엔드 `DemoUser` 의 값과 같아야 한다.
+   *
+   * 목업으로 고른 상대를 서버가 알아보고, 그 사람이 고른 시간이 실제로 DB 에서 읽힌다.
+   * 매칭이 서버로 옮겨가면 이 목업 목록 자체가 사라진다.
+   */
+  userId: string
   nickname: string
   /** 이 사람이 내놓은 카드 */
   itemId: string
@@ -34,11 +41,13 @@ export type WaitingUser = {
   online: boolean
 }
 
-export type Zone = {
-  id: string
-  name: string
-  location: string
-  /** 약도 위 위치. 행사장 안 상대 좌표라 거리 계산에는 쓰지 않는다. */
+/**
+ * 약도 위 핀 자리다. 행사장 안 상대 좌표라 거리 계산에는 쓰지 않는다.
+ *
+ * 서버는 교환 장소의 이름과 위치만 알려 준다. 약도 자체가 아직 목업이라 핀을 어디에 찍을지는
+ * 화면이 정하고, 서버가 준 순서대로 이 표를 얹는다. 실제 약도가 들어오면 서버가 좌표를 준다.
+ */
+export type ZonePin = {
   x: number
   y: number
   selectable: boolean
@@ -66,51 +75,110 @@ export function itemById(id: string): Item {
 
 /** 레이더에 뜨는 상대들. 시안이 최대 5명을 보여준다. */
 export const WAITING_USERS: WaitingUser[] = [
-  { id: 'u1', nickname: '캐스퍼', itemId: 'cas', needsItemIds: ['nv74', 'i5n'], online: true },
-  { id: 'u2', nickname: '블루N', itemId: 'nv74', needsItemIds: ['sf', 'pony'], online: true },
+  {
+    id: 'u1',
+    userId: '00000000-0000-4000-8000-000000000001',
+    nickname: '캐스퍼',
+    itemId: 'cas',
+    needsItemIds: ['nv74', 'i5n'],
+    online: true,
+  },
+  {
+    id: 'u2',
+    userId: '00000000-0000-4000-8000-000000000002',
+    nickname: '블루N',
+    itemId: 'nv74',
+    needsItemIds: ['sf', 'pony'],
+    online: true,
+  },
   {
     id: 'u3',
+    userId: '00000000-0000-4000-8000-000000000003',
     nickname: '아이오닉러버',
     itemId: 'i5n',
     needsItemIds: ['pony', 'nv74'],
     online: true,
   },
-  { id: 'u4', nickname: 'N드라이버', itemId: 'avn', needsItemIds: ['sf'], online: false },
-  { id: 'u5', nickname: '그랜저러버', itemId: 'gra', needsItemIds: ['pony', 'cas'], online: true },
+  {
+    id: 'u4',
+    userId: '00000000-0000-4000-8000-000000000004',
+    nickname: 'N드라이버',
+    itemId: 'avn',
+    needsItemIds: ['sf'],
+    online: false,
+  },
+  {
+    id: 'u5',
+    userId: '00000000-0000-4000-8000-000000000005',
+    nickname: '그랜저러버',
+    itemId: 'gra',
+    needsItemIds: ['pony', 'cas'],
+    online: true,
+  },
 ]
 
 /** 바텀시트 전체 리스트용. 레이더에 안 뜨는 사람까지 포함한다. */
 export const ALL_WAITING: WaitingUser[] = [
   ...WAITING_USERS,
-  { id: 'u6', nickname: '포니덕후', itemId: 'pony', needsItemIds: ['nv74', 'avn'], online: true },
-  { id: 'u7', nickname: '레몬 16', itemId: 'i5n', needsItemIds: ['pony', 'sf'], online: false },
-  { id: 'u8', nickname: '레몬 07', itemId: 'pony', needsItemIds: ['nv74', 'gra'], online: true },
-  { id: 'u9', nickname: '싼타페러버', itemId: 'sf', needsItemIds: ['avn', 'i5n'], online: true },
-  { id: 'u10', nickname: '비전러버', itemId: 'nv74', needsItemIds: ['cas'], online: false },
-]
-
-export const ZONES: Zone[] = [
   {
-    id: 'z1',
-    name: '중앙 포토존 앞',
-    location: '행사 중앙 포토존',
-    x: 52,
-    y: 44,
-    selectable: true,
+    id: 'u6',
+    userId: '00000000-0000-4000-8000-000000000006',
+    nickname: '포니덕후',
+    itemId: 'pony',
+    needsItemIds: ['nv74', 'avn'],
+    online: true,
   },
   {
-    id: 'z2',
-    name: '에스컬레이터',
-    location: '1층 에스컬레이터 앞',
-    x: 25,
-    y: 68,
-    selectable: false,
+    id: 'u7',
+    userId: '00000000-0000-4000-8000-000000000007',
+    nickname: '레몬 16',
+    itemId: 'i5n',
+    needsItemIds: ['pony', 'sf'],
+    online: false,
   },
-  { id: 'z3', name: '라운지', location: '휴게 라운지', x: 82, y: 60, selectable: false },
+  {
+    id: 'u8',
+    userId: '00000000-0000-4000-8000-000000000008',
+    nickname: '레몬 07',
+    itemId: 'pony',
+    needsItemIds: ['nv74', 'gra'],
+    online: true,
+  },
+  {
+    id: 'u9',
+    userId: '00000000-0000-4000-8000-000000000009',
+    nickname: '싼타페러버',
+    itemId: 'sf',
+    needsItemIds: ['avn', 'i5n'],
+    online: true,
+  },
+  {
+    id: 'u10',
+    userId: '00000000-0000-4000-8000-000000000010',
+    nickname: '비전러버',
+    itemId: 'nv74',
+    needsItemIds: ['cas'],
+    online: false,
+  },
 ]
 
-/** 지정 교환장소는 1개로 한정한다. */
-export const FIXED_ZONE = ZONES[0]
+/**
+ * 약도 위 핀 자리. **서버가 준 교환 장소 목록의 순서대로** 얹는다.
+ * 백엔드 `InitialDataSeeder` 의 순서를 바꾸면 여기도 같이 고친다.
+ */
+export const ZONE_PINS: ZonePin[] = [
+  { x: 52, y: 44, selectable: true },
+  { x: 25, y: 68, selectable: false },
+  { x: 82, y: 60, selectable: false },
+]
+
+/** 서버 목록이 이 표보다 길면 화면 밖으로 나가지 않게 마지막 자리를 돌려 쓴다. */
+export function zonePinAt(index: number): ZonePin {
+  return ZONE_PINS[index] ?? ZONE_PINS[ZONE_PINS.length - 1]
+}
 
 /** 내 식별 이름. 3인 매칭 화면의 "나 (레몬 28)" 과 같은 자리다. */
 export const MY_IDENTITY = { fruit: '레몬', number: 28 }
+
+/** 서버에 등록할 내 이름. 상대 화면에서 내 줄의 라벨이 된다. */
+export const MY_USERNAME = `${MY_IDENTITY.fruit} ${MY_IDENTITY.number}`
