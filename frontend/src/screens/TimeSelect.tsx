@@ -76,7 +76,13 @@ export function TimeSelect() {
     .map((other) => slotIndexOf(baseTime, other.confirmedTime as string, appt.slotCount))
     .filter((index): index is number => index !== null)
 
-  const answered = appt.allAnswered
+  /*
+    CTA 를 여는 기준은 **상대가 시간을 넣었는가** 다. 내가 아직 안 골랐어도 상대가 골랐으면
+    "시간 조율 요청하기" 는 보낼 수 있어야 한다. 전원이 답했는지로 보면 그 경우가 막힌다.
+
+    셋이 교환할 때는 상대 둘이 다 넣어야 연다. 한 명만 넣은 상태에서는 여전히 기다리는 중이다.
+  */
+  const answered = appt.partners.length > 0 && appt.partners.every((p) => p.slots.length > 0)
   const overlap = appt.overlapSlot
   const matched = overlap !== null
   const confirmed = appt.confirmedLabel !== null

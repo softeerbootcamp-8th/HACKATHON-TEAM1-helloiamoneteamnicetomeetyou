@@ -48,16 +48,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExchangeService {
 
     /**
-     * 식별 화면에서 쓸 표시의 가짓수다. 화면이 이 범위의 번호마다 그림과 색을 정해 두고 있어서,
-     * 늘리려면 프론트의 {@code IDENTITY_MARKS} 표도 같이 늘려야 한다.
+     * 식별 화면에서 쓸 표시의 가짓수다. 시안이 정한 과일 5종(레몬, 사과, 체리, 수박, 복숭아)에
+     * 맞춘다. 화면이 이 범위의 번호마다 그림과 색을 정해 두고 있어서, 바꾸려면 프론트의
+     * {@code IDENTITY_MARKS} 표도 같이 바꿔야 한다.
      */
-    private static final int IDENTITY_MARK_COUNT = 8;
+    private static final int IDENTITY_MARK_COUNT = 5;
 
     /** 식별 번호는 두 자리로 둔다. 시안의 "레몬 28" 에서 28 자리다. */
     private static final int IDENTITY_NUMBER_MIN = 10;
     private static final int IDENTITY_NUMBER_COUNT = 90;
 
-    /** 표시 8가지 × 번호 90가지. 이만큼의 교환이 동시에 진행될 때까지는 겹치지 않는다. */
+    /** 표시 5가지 × 번호 90가지. 이만큼의 교환이 동시에 진행될 때까지는 겹치지 않는다. */
     private static final int IDENTITY_CAPACITY = IDENTITY_MARK_COUNT * IDENTITY_NUMBER_COUNT;
 
     private static final List<ExchangeStatus> ACTIVE_STATUSES =
