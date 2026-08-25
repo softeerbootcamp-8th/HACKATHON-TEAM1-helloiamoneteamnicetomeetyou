@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { GoodsFace } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
+import { TopBar } from '@/components/ui/TopBar'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
 import { itemById, MY_IDENTITY } from '@/mocks/data'
@@ -51,13 +52,28 @@ export function MatchResult() {
       ? '상대와 교환할 카드를 확인하세요.'
       : '아래와 같이 카드가 교환돼요.'
 
+  /**
+   * 찔러보기로 성사된 건은 거절 버튼을 두지 않는다 (시안 수정 노트 204:5593).
+   *
+   * 내가 먼저 제안했고 상대가 내 묶음에서 골라 수락한 것이라, 여기서 거절할 대상이 없다.
+   * 대신 뒤로가기를 둬서 갇히지 않게 한다. 자동 매칭 결과는 내가 고른 상대가 아니므로
+   * 거절이 그대로 남는다 (desc 204:5670).
+   */
+  const fromPoke = match.origin === 'poke'
+
   return (
     <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
+      {fromPoke && <TopBar onBack={() => navigate('/home')} />}
       {/*
         데스크톱에서는 스크롤 없이 한 화면에 다 들어와야 한다. 삼자 교환은 카드가
         세 장이라 세로로 길어서, 넓은 화면에서는 가운데로 모으고 넘침을 막는다.
       */}
-      <div className="flex-1 overflow-y-auto px-6 pt-8 no-scrollbar md:flex md:flex-col md:overflow-hidden">
+      <div
+        className={cn(
+          'flex-1 overflow-y-auto px-6 no-scrollbar md:flex md:flex-col md:overflow-hidden',
+          fromPoke ? 'pt-2' : 'pt-8',
+        )}
+      >
         <motion.h1
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -94,7 +110,7 @@ export function MatchResult() {
         >
           교환 장소보기
         </Button>
-        <TextButton onClick={() => setConfirmOpen(true)}>거절하기</TextButton>
+        {!fromPoke && <TextButton onClick={() => setConfirmOpen(true)}>거절하기</TextButton>}
       </div>
 
       <Dialog

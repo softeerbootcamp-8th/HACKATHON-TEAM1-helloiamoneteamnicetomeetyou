@@ -1,6 +1,6 @@
 import { ALL_WAITING, FIXED_ZONE, itemById } from '@/mocks/data'
 
-import { findMatch, wantedFromMe, type MatchResult } from './matching'
+import { findMatch, type MatchResult } from './matching'
 import type { ActiveMatch, IncomingPoke, State } from './types'
 
 export const initialState: State = {
@@ -33,7 +33,7 @@ export type Action =
   | { type: 'open-match' }
   | { type: 'decline-match' }
   | { type: 'send-poke'; targetUserId: string }
-  | { type: 'poke-answered'; accepted: boolean }
+  | { type: 'poke-answered'; accepted: boolean; chosenItemId?: string }
   | { type: 'receive-poke'; poke: IncomingPoke }
   | { type: 'release-held-poke' }
   | { type: 'accept-incoming'; chosenItemId: string }
@@ -189,12 +189,12 @@ export function reducer(state: State, action: Action): State {
         }
       }
 
-      // 상대가 내 묶음 중 자기가 원하는 카드를 골랐다고 본다.
-      const wanted = wantedFromMe(
-        target,
-        state.have.map((s) => s.itemId),
-      )
-      const giveItemId = wanted[0] ?? state.have[0]?.itemId ?? target.needsItemIds[0]
+      // 상대가 내 묶음에서 무엇을 골랐는지는 고른 쪽만 안다.
+      //
+      // 전에는 wantedFromMe 로 짐작했는데, 찔러보기는 정의상 "상대 희망 ∩ 내 보유" 가
+      // 비어 있어서 그 계산이 늘 빈 배열이었다. 그래서 항상 have[0] 으로 떨어져 A 화면에
+      // 엉뚱한 카드가 떴다. 고른 카드를 받아 쓰고, 없으면 첫 장으로만 떨어진다.
+      const giveItemId = action.chosenItemId ?? state.have[0]?.itemId ?? target.needsItemIds[0]
 
       const match: ActiveMatch = {
         kind: 'ONE_TO_ONE',
@@ -237,9 +237,20 @@ export function reducer(state: State, action: Action): State {
     case 'release-held-poke': {
       const held = state.heldIncoming
       if (!held) return state
-      // 요청받은 카드의 잔여 수량이 없으면 알리지 않고 조용히 거절 처리한다.
+      // 요청받은 카드의 잔여 수량이 없으면 나에게는 알리지 않는다. 고를 수 있는 것이
+      // 없는 화면을 띄우는 것보다 조용히 지나가는 편이 낫다.
+      //
+      // 다만 상대는 답을 기다리고 있으므로 거절이 전달돼야 한다 (시안 desc 204:5194).
+      // 목업에서는 보낼 상대가 가짜라 토스트로 그 사실만 드러낸다. 서버 경로에서는
+      // 수락을 시도할 때 POKE_ITEM_SOLD_OUT 으로 갈린다.
       const left = state.have.find((s) => s.itemId === held.wantItemId)?.qty ?? 0
-      if (left <= 0) return { ...state, heldIncoming: null }
+      if (left <= 0) {
+        return {
+          ...state,
+          heldIncoming: null,
+          toast: '받은 교환 요청의 카드가 이미 나갔어요. 상대에게 알렸어요.',
+        }
+      }
       const from = ALL_WAITING.find((u) => u.id === held.fromUserId)
       return {
         ...state,

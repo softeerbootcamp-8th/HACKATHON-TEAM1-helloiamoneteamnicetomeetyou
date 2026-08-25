@@ -3,10 +3,23 @@ import { motion } from 'motion/react'
 import { GoodsFace } from '@/components/domain/GoodsCard'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
-import { itemById, type WaitingUser } from '@/mocks/data'
+import type { Item } from '@/mocks/data'
 
 type Props = {
-  user: WaitingUser
+  /**
+   * 끌어다 놓기의 표적 값이다. `hitTest` 가 `data-radar-user` 로 이 값을 읽어 누구 위에
+   * 있는지 판단하고, 그대로 찔러보기 대상이 된다.
+   *
+   * 목업은 대기자 id(`u3`), 서버는 보유 등록 줄 id(`haveItemId`)를 넣는다. 어느 쪽이든
+   * 이 컴포넌트는 문자열로만 다룬다.
+   */
+  targetId: string
+  /** 카드 그림. 서버 카드가 목업에 없으면 비어 있고, 그때는 이름만 보여 준다. */
+  item: Item | undefined
+  /** 카드 이름. `item` 이 없을 때도 무엇인지는 보여야 한다. */
+  itemName: string
+  /** 카드 아래 작게 붙는 줄. 목업은 닉네임, 서버는 상태 문구다. */
+  caption?: string
   /** 지금 내 카드 묶음이 이 사람 위에 올라와 있는지 */
   hovered: boolean
   /** 이미 찔러보기를 보내고 답을 기다리는 중인지 */
@@ -19,12 +32,20 @@ type Props = {
 }
 
 /** 레이더 위에 서 있는 상대 한 명. */
-export function RadarUser({ user, hovered, pending, burst = false, onSelect, index }: Props) {
-  const item = itemById(user.itemId)
-
+export function RadarUser({
+  targetId,
+  item,
+  itemName,
+  caption,
+  hovered,
+  pending,
+  burst = false,
+  onSelect,
+  index,
+}: Props) {
   return (
     <motion.div
-      data-radar-user={user.id}
+      data-radar-user={targetId}
       initial={{ opacity: 0, scale: 0.6 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ ...springSnap, delay: 0.08 * index }}
@@ -60,7 +81,7 @@ export function RadarUser({ user, hovered, pending, burst = false, onSelect, ind
         type="button"
         onClick={onSelect}
         disabled={pending || !onSelect}
-        aria-label={`${user.nickname}님에게 찔러보기`}
+        aria-label={`${itemName} 가진 상대에게 찔러보기`}
         whileTap={pending ? undefined : { scale: 0.94 }}
         animate={{ scale: hovered ? 1.08 : 1 }}
         transition={springSnap}
@@ -72,11 +93,20 @@ export function RadarUser({ user, hovered, pending, burst = false, onSelect, ind
           pending && 'opacity-45 grayscale',
         )}
       >
-        <GoodsFace item={item} size="sm" />
+        {item ? (
+          <GoodsFace item={item} size="sm" />
+        ) : (
+          // 서버에만 있는 카드다. 그림은 못 그려도 무엇인지는 보여야 한다.
+          <span className="flex h-[62px] items-center justify-center rounded-xl bg-tile text-[10px] font-bold text-ink md:h-[70px] md:text-[12px]">
+            {itemName}
+          </span>
+        )}
         <p className="mt-1.5 text-center text-[10px] font-bold text-ink md:text-[13px]">
-          {item.name}
+          {itemName}
         </p>
-        <p className="text-center text-[9px] text-neutral-400 md:text-[11px]">{user.nickname}</p>
+        {caption && (
+          <p className="text-center text-[9px] text-neutral-400 md:text-[11px]">{caption}</p>
+        )}
 
         {pending && (
           <span className="absolute inset-0 flex items-center justify-center text-[15px] font-bold text-neutral-500">

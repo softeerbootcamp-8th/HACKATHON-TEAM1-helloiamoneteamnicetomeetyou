@@ -9,11 +9,13 @@ import { RadarRings } from '@/components/domain/Radar'
 import { PushOptInBanner } from '@/components/domain/PushOptInBanner'
 import { RadarUser } from '@/components/domain/RadarUser'
 import { BellIcon, ClockIcon, SparkleIcon } from '@/components/ui/icons'
+import { useCatalog } from '@/features/catalog/useCatalog'
+import { usePoke } from '@/features/poke/usePoke'
 import { cn } from '@/lib/cn'
 import { tick } from '@/lib/haptics'
 import { springSheet, springSnap, staggerChild, staggerParent } from '@/lib/motion'
 import { usePush, type PushState } from '@/lib/use-push'
-import { ALL_WAITING, itemById, ZONES } from '@/mocks/data'
+import { ALL_WAITING, itemById, ZONES, type Item } from '@/mocks/data'
 import { getDeviceId } from '@/store/identity'
 import { radarUsers, sortedWaitingList, wantedFromMe } from '@/store/matching'
 import { useStore } from '@/store/useStore'
@@ -21,6 +23,16 @@ import { useStore } from '@/store/useStore'
 export function Home() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
+  const {
+    waiting: serverWaiting,
+    sent,
+    received,
+    error: pokeError,
+    clearError,
+    refresh: refreshPokes,
+    ready: pokeReady,
+  } = usePoke()
+  const { state: catalog } = useCatalog()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   // 앱을 닫아 둔 사이의 알림. 여는 자리는 알림 목록 위다.
@@ -36,11 +48,33 @@ export function Home() {
   // 끌었는지 기억해 둔다. 끌고 난 뒤 따라오는 click 을 걸러내는 데 쓴다.
   const draggedRef = useRef(false)
 
+  // 찔러보기 요청이 실패한 사유를 화면에 띄운다. 서버 message 는 그대로 보여줘도 되는
+  // 한글 문장이라는 것이 팀 약속이다. 띄운 뒤에는 지워서 화면을 옮겨도 다시 뜨지 않게 한다.
+  useEffect(() => {
+    if (!pokeError) return
+    dispatch({ type: 'toast', message: pokeError })
+    clearError()
+  }, [pokeError, dispatch, clearError])
+
   useEffect(() => {
     dispatch({ type: 'enter-home' })
     // 홈에 들어올 때 한 번만 자동 매칭을 켠다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /**
+   * 홈에 들어올 때마다 목록을 다시 읽는다.
+   *
+   * <b>각 줄의 `wanted` 와 "내가 줄 수 있는 카드" 는 서버가 내 등록 내용과 견줘 계산한다.</b>
+   * 그래서 찾는 카드나 내놓을 카드를 고치고 돌아오면 그 값이 이미 낡아 있다. 다시 읽지
+   * 않으면 방금 등록한 카드가 레이더에 뜨지 않아서, 새로고침해야 보이는 것처럼 보인다.
+   *
+   * 등록 화면에서 부르지 않고 여기 둔 이유는, 첫 등록뿐 아니라 나중에 편집하고 돌아오는
+   * 경로도 같이 덮기 때문이다. 알림을 받았을 때 하는 일과도 같다.
+   */
+  useEffect(() => {
+    refreshPokes()
+  }, [refreshPokes])
 
   // 배열을 그대로 의존성에 넣으면 렌더마다 새 참조라 매번 다시 계산한다.
   // 문자열 하나로 눌러서 값이 실제로 바뀔 때만 돌게 한다.
@@ -54,6 +88,81 @@ export function Home() {
   const haveCount = state.have.reduce((sum, s) => sum + s.qty, 0)
   const pendingTarget =
     state.outgoingPoke?.status === 'pending' ? state.outgoingPoke.targetUserId : null
+
+  const mockItemOf = catalog.status === 'ready' ? catalog.mockItemOf : undefined
+
+  // 답을 기다리는 상대. 그 사람 카드는 다시 보낼 수 없게 잠근다 (시안 desc 165:3514).
+  const pendingOwnerIds = useMemo(
+    () => new Set(sent.filter((p) => p.status === 'PENDING').map((p) => p.targetUserId)),
+    [sent],
+  )
+
+  /**
+   * 레이더에 세울 상대. 서버에 등록한 사람이 있으면 실제 목록에서 뽑는다.
+   *
+   * 시안 규칙 그대로다 (desc 165:3514) — 내 희망 카드와 맞고 수량이 남은 것만, 먼저 등록된
+   * 순으로 최대 5개. 서버 목록은 희망 카드를 위로 올린 순서로 오지만 레이더는 그 정렬을
+   * 쓰지 않으므로 `haveItemId` 로 다시 세운다.
+   *
+   * 같은 카드를 든 사람이 여럿이면 한 명만 세운다. 다섯 칸뿐인데 같은 그림이 겹치면
+   * 고를 것이 줄어든다.
+   */
+  const serverRadar = useMemo(() => {
+    const seen = new Set<number>()
+    return serverWaiting
+      .filter((row) => row.wanted)
+      .slice()
+      .sort((a, b) => a.haveItemId - b.haveItemId)
+      .filter((row) => {
+        if (seen.has(row.item.id)) return false
+        seen.add(row.item.id)
+        return true
+      })
+      .slice(0, 5)
+  }, [serverWaiting])
+
+  /**
+   * 서버 데이터를 쓸지, 목업으로 떨어질지.
+   *
+   * <b>목록이 비었다는 것도 서버가 준 답이다.</b> 서버가 붙어 있는데 아무도 없다면 "부스에
+   * 사람이 없다" 가 사실이고, 그 자리를 목업 대기자로 덮으면 화면이 거짓말을 한다. 게다가
+   * 그 목업 카드는 끌어다 놓아도 서버로 나가지 않아서, 보낸 것처럼 보이지만 아무 일도
+   * 일어나지 않는다.
+   *
+   * 목업으로 떨어지는 것은 서버가 아직 준비되지 않았을 때뿐이다(부스나 카드가 없거나 연결
+   * 실패). 그때는 화면이 비면 볼 수 있는 것이 아무것도 없다.
+   */
+  const useServerData = pokeReady
+
+  /**
+   * 레이더 한 칸. 서버와 목업을 같은 모양으로 맞춰 두면 배치와 끌어놓기 코드가 하나로 남는다.
+   *
+   * 둘을 각각 그리면 각도 계산과 표적 처리가 두 벌이 되고, 한쪽만 고쳐서 어긋나기 쉽다.
+   */
+  const radarSlots: {
+    targetId: string
+    item: Item | undefined
+    itemName: string
+    caption?: string
+    pending: boolean
+  }[] = useServerData
+    ? serverRadar.map((row) => ({
+        // 표적은 보유 등록 줄이다. 같은 사람이 여러 카드를 내놓아도 어느 카드를
+        // 달라는 것인지가 이 값으로 정해진다.
+        targetId: String(row.haveItemId),
+        item: mockItemOf?.(row.item.id),
+        itemName: row.item.name,
+        // username 이 아직 비어 있어서 사람 대신 상태를 보여 준다.
+        caption: row.givableItemNames.length > 0 ? '교환 가능' : '그래도 찔러보기',
+        pending: pendingOwnerIds.has(row.ownerId),
+      }))
+    : radar.map((user) => ({
+        targetId: user.id,
+        item: itemById(user.itemId),
+        itemName: itemById(user.itemId).name,
+        caption: user.nickname,
+        pending: pendingTarget === user.id,
+      }))
   const appointment = state.appointment
   const zone = ZONES.find((z) => z.id === appointment?.zoneId)
 
@@ -77,11 +186,24 @@ export function Home() {
     return null
   }
 
+  /**
+   * 이 표적에 지금 보낼 수 있는지.
+   *
+   * 답을 기다리는 상대는 막는다. 끌어놓는 동작 자체는 되지만 강조 표시가 붙지 않아서
+   * 보낼 수 없다는 것이 손끝으로 전해진다 (시안 desc 165:3514 "드래그 앤 드롭은 가능하나,
+   * 이미지 상태 변화 X & 해당 화면 잔류").
+   */
+  const isPendingTarget = (targetId: string): boolean => {
+    if (useServerData) {
+      const row = serverRadar.find((r) => String(r.haveItemId) === targetId)
+      return row ? pendingOwnerIds.has(row.ownerId) : false
+    }
+    return pendingTarget === targetId
+  }
+
   const onDrag = (_: unknown, info: PanInfo) => {
     const found = hitTest(info.point)
-    // 이미 답을 기다리는 상대에게는 다시 보낼 수 없다. 끌어놓는 동작 자체는 되지만
-    // 강조 표시가 붙지 않아서 보낼 수 없다는 것이 손끝으로 전해진다.
-    const next = found && found !== pendingTarget ? found : null
+    const next = found && !isPendingTarget(found) ? found : null
     // 대상에 처음 올라탄 순간에만 울린다. 매 프레임 울리면 손이 얼얼해진다.
     if (next && next !== hovered) tick(8)
     setHovered(next)
@@ -92,11 +214,13 @@ export function Home() {
    * 화면이 바로 바뀌면 무슨 일이 일어났는지 안 보여서 물결이 퍼지는 동안 붙잡아 둔다.
    */
   const sendPokeTo = (targetId: string) => {
-    if (pendingTarget === targetId) return
+    if (isPendingTarget(targetId)) return
     tick([10, 40, 14])
     setBurstOn(targetId)
     window.setTimeout(() => {
       setBurstOn(null)
+      // 확인 화면이 이 값으로 상대를 다시 찾는다. 서버 표적은 보유 등록 줄 id 라
+      // 목업 대기자 id 와 섞이지 않는다.
       navigate(`/poke/confirm?to=${targetId}`)
     }, 700)
   }
@@ -148,6 +272,18 @@ export function Home() {
         onClick: () => navigate('/match'),
       }
     }
+    // 서버에 실제로 온 것이 목업보다 먼저다. 둘이 같이 있으면 실제 요청을 놓치는 쪽이
+    // 손해가 크다.
+    const serverPoke = received[0]
+    if (serverPoke) {
+      return {
+        id: `server-poke-${serverPoke.pokeId}`,
+        tone: 'white' as const,
+        title: '교환 신청이 왔어요~',
+        body: '탭하여 확인',
+        onClick: () => navigate('/poke/received'),
+      }
+    }
     if (state.incomingPoke) {
       return {
         id: `poke-${state.incomingPoke.fromUserId}-${state.incomingPoke.wantItemId}`,
@@ -177,14 +313,23 @@ export function Home() {
       <div className="relative mx-auto min-h-0 w-full max-w-[560px] flex-1">
         <RadarRings />
 
-        {radar.map((user, i) => {
-          const angle = (-90 + i * (360 / Math.max(radar.length, 1))) * (Math.PI / 180)
+        {/* 아무도 없을 때 원 안이 텅 비면 고장 난 것처럼 보인다. 왜 비었는지 알려 준다. */}
+        {radarSlots.length === 0 && (
+          <p className="absolute top-[22%] left-1/2 w-[210px] -translate-x-1/2 text-center text-[12px] leading-[1.6] text-neutral-400 md:text-[13px]">
+            {needIds.length === 0
+              ? '찾는 카드를 등록하면 그 카드를 가진 사람이 여기 나타나요.'
+              : '아직 이 부스에 찾는 카드를 내놓은 사람이 없어요.'}
+          </p>
+        )}
+
+        {radarSlots.map((slot, i) => {
+          const angle = (-90 + i * (360 / Math.max(radarSlots.length, 1))) * (Math.PI / 180)
           // 가로와 세로 반지름을 따로 둬서 화면이 길수록 위아래로 더 벌어지게 한다.
           const radiusX = 37
           const radiusY = 36
           return (
             <div
-              key={user.id}
+              key={slot.targetId}
               className="absolute -translate-x-1/2 -translate-y-1/2"
               style={{
                 left: `${50 + radiusX * Math.cos(angle)}%`,
@@ -192,12 +337,15 @@ export function Home() {
               }}
             >
               <RadarUser
-                user={user}
+                targetId={slot.targetId}
+                item={slot.item}
+                itemName={slot.itemName}
+                caption={slot.caption}
                 index={i}
-                hovered={hovered === user.id}
-                pending={pendingTarget === user.id}
-                burst={burstOn === user.id}
-                onSelect={() => sendPokeTo(user.id)}
+                hovered={hovered === slot.targetId}
+                pending={slot.pending}
+                burst={burstOn === slot.targetId}
+                onSelect={() => sendPokeTo(slot.targetId)}
               />
             </div>
           )
@@ -254,7 +402,9 @@ export function Home() {
       <p className="mt-5 shrink-0 text-center text-[12px] text-neutral-400 md:text-[14px]">
         {dragging
           ? '놓아주면 찔러보기가 전송돼요'
-          : '상대 카드를 누르거나, 내 카드 묶음을 끌어다 놓아보세요'}
+          : radarSlots.length === 0
+            ? '상대가 나타나면 알려 드려요'
+            : '상대 카드를 누르거나, 내 카드 묶음을 끌어다 놓아보세요'}
       </p>
     </div>
   )
@@ -262,8 +412,12 @@ export function Home() {
   /**
    * 전체리스트 한 줄. 시안대로 굿즈 이름, 내가 줄 수 있는 카드, 접속 여부를 보여준다.
    * 상대가 원하는 것 중 내가 가진 게 무엇인지가 이 줄에서 바로 보여야 누를지 말지 정한다.
+   *
+   * 서버에 등록한 사람이 있으면 그 목록을 쓴다. 시안이 이 리스트를 찔러보기의 정식 진입점으로
+   * 정해 뒀다 (desc 204:5464 "리스트 클릭 시 찔러보기 요청 가능"). 아직 아무도 없으면 목업
+   * 대기자로 떨어져서 화면이 비지 않는다.
    */
-  const listPanel = (
+  const mockListPanel = (
     <motion.ul
       variants={staggerParent}
       initial="hidden"
@@ -322,6 +476,114 @@ export function Home() {
       })}
     </motion.ul>
   )
+
+  /**
+   * 서버에 등록한 사람들의 카드. 시안의 상태 배지 세 가지를 여기서 가른다 (desc 204:4948).
+   *
+   * - 교환 가능: 내 희망 카드이고 내가 줄 수 있는 카드가 있다
+   * - 그래도 찔러보기: 내 희망 카드인데 줄 수 있는 카드가 없다
+   *
+   * "매칭됨" 은 서버가 내려주지 않는다. 나와 그 사람 사이에 이미 성사된 교환이 있는지의
+   * 이야기라 화면이 들고 있는 현재 매칭 상태에서 판단해야 한다.
+   */
+  const serverListPanel =
+    serverWaiting.length === 0 ? (
+      <p className="py-10 text-center text-[13px] leading-[1.7] text-neutral-400">
+        아직 이 부스에 카드를 내놓은 사람이 없어요.
+        <br />
+        누군가 등록하면 새로고침 없이 여기 나타나요.
+      </p>
+    ) : (
+      <motion.ul
+        variants={staggerParent}
+        initial="hidden"
+        animate="show"
+        className="divide-y divide-neutral-100"
+      >
+        {serverWaiting.map((row) => {
+          const mockItem = mockItemOf?.(row.item.id)
+          // 답을 기다리는 상대에게는 다시 보낼 수 없다 (시안 desc 165:3514).
+          const waitingReply = pendingOwnerIds.has(row.ownerId)
+
+          return (
+            <motion.li key={row.haveItemId} variants={staggerChild}>
+              <motion.button
+                type="button"
+                onClick={() => navigate(`/poke/confirm?to=${row.haveItemId}`)}
+                disabled={waitingReply}
+                whileTap={waitingReply ? undefined : { scale: 0.98 }}
+                transition={springSnap}
+                className={cn(
+                  'flex w-full items-center gap-4 py-4 text-left',
+                  waitingReply && 'opacity-45',
+                )}
+              >
+                <div className="w-[92px] shrink-0">
+                  {mockItem ? (
+                    <GoodsFace item={mockItem} size="lg" />
+                  ) : (
+                    <span className="flex h-[92px] items-center justify-center rounded-xl bg-tile text-[13px] font-bold text-ink md:h-[104px]">
+                      {row.item.name}
+                    </span>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-[14px] font-bold text-ink">{row.item.name}</p>
+                    {row.wanted && (
+                      <span
+                        className={cn(
+                          'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                          row.givableItemNames.length > 0
+                            ? 'bg-brand/15 text-ink'
+                            : 'bg-neutral-100 text-neutral-500',
+                        )}
+                      >
+                        {row.givableItemNames.length > 0 ? '교환 가능' : '그래도 찔러보기'}
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="mt-0.5 text-[10px] font-medium text-[#aeaeb2]">
+                    내가 줄 수 있는 카드
+                  </p>
+                  <p className="truncate text-[11px] text-[#8b8b8b]">
+                    {row.givableItemNames.length > 0
+                      ? row.givableItemNames.join(' · ')
+                      : '아직 없어요'}
+                  </p>
+
+                  {row.ownerWantedItemNames.length > 0 && (
+                    <>
+                      <p className="mt-1 text-[10px] font-medium text-[#aeaeb2]">
+                        상대방이 원하는 것
+                      </p>
+                      <p className="truncate text-[11px] text-[#8b8b8b]">
+                        {row.ownerWantedItemNames.join(' · ')}
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                {waitingReply && (
+                  <span className="shrink-0 text-[11px] font-semibold text-neutral-400">
+                    대기 중
+                  </span>
+                )}
+              </motion.button>
+            </motion.li>
+          )
+        })}
+      </motion.ul>
+    )
+
+  // 레이더와 같은 기준이다. 서버가 붙어 있으면 비어 있는 것도 서버가 준 답이다.
+  const listPanel = useServerData ? serverListPanel : mockListPanel
+
+  // 머리에 적히는 개수는 실제로 그리는 목록의 개수여야 한다. 목업 개수를 그대로 쓰면
+  // 서버에 아무도 없는데 "전체 10개" 라고 적혀서 목록이 안 뜬 것처럼 보인다.
+  const listCount = useServerData ? serverWaiting.length : list.length
 
   return (
     <div className="relative flex h-full flex-col">
@@ -474,7 +736,7 @@ export function Home() {
         <aside className="hidden w-[360px] shrink-0 flex-col md:flex lg:w-[420px]">
           <div className="flex items-baseline justify-between px-1 pb-3">
             <h2 className="text-[17px] font-extrabold text-ink">전체리스트</h2>
-            <span className="text-[12px] text-neutral-400">전체 {list.length}개</span>
+            <span className="text-[12px] text-neutral-400">전체 {listCount}개</span>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto pr-1 pb-2 no-scrollbar">{listPanel}</div>
         </aside>
@@ -488,7 +750,7 @@ export function Home() {
             header={
               <div className="flex items-baseline justify-between">
                 <span className="text-[17px] font-extrabold text-ink">전체리스트</span>
-                <span className="text-[12px] text-neutral-400">전체 {list.length}개</span>
+                <span className="text-[12px] text-neutral-400">전체 {listCount}개</span>
               </div>
             }
           >
