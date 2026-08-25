@@ -50,8 +50,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        const { serverIdOf, unmatched } = matchByName(ALL_ITEMS, serverItems)
-        setState({ status: 'ready', boothId: booth.id, serverIdOf, unmatched })
+        const { serverIdOf, mockIdOf, unmatched } = matchByName(ALL_ITEMS, serverItems)
+        setState({ status: 'ready', boothId: booth.id, serverIdOf, mockIdOf, unmatched })
       } catch (error) {
         if (signal.aborted) return
         setState({ status: 'error', reason: messageOf(error) })

@@ -16,6 +16,8 @@ export type CatalogState =
       status: 'ready'
       boothId: number
       serverIdOf: (mockItemId: string) => number | undefined
+      /** 서버 카드 id → 목업 카드 id. SSE 로 오는 매칭 알림을 화면에 그릴 때 쓴다. */
+      mockIdOf: (serverItemId: number) => string | undefined
       unmatched: Item[]
     }
   | { status: 'empty'; reason: string }

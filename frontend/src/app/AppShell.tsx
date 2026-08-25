@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
 import { Toast } from '@/components/ui/Toast'
+import { useCatalog } from '@/features/catalog/useCatalog'
+import { fromServerMatch, type ServerMatchSuggested } from '@/features/matching/from-server-match'
+import { useBoothEvents } from '@/lib/use-booth-events'
 import { pageVariants, pageVariantsWide, springPage, springPageWide } from '@/lib/motion'
 import { useStore } from '@/store/useStore'
 
@@ -19,8 +22,29 @@ import { SwipeBackEdge } from './SwipeBackEdge'
 export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { state } = useStore()
+  const { state, dispatch } = useStore()
+  const { state: catalog, userId } = useCatalog()
   const index = routeIndex(location.pathname)
+
+  /**
+   * 실제 매칭 알림. 카탈로그가 준비돼야(부스 id 와 카드 이름 매핑이 있어야) 구독하고
+   * 화면에 그릴 수 있어서, 그 전에는 `useBoothEvents` 가 `null` 을 받아 연결하지 않는다.
+   *
+   * 이미 매칭이나 약속이 화면에 떠 있으면 리듀서가 알아서 무시한다
+   * (`server-match-arrived`). 여기서는 파싱과 dispatch 만 한다.
+   */
+  const boothId = catalog.status === 'ready' ? catalog.boothId : null
+  useBoothEvents(boothId, userId, {
+    MATCH_SUGGESTED: (data) => {
+      if (catalog.status !== 'ready') return
+      const match = fromServerMatch(data as ServerMatchSuggested, catalog.mockIdOf)
+      if (!match) {
+        console.warn('[match] 카드 매핑을 찾지 못해 알림을 무시합니다', data)
+        return
+      }
+      dispatch({ type: 'server-match-arrived', match })
+    },
+  })
 
   // 라우트가 바뀐 그 렌더에서 방향을 정해야 첫 프레임부터 올바른 쪽에서 들어온다.
   // 렌더 중 state 를 고치는 것은 이 경우에 React 가 권하는 방식이다.

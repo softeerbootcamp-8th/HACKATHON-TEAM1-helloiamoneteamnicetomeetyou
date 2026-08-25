@@ -38,6 +38,7 @@ export type Action =
   | { type: 'clear-need'; itemId: string }
   | { type: 'enter-home' }
   | { type: 'auto-match-tick' }
+  | { type: 'server-match-arrived'; match: ActiveMatch }
   | { type: 'open-match' }
   | { type: 'decline-match' }
   | { type: 'send-poke'; targetUserId: string }
@@ -176,6 +177,20 @@ export function reducer(state: State, action: Action): State {
       return {
         ...state,
         match,
+        autoMatching: false,
+        notifications: notify(state, 'match', '내가 원하는 굿즈로 교환할 수 있어요!', NOTICE_BODY),
+      }
+    }
+
+    /**
+     * 서버가 SSE 로 실제 매칭을 알려온 것. 목업 자동 매칭(`auto-match-tick`)과 같은 자리를
+     * 쓰지만, 이미 화면에 매칭이나 약속이 떠 있으면 덮어쓰지 않는다.
+     */
+    case 'server-match-arrived': {
+      if (state.match || state.appointments.length > 0) return state
+      return {
+        ...state,
+        match: action.match,
         autoMatching: false,
         notifications: notify(state, 'match', '내가 원하는 굿즈로 교환할 수 있어요!', NOTICE_BODY),
       }
