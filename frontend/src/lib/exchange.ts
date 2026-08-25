@@ -27,6 +27,9 @@ export type ExchangeParticipant = {
   username: string | null
   slots: number[]
   answered: boolean
+  /** 식별 화면에서 사람을 가르는 두 자리 번호. 시안의 "레몬 28" 에서 28 자리다. */
+  identityNumber: number
+  arrived: boolean
 }
 
 /**
@@ -46,6 +49,8 @@ export type Exchange = {
   slotBaseTime: string
   slotCount: number
   slotMinutes: number
+  /** 식별 화면에서 쓸 표시. 같은 교환의 참가자는 같은 값을 받는다. */
+  identityMark: number
   participants: ExchangeParticipant[]
   /** 모두가 되는 가장 빠른 칸. 없으면 null 이다. */
   overlapSlot: number | null
@@ -118,6 +123,16 @@ export async function updateTimeSlots(
 export async function resetTimeSlots(exchangeId: number, userId: string): Promise<Exchange> {
   return unwrap(
     await api<CommonResponse<Exchange>>(`/api/exchanges/${exchangeId}/time-slots/reset`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+  )
+}
+
+/** "도착했어요". 상대 화면의 배지가 이동중에서 도착으로 바뀐다. */
+export async function arriveAtExchange(exchangeId: number, userId: string): Promise<Exchange> {
+  return unwrap(
+    await api<CommonResponse<Exchange>>(`/api/exchanges/${exchangeId}/arrive`, {
       method: 'POST',
       body: JSON.stringify({ userId }),
     }),

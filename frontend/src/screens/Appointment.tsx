@@ -1,13 +1,16 @@
 import { motion } from 'motion/react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { GoodsFace } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
 import { PinIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
+import { arriveAtExchange } from '@/lib/exchange'
 import { springSnap } from '@/lib/motion'
 import { itemById } from '@/mocks/data'
 import { useLastDefined } from '@/lib/useLastDefined'
+import { getDeviceId } from '@/store/identity'
 import { useStore } from '@/store/useStore'
 
 /** 확정된 약속. 시간과 장소, 주고받을 카드를 다시 보여준다. */
@@ -16,6 +19,15 @@ export function Appointment() {
   const { state, dispatch } = useStore()
   const appt = useLastDefined(state.appointment)
   const match = useLastDefined(state.match)
+  const myUserId = useMemo(() => getDeviceId(), [])
+  const [busy, setBusy] = useState(false)
+
+  // 남은 시간을 1분마다 다시 센다. 화면을 열어 둔 채로 시간이 흘러도 숫자가 따라간다.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   if (!appt || !match || (appt.stage !== 'confirmed' && appt.stage !== 'arrived')) {
     return (
@@ -29,6 +41,20 @@ export function Appointment() {
   }
 
   const isThreeWay = match.kind === 'THREE_WAY'
+  const headline = countdownLabel(appt.confirmedTime, now)
+
+  const goArrive = async () => {
+    setBusy(true)
+    try {
+      const exchange = await arriveAtExchange(appt.exchangeId, myUserId)
+      dispatch({ type: 'exchange-synced', exchange, myUserId })
+      navigate('/identify')
+    } catch {
+      dispatch({ type: 'toast', message: '잠시 후 다시 시도해주세요' })
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
@@ -39,7 +65,7 @@ export function Appointment() {
           transition={springSnap}
           className="text-[26px] font-extrabold tracking-[-0.02em] text-ink"
         >
-          15분 뒤 만나요!
+          {headline}
         </motion.h1>
         <p className="mt-2 text-[13px] text-neutral-400">약속정보</p>
 
@@ -61,31 +87,27 @@ export function Appointment() {
         </motion.div>
 
         <div className="mt-10 flex items-start justify-center gap-4">
-          <ArrivalCard
-            itemId={match.giveItemId}
-            caption="내가 줄 것"
-            status="이동중"
-            arrived={appt.stage === 'arrived'}
-          />
+          <ArrivalCard itemId={match.giveItemId} caption="내가 줄 것" arrived={appt.myArrived} />
           <span className="anim-breathe mt-16 text-[20px] text-ink">⇄</span>
-          <ArrivalCard itemId={match.receiveItemId} caption="내가 받을 것" status="도착" arrived />
+          <ArrivalCard
+            itemId={match.receiveItemId}
+            caption="내가 받을 것"
+            arrived={appt.partners.every((p) => p.arrived)}
+          />
         </div>
 
-        {isThreeWay && (
+        {/* 상대가 여럿이면 누가 왔는지 한 줄로 보여준다. 배지만으로는 셋 중 누구인지 알 수 없다. */}
+        {appt.partners.length > 0 && (
           <p className="mt-8 text-center text-[12px] text-neutral-400">
-            {match.giver.nickname}, {match.receiver.nickname}님과 셋이서 교환해요
+            {appt.partners.map((p) => `${p.name} ${p.arrived ? '도착' : '이동중'}`).join(' · ')}
+            {isThreeWay && ' · 셋이서 교환해요'}
           </p>
         )}
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
-        <Button
-          onClick={() => {
-            dispatch({ type: 'arrive' })
-            navigate('/identify')
-          }}
-        >
-          도착했어요
+        <Button disabled={busy} onClick={() => void goArrive()}>
+          {appt.myArrived ? '상대 찾으러 가기' : '도착했어요'}
         </Button>
         <TextButton onClick={() => navigate('/home')}>홈으로</TextButton>
       </div>
@@ -93,28 +115,44 @@ export function Appointment() {
   )
 }
 
+/**
+ * "15분 뒤 만나요!" 자리. 서버가 확정해 준 시각에서 실제로 남은 시간을 센다.
+ *
+ * 시안이 15분으로 그려져 있는데 그건 예시라, 고정 문구로 두면 30분 뒤 약속에도 15분이라고 나온다.
+ * 약속 시각이 지난 뒤에도 화면이 열려 있을 수 있어서 그 경우를 따로 둔다.
+ */
+function countdownLabel(confirmedTime: string | null, now: number): string {
+  if (!confirmedTime) return '곧 만나요!'
+
+  const minutes = Math.round((new Date(confirmedTime).getTime() - now) / 60_000)
+
+  if (minutes <= 0) return '지금 만나요!'
+  if (minutes < 60) return `${minutes}분 뒤 만나요!`
+
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest === 0 ? `${hours}시간 뒤 만나요!` : `${hours}시간 ${rest}분 뒤 만나요!`
+}
+
 function ArrivalCard({
   itemId,
   caption,
-  status,
   arrived,
 }: {
   itemId: string
   caption: string
-  status: string
   arrived: boolean
 }) {
   const item = itemById(itemId)
   return (
     <div className="text-center">
-      <span
-        className={cn(
-          'mb-3 inline-block rounded-full px-3 py-1 text-[11px] font-bold',
-          arrived ? 'bg-ink text-white' : 'bg-neutral-300 text-white',
-        )}
+      <motion.span
+        animate={{ backgroundColor: arrived ? '#111111' : '#d4d4d4' }}
+        transition={springSnap}
+        className={cn('mb-3 inline-block rounded-full px-3 py-1 text-[11px] font-bold text-white')}
       >
-        {status}
-      </span>
+        {arrived ? '도착' : '이동중'}
+      </motion.span>
       <div className="w-[118px] rounded-2xl bg-white p-3 shadow-[0_6px_22px_rgba(0,0,0,0.10)]">
         <GoodsFace item={item} size="lg" />
         <p className="mt-2.5 text-center text-[12px] font-bold text-ink">{item.name}</p>

@@ -21,6 +21,8 @@ public record ExchangeResponseDto(
         LocalDateTime slotBaseTime,
         int slotCount,
         int slotMinutes,
+        /** 식별 화면에서 쓸 표시. 같은 교환의 참가자는 같은 값을 받는다. */
+        int identityMark,
         List<ExchangeParticipantResponseDto> participants,
         /** 모두가 되는 가장 빠른 칸. 없으면 null 이다. */
         Integer overlapSlot,

@@ -5,8 +5,10 @@ import { useNavigate } from 'react-router'
 import { Dialog } from '@/components/ui/Dialog'
 import { tick } from '@/lib/haptics'
 import { springSnap } from '@/lib/motion'
-import { MY_IDENTITY } from '@/mocks/data'
+import { useLastDefined } from '@/lib/useLastDefined'
+import { identityLabel, identityMarkAt } from '@/store/identity-mark'
 import { useCancelAppointment } from '@/store/use-cancel-appointment'
+import { useStore } from '@/store/useStore'
 
 /**
  * 서로를 찾는 화면. 같은 그림을 든 사람이 상대다.
@@ -14,10 +16,22 @@ import { useCancelAppointment } from '@/store/use-cancel-appointment'
  */
 export function Identify() {
   const navigate = useNavigate()
+  const { state } = useStore()
   const cancelAppointment = useCancelAppointment()
+  const appt = useLastDefined(state.appointment)
   const [noShowOpen, setNoShowOpen] = useState(false)
   // 레몬을 누른 횟수. 누를 때마다 키가 바뀌어서 흔들림이 처음부터 다시 돈다.
   const [pokes, setPokes] = useState(0)
+
+  /*
+    표시는 교환마다 서버가 정해 주고, 번호는 그 안에서 사람마다 다르다. 그래서 같은 그림을 든
+    사람이 내 교환 상대이고, 번호로 그중 누구인지 가른다.
+
+    약속 없이 주소로 바로 들어온 경우에는 첫 표시로 보여준다. 화면이 비면 무엇을 보는 자리인지
+    알 수 없기 때문이다.
+  */
+  const mark = identityMarkAt(appt?.identityMark ?? 0)
+  const label = appt ? identityLabel(appt.identityMark, appt.myIdentityNumber) : mark.name
 
   return (
     <div
@@ -84,6 +98,7 @@ export function Identify() {
                 animate={pokes > 0 ? { rotate: [0, -9, 7, -4, 0], scale: [1, 1.08, 0.98, 1] } : {}}
                 transition={{ duration: 0.7, ease: 'easeOut' }}
                 className="anim-lemon w-[260px] max-w-[70vw] select-none"
+                style={{ filter: `hue-rotate(${mark.hueRotate}deg)` }}
                 draggable={false}
               />
             </motion.button>
@@ -95,13 +110,22 @@ export function Identify() {
             transition={{ ...springSnap, delay: 0.15 }}
             className="mt-12 text-[28px] font-extrabold"
           >
-            {MY_IDENTITY.fruit} {MY_IDENTITY.number}
+            {label}
           </motion.h1>
           <p className="mt-3 text-center text-[14px] leading-[1.55] text-white/70">
             같은 화면을 든 사람이
             <br />내 교환 상대예요.
           </p>
           <p className="mt-4 text-[13px] text-white/45">휴대폰 화면을 들어 서로를 찾아보세요.</p>
+          {appt && appt.partners.length > 0 && (
+            <p className="mt-2 text-[13px] text-white/45">
+              상대는{' '}
+              {appt.partners
+                .map((p) => identityLabel(appt.identityMark, p.identityNumber))
+                .join(', ')}{' '}
+              예요.
+            </p>
+          )}
         </div>
 
         <div className="shrink-0 space-y-2.5 px-6 pb-8">

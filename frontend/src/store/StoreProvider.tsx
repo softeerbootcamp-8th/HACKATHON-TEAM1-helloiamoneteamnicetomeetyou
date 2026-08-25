@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, type ReactNode } from 'rea
 
 import { fetchBooths, fetchExchange, fetchZones, registerUser } from '@/lib/exchange'
 import { useBoothEvents } from '@/lib/use-booth-events'
-import { ALL_WAITING, MY_USERNAME } from '@/mocks/data'
+import { ALL_WAITING, myUsername } from '@/mocks/data'
 
 import { StoreContext } from './context'
 import { getDeviceId } from './identity'
@@ -24,7 +24,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const load = async () => {
       try {
-        await registerUser(myUserId, MY_USERNAME)
+        await registerUser(myUserId, myUsername(myUserId))
         const booths = await fetchBooths()
         const booth = booths[0]
         if (!booth || cancelled) return
@@ -80,6 +80,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     CONNECTED: () => void syncExchange(),
     EXCHANGE_CREATED: (data) => void syncExchange(data),
     EXCHANGE_TIME_UPDATED: (data) => void syncExchange(data),
+    EXCHANGE_ARRIVED: (data) => void syncExchange(data),
     EXCHANGE_CANCELLED: (data) => void syncExchange(data),
   })
 

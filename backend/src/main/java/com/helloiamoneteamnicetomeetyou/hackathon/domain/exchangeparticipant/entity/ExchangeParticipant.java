@@ -41,13 +41,23 @@ public class ExchangeParticipant {
     @Column(nullable = false, length = 50)
     private ParticipantStatus status;
 
+    /**
+     * 식별 화면에서 사람을 가르는 두 자리 번호다. 시안의 "레몬 28" 에서 28 자리다.
+     *
+     * <p>같은 교환 안에서만 겹치지 않으면 된다. 다른 교환의 28 과 같아도 상관없는데, 식별은
+     * 그림과 번호를 함께 보고 하기 때문이다.
+     */
+    @Column(nullable = false)
+    private int identityNumber;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime joinedAt;
 
-    private ExchangeParticipant(Exchange exchange, User user, ParticipantStatus status) {
+    private ExchangeParticipant(Exchange exchange, User user, ParticipantStatus status, int identityNumber) {
         this.exchange = exchange;
         this.user = user;
         this.status = status;
+        this.identityNumber = identityNumber;
         this.joinedAt = LocalDateTime.now();
     }
 
@@ -58,7 +68,16 @@ public class ExchangeParticipant {
      * 때문이다. 매칭 알고리즘이 붙어서 서버가 먼저 제안하게 되면 {@code PENDING} 으로 만들고
      * 수락을 기다리는 흐름이 필요해진다.
      */
-    public static ExchangeParticipant of(Exchange exchange, User user) {
-        return new ExchangeParticipant(exchange, user, ParticipantStatus.ACCEPTED);
+    public static ExchangeParticipant of(Exchange exchange, User user, int identityNumber) {
+        return new ExchangeParticipant(exchange, user, ParticipantStatus.ACCEPTED, identityNumber);
+    }
+
+    public boolean hasArrived() {
+        return status == ParticipantStatus.ARRIVED;
+    }
+
+    /** 약속 장소에 도착했다. 이미 도착했으면 아무 일도 하지 않는다. */
+    public void arrive() {
+        this.status = ParticipantStatus.ARRIVED;
     }
 }

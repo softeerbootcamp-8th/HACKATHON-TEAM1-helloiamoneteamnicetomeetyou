@@ -59,7 +59,8 @@ class ExchangeControllerTest {
                 LocalDateTime.of(2026, 8, 25, 14, 15),
                 8,
                 15,
-                List.of(new ExchangeParticipantResponseDto(ME, "레몬 28", List.of(0, 2), true)),
+                3,
+                List.of(new ExchangeParticipantResponseDto(ME, "레몬 28", List.of(0, 2), true, 28, false)),
                 overlapSlot,
                 true,
                 confirmedTime);

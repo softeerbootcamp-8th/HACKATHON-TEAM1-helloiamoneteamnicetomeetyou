@@ -57,6 +57,17 @@ public class Exchange {
     /** 확정된 만나는 시각. 아직 안 정해졌으면 null 이다. */
     private LocalDateTime exchangeTime;
 
+    /**
+     * 식별 화면에서 서로를 찾는 표시다. 같은 교환의 참가자는 같은 값을 받는다.
+     *
+     * <p>화면은 이 번호로 그림과 색을 고른다. 어떤 그림인지는 서버가 정하지 않는다. 지도 위 핀
+     * 좌표를 화면이 정하는 것과 같은 이유로, 표시 방법이 바뀌어도 서버를 안 고치게 하려는 것이다.
+     *
+     * <p>교환 id 에서 끌어내기 때문에 같은 시각에 열린 교환끼리는 서로 다른 값을 받는다.
+     */
+    @Column(nullable = false)
+    private int identityMark;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -70,6 +81,11 @@ public class Exchange {
 
     public static Exchange of(Zone zone, ExchangeType type, LocalDateTime slotBaseTime) {
         return new Exchange(zone, type, slotBaseTime);
+    }
+
+    /** 식별 표시는 id 가 있어야 정해지므로 저장한 뒤에 부른다. */
+    public void assignIdentityMark(int markCount) {
+        this.identityMark = (int) Math.floorMod(id, markCount);
     }
 
     public boolean isTimeConfirmed() {

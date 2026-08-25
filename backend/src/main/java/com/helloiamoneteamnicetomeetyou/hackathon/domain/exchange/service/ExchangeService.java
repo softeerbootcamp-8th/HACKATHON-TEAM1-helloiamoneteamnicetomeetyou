@@ -22,9 +22,11 @@ import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventType;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,6 +43,16 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ExchangeService {
+
+    /**
+     * 식별 화면에서 쓸 표시의 가짓수다. 화면이 이 범위의 번호마다 그림과 색을 정해 두고 있어서,
+     * 늘리려면 프론트의 표도 같이 늘려야 한다.
+     */
+    private static final int IDENTITY_MARK_COUNT = 8;
+
+    /** 식별 번호는 두 자리로 둔다. 시안의 "레몬 28" 이 그 자리다. */
+    private static final int IDENTITY_NUMBER_MIN = 10;
+    private static final int IDENTITY_NUMBER_MAX = 99;
 
     private final ExchangeRepository exchangeRepository;
     private final ExchangeParticipantRepository participantRepository;
@@ -72,11 +84,14 @@ public class ExchangeService {
 
         Exchange exchange = exchangeRepository.save(
                 Exchange.of(zone, type, TimeSlotGrid.baseTimeFrom(LocalDateTime.now())));
+        exchange.assignIdentityMark(IDENTITY_MARK_COUNT);
 
+        Set<Integer> usedNumbers = new HashSet<>();
         for (UUID userId : distinctIds) {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_FOUND));
-            participantRepository.save(ExchangeParticipant.of(exchange, user));
+            participantRepository.save(
+                    ExchangeParticipant.of(exchange, user, nextIdentityNumber(userId, usedNumbers)));
         }
 
         notifyParticipants(exchange.getId(), distinctIds, SseEventType.EXCHANGE_CREATED);
@@ -161,6 +176,30 @@ public class ExchangeService {
     }
 
     /**
+     * 약속 장소에 도착했다고 알린다.
+     *
+     * <p>상대 화면의 "이동중 / 도착" 배지가 이걸 봅니다. 도착은 시간이 바뀐 것이 아니라서
+     * {@code EXCHANGE_ARRIVED} 로 따로 보낸다.
+     *
+     * <p>시간이 확정되기 전에는 받지 않는다. 만날 시각이 안 정해졌는데 도착할 자리가 없다.
+     */
+    @Transactional
+    public ExchangeResponseDto arrive(Long exchangeId, UUID userId) {
+        Exchange exchange = getExchange(exchangeId);
+        ExchangeParticipant participant = getParticipant(exchangeId, userId);
+
+        if (!exchange.isTimeConfirmed()) {
+            throw new ApplicationException(ErrorCode.EXCHANGE_TIME_NOT_CONFIRMED);
+        }
+
+        participant.arrive();
+
+        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_ARRIVED);
+
+        return toResponse(exchange);
+    }
+
+    /**
      * 약속을 취소한다. 참가자 누구든 취소할 수 있다.
      *
      * <p><b>상대에게 알리는 것이 이 API 의 존재 이유다.</b> 취소한 사람 화면에서만 사라지면 상대는
@@ -177,6 +216,26 @@ public class ExchangeService {
         notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_CANCELLED);
 
         return toResponse(exchange);
+    }
+
+    /**
+     * 참가자의 식별 번호를 정한다.
+     *
+     * <p>UUID 에서 끌어내서 같은 사람이 같은 번호를 받게 하되, 한 교환 안에서 겹치면 다음 번호로
+     * 밀어 준다. 두 자리 안에서 고르기 때문에 서너 명이면 거의 안 겹치지만, 겹치면 두 사람이 서로를
+     * 못 가려서 식별 화면이 제 역할을 못 한다.
+     */
+    private int nextIdentityNumber(UUID userId, Set<Integer> used) {
+        int range = IDENTITY_NUMBER_MAX - IDENTITY_NUMBER_MIN + 1;
+        int candidate = IDENTITY_NUMBER_MIN + Math.floorMod(userId.hashCode(), range);
+
+        while (used.contains(candidate)) {
+            candidate = IDENTITY_NUMBER_MIN + Math.floorMod(candidate + 1 - IDENTITY_NUMBER_MIN, range);
+        }
+
+        used.add(candidate);
+
+        return candidate;
     }
 
     private Exchange getExchange(Long exchangeId) {
@@ -253,7 +312,12 @@ public class ExchangeService {
                             User user = participant.getUser();
                             List<Integer> slots = slotsByUser.getOrDefault(user.getId(), List.of());
                             return new ExchangeParticipantResponseDto(
-                                    user.getId(), user.getUsername(), slots, !slots.isEmpty());
+                                    user.getId(),
+                                    user.getUsername(),
+                                    slots,
+                                    !slots.isEmpty(),
+                                    participant.getIdentityNumber(),
+                                    participant.hasArrived());
                         })
                         .toList();
 
@@ -268,6 +332,7 @@ public class ExchangeService {
                 exchange.getSlotBaseTime(),
                 TimeSlotGrid.SLOT_COUNT,
                 TimeSlotGrid.SLOT_MINUTES,
+                exchange.getIdentityMark(),
                 participants,
                 TimeSlotGrid.earliestOverlap(slotsByUser.values()),
                 participants.stream().allMatch(ExchangeParticipantResponseDto::answered),

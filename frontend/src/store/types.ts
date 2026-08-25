@@ -31,6 +31,17 @@ export type IncomingPoke = {
 
 export type AppointmentStage = 'time-waiting' | 'time-conflict' | 'confirmed' | 'arrived'
 
+/** 약속 화면의 상대 한 명. */
+export type AppointmentPartner = {
+  userId: string
+  /** 이름을 안 보낸 사용자는 "상대" 로 들어간다. */
+  name: string
+  slots: number[]
+  /** 식별 화면에서 사람을 가르는 두 자리 번호 */
+  identityNumber: number
+  arrived: boolean
+}
+
 /**
  * 서버가 들고 있는 약속을 화면이 쓰기 좋게 옮겨 담은 것이다. 원본은 `Exchange` 고,
  * 실시간 알림을 받을 때마다 다시 읽어 이걸 갈아끼운다.
@@ -42,15 +53,19 @@ export type Appointment = {
   /** 격자 0번 칸이 가리키는 시각. 서버가 정한 값이라 참가자 모두가 같다. */
   slotBaseTime: string
   slotCount: number
+  /** 식별 화면에서 쓸 표시. 같은 교환의 참가자는 같은 값이다. */
+  identityMark: number
   mySlots: number[]
-  /** 상대별로 고른 칸. 키는 서버 userId 다. */
-  partnerSlots: Record<string, number[]>
-  /** 상대 화면 라벨. 이름을 안 보낸 사용자는 "상대" 로 들어간다. */
-  partnerNames: Record<string, string>
+  myName: string
+  myIdentityNumber: number
+  myArrived: boolean
+  partners: AppointmentPartner[]
   /** 모두가 되는 가장 빠른 칸. 서버가 계산해 준다. */
   overlapSlot: number | null
   allAnswered: boolean
   confirmedLabel: string | null
+  /** 확정된 만나는 시각. 남은 시간을 세는 데 쓴다. */
+  confirmedTime: string | null
 }
 
 /** 화면에 보여줄 매칭. 자동 매칭인지 찔러보기 성사인지에 따라 제목이 달라진다. */

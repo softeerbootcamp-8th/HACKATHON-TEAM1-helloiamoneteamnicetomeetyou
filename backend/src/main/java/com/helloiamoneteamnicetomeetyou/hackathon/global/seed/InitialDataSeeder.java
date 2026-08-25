@@ -18,8 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 행사 데이터를 넣는다. 부스 하나, 그 안의 교환 장소 셋, 포토카드 일곱 종이다.
  *
- * <p><b>부스가 이미 있으면 아무것도 하지 않는다.</b> 서버가 뜰 때마다 도는 코드라, 이 가드가
- * 없으면 배포할 때마다 같은 부스가 하나씩 늘어난다.
+ * <p>서버가 뜰 때마다 도는 코드라 이미 있는 것은 건드리지 않는다. <b>다만 "부스가 있으면 전부
+ * 건너뛴다" 처럼 뭉뚱그려 보면 안 된다.</b> 부스만 있고 구역이 없는 DB 를 만나면 아무것도 넣지
+ * 않고 지나가서, 교환을 만들 때 ZONE_NOT_FOUND 로 막힌다. 팀원이 손으로 넣어 본 흔적이 남아
+ * 있거나 스키마를 다시 만든 DB 에서 실제로 겪는 일이라, 종류마다 따로 본다.
  *
  * <p>{@code data.sql} 대신 코드로 넣는 것은 {@code ddl-auto: update} 와 함께 쓸 때 실행 순서가
  * 헷갈리지 않게 하려는 것이다. 마이그레이션 도구가 들어오면 이 클래스는 그쪽으로 옮긴다.
@@ -52,16 +54,24 @@ public class InitialDataSeeder implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (boothRepository.count() > 0) {
-            return;
+        Booth booth = boothRepository.findAll().stream()
+                .findFirst()
+                .orElseGet(() -> boothRepository.save(Booth.of("현대자동차 팝업", "자동차 포토카드 교환")));
+
+        int zones = 0;
+        if (zoneRepository.findByBoothIdOrderByIdAsc(booth.getId()).isEmpty()) {
+            ZONES.forEach(zone -> zoneRepository.save(Zone.of(booth, zone[0], zone[1])));
+            zones = ZONES.size();
         }
 
-        Booth booth = boothRepository.save(Booth.of("현대자동차 팝업", "자동차 포토카드 교환"));
+        int items = 0;
+        if (itemRepository.count() == 0) {
+            ITEMS.forEach(item -> itemRepository.save(Item.of(booth, item[0], item[1])));
+            items = ITEMS.size();
+        }
 
-        ZONES.forEach(zone -> zoneRepository.save(Zone.of(booth, zone[0], zone[1])));
-        ITEMS.forEach(item -> itemRepository.save(Item.of(booth, item[0], item[1])));
-
-        log.info("행사 데이터를 넣었다: booth={}, zone={}개, item={}개",
-                booth.getId(), ZONES.size(), ITEMS.size());
+        if (zones > 0 || items > 0) {
+            log.info("행사 데이터를 넣었다: booth={}, zone={}개, item={}개", booth.getId(), zones, items);
+        }
     }
 }

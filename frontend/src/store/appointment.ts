@@ -14,36 +14,48 @@ export function toAppointment(
   previousStage?: AppointmentStage,
 ): Appointment {
   const me = exchange.participants.find((p) => p.userId === myUserId)
-  const partners = exchange.participants.filter((p) => p.userId !== myUserId)
-
-  const partnerSlots: Record<string, number[]> = {}
-  const partnerNames: Record<string, string> = {}
-  for (const partner of partners) {
-    partnerSlots[partner.userId] = partner.slots
-    partnerNames[partner.userId] = partner.username ?? '상대'
-  }
 
   return {
     exchangeId: exchange.exchangeId,
-    stage: stageOf(exchange, previousStage),
+    stage: stageOf(exchange, myUserId, previousStage),
     zone: exchange.zone,
     slotBaseTime: exchange.slotBaseTime,
     slotCount: exchange.slotCount,
+    identityMark: exchange.identityMark,
     mySlots: me?.slots ?? [],
-    partnerSlots,
-    partnerNames,
+    myName: me?.username ?? '나',
+    myIdentityNumber: me?.identityNumber ?? 0,
+    myArrived: me?.arrived ?? false,
+    partners: exchange.participants
+      .filter((p) => p.userId !== myUserId)
+      .map((p) => ({
+        userId: p.userId,
+        name: p.username ?? '상대',
+        slots: p.slots,
+        identityNumber: p.identityNumber,
+        arrived: p.arrived,
+      })),
     overlapSlot: exchange.overlapSlot,
     allAnswered: exchange.allAnswered,
     confirmedLabel: exchange.confirmedTime ? formatConfirmedTime(exchange.confirmedTime) : null,
+    confirmedTime: exchange.confirmedTime,
   }
 }
 
 /**
  * 단계는 서버 상태에서 끌어낸다. 화면이 따로 들고 있으면 실시간으로 갱신될 때마다 어긋난다.
  *
- * 도착만 예외다. 그건 서버가 모르는 내 화면의 사정이라, 한 번 도착했으면 그대로 둔다.
+ * 도착도 서버가 알고 있어서 `previousStage` 를 볼 필요가 없어졌다. 다른 기기에서 도착을 눌러도
+ * 이 화면이 따라온다.
  */
-function stageOf(exchange: Exchange, previousStage?: AppointmentStage): AppointmentStage {
+function stageOf(
+  exchange: Exchange,
+  myUserId: string,
+  previousStage?: AppointmentStage,
+): AppointmentStage {
+  const me = exchange.participants.find((p) => p.userId === myUserId)
+
+  if (me?.arrived) return 'arrived'
   if (previousStage === 'arrived') return 'arrived'
   if (exchange.confirmedTime) return 'confirmed'
   if (exchange.allAnswered && exchange.overlapSlot === null) return 'time-conflict'

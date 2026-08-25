@@ -50,7 +50,6 @@ export function TimeSelect() {
     )
   }
 
-  const partnerIds = Object.keys(appt.partnerSlots)
   const matched = appt.overlapSlot !== null
   const conflict = appt.allAnswered && !matched
   const waiting = !appt.allAnswered
@@ -99,7 +98,7 @@ export function TimeSelect() {
 
         <span className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3.5 py-1.5 text-[12px] font-semibold text-neutral-600">
           <span className="size-1.5 rounded-full bg-ink" />
-          {partnerIds.map((id) => appt.partnerNames[id]).join(', ')}님과 매칭
+          {appt.partners.map((p) => p.name).join(', ')}님과 매칭
         </span>
 
         <div className="mt-4 overflow-x-auto no-scrollbar">
@@ -128,12 +127,12 @@ export function TimeSelect() {
               interactive
               onToggle={toggle}
             />
-            {partnerIds.map((id, i) => (
+            {appt.partners.map((partner, i) => (
               <TimeRow
-                key={id}
-                label={appt.partnerNames[id]}
+                key={partner.userId}
+                label={partner.name}
                 slotCount={appt.slotCount}
-                slots={appt.partnerSlots[id]}
+                slots={partner.slots}
                 color={ROW_COLORS[(i + 1) % ROW_COLORS.length]}
                 overlap={appt.overlapSlot}
               />

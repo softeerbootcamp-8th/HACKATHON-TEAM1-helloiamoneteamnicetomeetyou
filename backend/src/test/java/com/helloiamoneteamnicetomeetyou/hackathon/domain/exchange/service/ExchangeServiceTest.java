@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.entity.Booth;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.TimeSlotGrid;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeParticipantResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
@@ -85,7 +86,7 @@ class ExchangeServiceTest {
 
         given(exchangeRepository.findById(EXCHANGE_ID)).willReturn(Optional.of(exchange));
         given(participantRepository.findAllByExchangeId(EXCHANGE_ID))
-                .willReturn(List.of(ExchangeParticipant.of(exchange, me), ExchangeParticipant.of(exchange, partner)));
+                .willReturn(List.of(ExchangeParticipant.of(exchange, me, 28), ExchangeParticipant.of(exchange, partner, 16)));
         given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of());
     }
 
@@ -103,6 +104,8 @@ class ExchangeServiceTest {
 
         assertThat(response.slotBaseTime()).isEqualTo(BASE_TIME);
         assertThat(response.slotCount()).isEqualTo(TimeSlotGrid.SLOT_COUNT);
+        // 식별 화면에서 서로를 찾으려면 참가자마다 번호가 달라야 한다.
+        assertThat(response.participants()).extracting(p -> p.identityNumber()).doesNotHaveDuplicates();
         assertThat(response.zone().name()).isEqualTo("중앙 포토존 앞");
         assertThat(response.boothId()).isEqualTo(booth.getId());
         verify(sseEventPublisher).toUser(eq(ME), eq(SseEventType.EXCHANGE_CREATED), any());
@@ -188,6 +191,28 @@ class ExchangeServiceTest {
                 .isInstanceOf(ApplicationException.class)
                 .extracting(e -> ((ApplicationException) e).getErrorType())
                 .isEqualTo(ErrorCode.EXCHANGE_TIME_ALREADY_CONFIRMED);
+    }
+
+    @Test
+    @DisplayName("시간이 정해진 뒤에 도착을 알리면 전원에게 전해진다")
+    void 도착을_알리면_전원에게_전해진다() {
+        exchange.confirmTime(1);
+
+        ExchangeResponseDto response = exchangeService.arrive(EXCHANGE_ID, ME);
+
+        assertThat(response.participants())
+                .filteredOn(p -> p.userId().equals(ME))
+                .allMatch(ExchangeParticipantResponseDto::arrived);
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_ARRIVED), any());
+    }
+
+    @Test
+    @DisplayName("시간이 정해지기 전에는 도착을 받지 않는다")
+    void 시간이_정해지기_전에는_도착을_받지_않는다() {
+        assertThatThrownBy(() -> exchangeService.arrive(EXCHANGE_ID, ME))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(e -> ((ApplicationException) e).getErrorType())
+                .isEqualTo(ErrorCode.EXCHANGE_TIME_NOT_CONFIRMED);
     }
 
     @Test

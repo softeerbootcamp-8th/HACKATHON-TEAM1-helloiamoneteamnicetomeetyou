@@ -61,6 +61,17 @@ public class ExchangeController {
         return ResponseEntity.ok(CommonResponse.ok(exchange, "시간 조율을 요청했습니다."));
     }
 
+    /** "도착했어요". 상대 화면의 배지가 이동중에서 도착으로 바뀐다. */
+    @PostMapping("/{exchangeId}/arrive")
+    public ResponseEntity<CommonResponse<ExchangeResponseDto>> arrive(
+            @PathVariable Long exchangeId,
+            @RequestBody ExchangeActorRequestDto request) {
+
+        ExchangeResponseDto exchange = exchangeService.arrive(exchangeId, request.userId());
+
+        return ResponseEntity.ok(CommonResponse.ok(exchange, "도착을 알렸습니다."));
+    }
+
     /** 거래 취소. 상대 화면에도 취소됐다는 것이 실시간으로 전해진다. */
     @PostMapping("/{exchangeId}/cancel")
     public ResponseEntity<CommonResponse<ExchangeResponseDto>> cancel(
