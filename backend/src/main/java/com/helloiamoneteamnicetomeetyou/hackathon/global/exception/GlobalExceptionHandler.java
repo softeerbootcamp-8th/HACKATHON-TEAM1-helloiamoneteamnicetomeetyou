@@ -12,6 +12,7 @@ import org.springframework.validation.method.ParameterErrors;
 import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -107,6 +108,24 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(ErrorCode.INVALID_TYPE.getHttpStatus())
                 .body(CommonResponse.error(ErrorCode.INVALID_TYPE));
+    }
+
+    /**
+     * 필수 쿼리 파라미터가 빠진 경우다. 잡아 주지 않으면 아래 {@code Exception} 핸들러로 떨어져서,
+     * 요청을 잘못 보낸 것인데 500 과 "서버 내부 오류" 가 나간다. 프론트가 원인을 알 수 없다.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<CommonResponse<Void>> handleMissingServletRequestParameterException(
+            MissingServletRequestParameterException e, HttpServletRequest request) {
+
+        log.warn("필수 요청 파라미터 누락 - [{}] {} name={}",
+                request.getMethod(), request.getRequestURI(), e.getParameterName());
+
+        List<ValidationError> errors =
+                List.of(new ValidationError(e.getParameterName(), "필수 값입니다."));
+
+        return ResponseEntity.status(ErrorCode.INVALID_INPUT.getHttpStatus())
+                .body(CommonResponse.error(ErrorCode.INVALID_INPUT, errors));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

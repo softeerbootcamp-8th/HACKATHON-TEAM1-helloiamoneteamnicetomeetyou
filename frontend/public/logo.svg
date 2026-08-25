@@ -1,0 +1,52 @@
+<!-- PWA 아이콘 원본. Figma(Page 1)의 NearLy 레몬 심볼을 512 정사각 캔버스에 올린 것이다.
+     이 파일만 갈아끼우고 `pnpm generate-pwa-assets` 를 돌리면 아이콘 전체가 다시 만들어진다.
+     안드로이드가 아이콘을 원형으로 깎으므로 가장자리 여백을 줄이지 않는다. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#ffffff"/>
+  <g transform="translate(-16.86,-16.86) scale(1.4391)">
+<defs>
+<path id="b" d="M243.582 101.543C251.568 96.8913 263.204 99.2717 271.567 107.634C279.929 115.997 282.308 127.632 277.656 135.619C274.939 140.283 274.56 146.337 274.969 153.928C275.369 161.351 276.54 170.327 276.554 179.971C276.582 199.542 271.919 222.712 247.316 247.316C222.712 271.92 199.54 276.583 179.97 276.554C170.326 276.54 161.35 275.371 153.928 274.97C146.337 274.561 140.283 274.94 135.619 277.657C127.633 282.309 115.997 279.93 107.634 271.567C99.2714 263.204 96.8914 251.569 101.543 243.583C104.26 238.918 104.64 232.864 104.231 225.273C103.83 217.851 102.661 208.874 102.647 199.23C102.618 179.659 107.28 156.489 131.884 131.885C156.488 107.281 179.659 102.619 199.23 102.647C208.873 102.661 217.85 103.831 225.273 104.231C232.863 104.64 238.918 104.26 243.582 101.543ZM187.882 127.592C187.353 125.476 185.209 124.189 183.092 124.718C171.368 127.65 158.239 136.282 147.253 147.271C136.61 157.917 128.186 170.569 125.009 181.991L124.718 183.092C124.189 185.209 125.476 187.353 127.592 187.882H127.591C127.916 187.963 128.238 188.001 128.554 188.001C130.324 188.001 131.934 186.801 132.382 185.008L132.644 184.021C135.509 173.779 143.351 162.361 152.858 152.855C162.67 143.043 174.52 135.004 185.008 132.382C187.124 131.853 188.411 129.709 187.882 127.592Z"/>
+<linearGradient id="body" x1="196.685" y1="151.813" x2="239.096" y2="282.865" gradientUnits="userSpaceOnUse">
+<stop stop-color="#EDF722"/><stop offset="1" stop-color="#2CED90"/>
+</linearGradient>
+<radialGradient id="hi1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(259.034 107.885) rotate(133.191) scale(63.4907)">
+<stop stop-color="#EDF920"/><stop offset="1" stop-color="#EDF920" stop-opacity="0"/>
+</radialGradient>
+<radialGradient id="hi2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(123.472 259.034) rotate(-97.0013) scale(108.503)">
+<stop stop-color="#EDF920"/><stop offset="1" stop-color="#55BB64" stop-opacity="0"/>
+</radialGradient>
+<linearGradient id="edge" x1="214.162" y1="283.596" x2="172.596" y2="189.6" gradientUnits="userSpaceOnUse">
+<stop stop-color="white" stop-opacity="0.34"/><stop offset="1" stop-color="white" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="s1" x1="216.86" y1="83.0693" x2="354.009" y2="159.196" gradientUnits="userSpaceOnUse">
+<stop stop-color="#EEF823"/><stop offset="1" stop-color="#2CED90"/>
+</linearGradient>
+<linearGradient id="s2" x1="245.304" y1="272.157" x2="88.4571" y2="270.158" gradientUnits="userSpaceOnUse">
+<stop stop-color="#EEF823"/><stop offset="1" stop-color="#2CED90"/>
+</linearGradient>
+<linearGradient id="s3" x1="87.5077" y1="122.832" x2="225.997" y2="196.49" gradientUnits="userSpaceOnUse">
+<stop stop-color="#EEF823"/><stop offset="1" stop-color="#2CED90"/>
+</linearGradient>
+<linearGradient id="s4" x1="284.653" y1="163.433" x2="220.315" y2="112.357" gradientUnits="userSpaceOnUse">
+<stop stop-color="#EEF823"/><stop offset="1" stop-color="#2CED90"/>
+</linearGradient>
+<linearGradient id="s5" x1="49.5811" y1="287.377" x2="142.191" y2="215.779" gradientUnits="userSpaceOnUse">
+<stop stop-color="#EEF823"/><stop offset="1" stop-color="#2CED90"/>
+</linearGradient>
+<mask id="m" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="97" y="97" width="185" height="185">
+<use href="#b" fill="#ffffff"/>
+</mask>
+</defs>
+<use href="#b" fill="url(#body)"/>
+<use href="#b" fill="url(#hi1)"/>
+<use href="#b" fill="url(#hi2)"/>
+<g mask="url(#m)">
+<path d="M233.728 174.091C265.518 222.507 231.133 244.886 225.294 265.113C227.889 265.113 246.703 266.405 259.679 267.05C282.661 268.193 277.844 198.622 241.513 144.396C210.373 97.917 260.976 37.2355 238.269 49.5009C220.104 59.3132 203.452 77.2594 197.397 85.0059C196.965 105.879 193.702 113.13 233.728 174.091Z" fill="url(#s1)" fill-opacity="0.6"/>
+<path d="M205.072 179.801C154.127 152.246 156.014 136.452 151.564 115.875C149.279 117.105 132.102 124.889 120.372 130.473C99.5956 140.363 128.757 204.373 186.455 234.89C235.911 261.048 228.194 333.428 242.37 311.863C253.712 294.611 259.864 270.915 261.522 261.223C252.006 242.641 269.217 214.496 205.072 179.801Z" fill="url(#s2)" fill-opacity="0.6"/>
+<path d="M106.003 213.537C138.654 261.376 104.676 284.367 99.2 304.695C101.795 304.649 120.629 305.603 133.614 306.016C156.612 306.748 150.551 237.274 113.255 183.707C81.2868 137.793 130.796 76.2151 108.312 88.8851C90.3254 99.0211 73.9979 117.263 68.0824 125.116C68.0238 145.993 64.8913 153.303 106.003 213.537Z" fill="url(#s3)" fill-opacity="0.6"/>
+<path d="M257.25 116.583C285.638 116.444 276.248 158.54 278.229 177.477L293.014 147.066L291.708 94.5995C279.716 72.3111 252.925 35.7092 241.701 67.6089C227.67 107.483 238.044 116.676 257.25 116.583Z" fill="url(#s4)" fill-opacity="0.4"/>
+<path d="M123.749 265.44C114.259 304.765 59.2184 277.417 32.341 273.699L69.375 304.527L142.413 320.614C177.342 311.623 237.121 287.038 196.812 260.628C146.427 227.616 130.17 238.835 123.749 265.44Z" fill="url(#s5)" fill-opacity="0.4"/>
+</g>
+<use href="#b" fill="none" stroke="url(#edge)" stroke-width="3.2"/>
+</g>
+</svg>

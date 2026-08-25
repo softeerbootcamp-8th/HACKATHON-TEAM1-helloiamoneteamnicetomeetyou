@@ -7,9 +7,11 @@
 
 - Vite 8 + React 19 + TypeScript (strict)
 - Tailwind CSS v4 (`@tailwindcss/vite` 플러그인, CSS-first)
+- PWA (`vite-plugin-pwa`). 홈 화면 설치와 오프라인 앱 껍데기까지만 한다
 - ESLint + Prettier (포맷 규칙은 전부 Prettier 가 맡는다)
 - 패키지 매니저는 **pnpm 고정**이다. Node 22 이상이 필요하다.
-- **라우터와 서버 상태 라이브러리는 아직 없다.** 필요해지면 팀에 알리고 넣는다.
+- 라우팅은 `react-router`, 모션은 `motion` 을 쓴다.
+- **서버 상태 라이브러리는 아직 없다.** 필요해지면 팀에 알리고 넣는다.
 
 ## 명령어
 
@@ -20,6 +22,36 @@
 | `pnpm lint`         | ESLint (`pnpm lint:fix` 로 자동 수정)                         |
 | `pnpm format`       | Prettier 로 정리                                              |
 | `pnpm format:check` | Prettier 검사만. **CI 가 이걸 돌린다**                        |
+| `pnpm preview`      | 빌드 결과를 띄운다. **서비스 워커는 여기서만 돈다**           |
+
+## PWA
+
+`vite.config.ts` 의 `VitePWA` 설정 한 군데에 모여 있다.
+
+- **서비스 워커는 `pnpm dev` 에서 돌지 않는다.** 설치나 오프라인을 확인하려면
+  `pnpm build && pnpm preview` 로 봐야 한다.
+- **`/api` 응답은 캐시하지 않는다.** 프리캐시 대상은 빌드 산출물뿐이고 `runtimeCaching`
+  을 비워 뒀다. 오래된 데이터가 화면에 남으면 디버깅이 어려워진다. 오프라인에서 API 를
+  쓰고 싶어지면 그때 팀에 알리고 넣는다.
+- 새 배포가 올라오면 다음 방문에 서비스 워커가 알아서 갈아끼운다(`autoUpdate`).
+
+### 아이콘 바꾸기
+
+**`public/logo.svg` 하나만 갈아끼우고 아래를 돌린다.** 512x512 정사각형이고,
+안드로이드가 아이콘을 원형으로 깎기 때문에 가장자리에 여백이 있어야 한다.
+
+```bash
+pnpm generate-pwa-assets
+```
+
+`public/` 의 `favicon.ico`, `apple-touch-icon-180x180.png`, `pwa-*.png`,
+`maskable-icon-512x512.png` 가 다시 만들어진다. **결과물은 커밋한다.** 빌드할 때
+만들지 않는 이유는 CI 와 Vercel 이 `sharp` 를 설치하지 않아도 되게 하려는 것이다.
+
+- 브라우저 탭 아이콘인 `public/favicon.svg` 는 이 생성기가 건드리지 않는다.
+  배경이 투명한 별도 파일이라 같이 바꿔야 한다.
+- 이름과 테마색은 `vite.config.ts` 의 `manifest` 에 있다. `theme_color` 를 바꾸면
+  `index.html` 의 `<meta name="theme-color">` 도 같이 고친다.
 
 ### push 전에 돌릴 것
 
@@ -47,10 +79,15 @@ Claude Code 로 작업할 때는 `frontend/` 아래 파일을 고치는 즉시
 
 ```
 src/
-├── lib/        api 클라이언트 등 공용 유틸
-├── components/ 재사용 UI
-├── features/   도메인별 화면 조각
-└── main.tsx    진입점
+├── app/          라우터와 화면 껍데기(AppShell)
+├── lib/          api 클라이언트, 모션 프리셋 등 공용 유틸
+├── components/
+│   ├── ui/       버튼, 다이얼로그처럼 도메인을 모르는 것
+│   └── domain/   카드, 레이더처럼 이 서비스에만 있는 것
+├── screens/      화면 하나당 파일 하나
+├── store/        전역 상태와 매칭 규칙
+├── mocks/        API 가 붙기 전까지 쓰는 고정 데이터
+└── main.tsx      진입점
 ```
 
 - import 는 항상 `@/` 별칭을 쓴다 (`@/lib/api`).
@@ -99,3 +136,25 @@ src/
 - npm 이나 yarn 으로 설치 (pnpm 고정)
 - `dist/` 나 자동 생성 파일 직접 수정
 - 요청받지 않은 전체 포맷 변경
+
+## 모션
+
+**모션 값을 화면마다 따로 적지 않는다.** `@/lib/motion` 의 프리셋만 쓴다.
+화면마다 stiffness 를 다르게 두면 같은 앱인데 화면마다 손맛이 달라진다.
+
+- 화면 전환은 `springPage`, 버튼과 카드는 `springSnap`, 시트와 다이얼로그는 `springSheet` 다.
+- **duration 기반 이징으로 때우지 않는다.** 손가락을 떼는 속도가 이어져야 끊긴 느낌이 안 난다.
+- 누를 수 있는 것에는 반드시 `whileTap` 축소를 준다. 모바일에는 hover 가 없어서
+  이것이 사용자가 받는 유일한 피드백이다.
+- 리스트는 `staggerParent` / `staggerChild` 로 순서대로 띄운다.
+- `prefers-reduced-motion` 은 `index.css` 에서 한 번에 처리한다.
+
+## 화면을 만들 때
+
+- **죽은 버튼을 남기지 않는다.** 누를 것이 있으면 반드시 무언가 일어난다.
+- 다이얼로그와 바텀시트는 바깥 탭, Esc, 버튼 셋 다로 닫힌다. 하나라도 막히면 사용자가 갇힌다.
+- 모바일이 기준이다. 데스크톱은 `AppShell` 이 가운데 판으로 감싸고, 넓게 쓰는 화면만
+  `app/routes.ts` 의 `WIDE_ROUTES` 에 넣는다.
+- 아이콘은 이모지 대신 `components/ui/icons.tsx` 의 선 아이콘을 쓴다. 이모지는 기기마다
+  모양과 색이 달라서 시안대로 맞출 수가 없다.
+- 색과 그라데이션은 `index.css` 의 `@theme` 토큰만 쓴다. 시안에서 뽑은 값이라 임의로 바꾸지 않는다.
