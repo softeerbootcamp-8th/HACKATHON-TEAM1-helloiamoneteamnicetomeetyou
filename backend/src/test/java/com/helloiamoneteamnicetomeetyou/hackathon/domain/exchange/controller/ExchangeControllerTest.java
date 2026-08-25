@@ -55,7 +55,7 @@ class ExchangeControllerTest {
                 1L,
                 ExchangeType.ONE_TO_ONE,
                 ExchangeStatus.PENDING,
-                new ZoneResponseDto(1L, "중앙 포토존 앞", "행사 중앙 포토존"),
+                new ZoneResponseDto(1L, "중앙 포토존 앞", "행사 중앙 포토존", 52, 44),
                 LocalDateTime.of(2026, 8, 25, 14, 15),
                 8,
                 15,

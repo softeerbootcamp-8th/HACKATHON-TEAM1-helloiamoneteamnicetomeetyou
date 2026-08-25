@@ -9,6 +9,9 @@ import { ALL_WAITING } from '@/mocks/data'
 import { StoreContext } from './context'
 import { initialState, reducer } from './reducer'
 
+/** 시안의 `토스트 정리` 가 정한 노출 시간이다. 5초 뒤에 스스로 사라진다. */
+const TOAST_MS = 5000
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const { state: catalog, userId: myUserId } = useCatalog()
@@ -127,7 +130,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // 토스트는 스스로 사라진다.
   useEffect(() => {
     if (!state.toast) return
-    const timer = window.setTimeout(() => dispatch({ type: 'toast', message: null }), 2400)
+    const timer = window.setTimeout(() => dispatch({ type: 'toast', message: null }), TOAST_MS)
     return () => window.clearTimeout(timer)
   }, [state.toast])
 

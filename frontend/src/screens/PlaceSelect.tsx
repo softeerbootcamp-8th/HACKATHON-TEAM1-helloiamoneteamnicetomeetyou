@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/Button'
 import { PinIcon } from '@/components/ui/icons'
 import { TopBar } from '@/components/ui/TopBar'
 import { springSnap } from '@/lib/motion'
-import { zonePinAt } from '@/mocks/data'
 import { activeAppointment } from '@/store/reducer'
 import { useCancelAppointment } from '@/store/use-cancel-appointment'
 import { useLastDefined } from '@/lib/useLastDefined'
@@ -17,8 +16,8 @@ import { useStore } from '@/store/useStore'
  * 교환 장소 확인. 지정 장소는 하나로 정해져 있고, 이 화면은 그 위치가 행사장
  * 어디쯤인지 눈으로 보여주는 자리다. 그래서 다른 핀은 고를 수 없다.
  *
- * 장소의 이름과 위치는 서버에서 온다. 약도와 핀 자리는 아직 목업이라 화면이 정하고,
- * 서버가 준 목록 순서대로 좌표를 얹는다.
+ * 장소의 이름과 위치, 약도 위 자리까지 전부 서버에서 온다. 약도 이미지만 아직 없어서 화면이
+ * 격자로 대신 그리고, 그 위에 서버가 준 비율대로 핀을 찍는다.
  */
 export function PlaceSelect() {
   const navigate = useNavigate()
@@ -56,7 +55,7 @@ export function PlaceSelect() {
             <p className="text-[10px] text-neutral-300">팝업 매장</p>
           </div>
 
-          {zones.map((zone, index) => (
+          {zones.map((zone) => (
             <motion.button
               type="button"
               key={zone.id}
@@ -71,7 +70,7 @@ export function PlaceSelect() {
               whileTap={{ scale: 0.88 }}
               transition={springSnap}
               className="absolute -translate-x-1/2 -translate-y-1/2 text-center"
-              style={{ left: `${zonePinAt(index).x}%`, top: `${zonePinAt(index).y}%` }}
+              style={{ left: `${zone.mapX}%`, top: `${zone.mapY}%` }}
             >
               <PinIcon
                 className={

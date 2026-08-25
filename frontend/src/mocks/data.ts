@@ -50,18 +50,6 @@ export type WaitingUser = {
   online: boolean
 }
 
-/**
- * 약도 위 핀 자리다. 행사장 안 상대 좌표라 거리 계산에는 쓰지 않는다.
- *
- * 서버는 교환 장소의 이름과 위치만 알려 준다. 약도 자체가 아직 목업이라 핀을 어디에 찍을지는
- * 화면이 정하고, 서버가 준 순서대로 이 표를 얹는다. 실제 약도가 들어오면 서버가 좌표를 준다.
- */
-export type ZonePin = {
-  x: number
-  y: number
-  selectable: boolean
-}
-
 export const PHOTOCARD_ITEMS: Item[] = [
   {
     id: 'i5n',
@@ -238,21 +226,6 @@ export const ALL_WAITING: WaitingUser[] = [
     online: false,
   },
 ]
-
-/**
- * 약도 위 핀 자리. **서버가 준 교환 장소 목록의 순서대로** 얹는다.
- * 백엔드 시드나 어드민에서 구역 순서를 바꾸면 여기도 같이 고친다.
- */
-export const ZONE_PINS: ZonePin[] = [
-  { x: 52, y: 44, selectable: true },
-  { x: 25, y: 68, selectable: false },
-  { x: 82, y: 60, selectable: false },
-]
-
-/** 서버 목록이 이 표보다 길면 화면 밖으로 나가지 않게 마지막 자리를 돌려 쓴다. */
-export function zonePinAt(index: number): ZonePin {
-  return ZONE_PINS[index] ?? ZONE_PINS[ZONE_PINS.length - 1]
-}
 
 /** 내 식별 이름. 3인 매칭 화면의 "나 (레몬 28)" 과 같은 자리다. */
 export const MY_IDENTITY = { fruit: '레몬', number: 28 }

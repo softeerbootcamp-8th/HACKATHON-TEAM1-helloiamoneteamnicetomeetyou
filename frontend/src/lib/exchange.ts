@@ -12,6 +12,14 @@ export type Zone = {
   id: number
   name: string
   location: string
+  /**
+   * 약도 위 자리. 약도 너비와 높이에 대한 백분율(0~100)이다.
+   *
+   * 거리 계산에 쓰는 좌표가 아니라 그림 위에 핀을 찍을 비율이다. 약도 이미지 자체는 서버가
+   * 주지 않는다. 행사장 약도 자산이 아직 없어서 화면이 격자로 대신 그린다.
+   */
+  mapX: number
+  mapY: number
 }
 
 export type ExchangeType = 'ONE_TO_ONE' | 'MULTI_WAY'

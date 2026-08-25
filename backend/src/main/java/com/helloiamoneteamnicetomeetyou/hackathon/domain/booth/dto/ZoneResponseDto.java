@@ -5,12 +5,16 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.entity.Zone;
 /**
  * 교환 장소 하나.
  *
- * <p>약도 위 좌표는 여기 없다. 행사장 약도 자체가 아직 목업이라 핀 자리는 화면이 정하고, 서버는
- * 어떤 자리들이 있고 무엇이라 부르는지만 알려 준다. 실제 약도가 들어오면 그때 좌표를 넣는다.
+ * <p>{@code mapX}, {@code mapY} 는 약도 위 자리다. 약도 너비와 높이에 대한 백분율(0~100)이고,
+ * 거리 계산에 쓰는 좌표가 아니라 그림 위에 핀을 찍을 비율이다.
+ *
+ * <p>약도 이미지 자체는 서버가 주지 않는다. 행사장 약도 자산이 아직 없어서 화면이 격자로 대신
+ * 그리고 있고, 이미지가 들어오면 그때 이 응답에 더한다.
  */
-public record ZoneResponseDto(Long id, String name, String location) {
+public record ZoneResponseDto(Long id, String name, String location, int mapX, int mapY) {
 
     public static ZoneResponseDto from(Zone zone) {
-        return new ZoneResponseDto(zone.getId(), zone.getName(), zone.getLocation());
+        return new ZoneResponseDto(
+                zone.getId(), zone.getName(), zone.getLocation(), zone.getMapX(), zone.getMapY());
     }
 }

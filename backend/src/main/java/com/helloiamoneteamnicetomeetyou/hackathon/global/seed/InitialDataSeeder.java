@@ -32,11 +32,16 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class InitialDataSeeder implements ApplicationRunner {
 
-    /** 화면의 핀 배치가 이 순서에 기댄다. 순서를 바꾸면 프론트의 좌표표도 같이 고친다. */
-    private static final List<String[]> ZONES = List.of(
-            new String[]{"중앙 포토존 앞", "행사 중앙 포토존"},
-            new String[]{"에스컬레이터", "1층 에스컬레이터 앞"},
-            new String[]{"라운지", "휴게 라운지"});
+    /**
+     * 교환 장소와 약도 위 자리다. 뒤의 두 숫자가 약도 너비·높이에 대한 백분율이다.
+     *
+     * <p>행사장 약도 이미지가 아직 없어서 자리는 우리가 임의로 정했다. 다만 그 값이 화면에
+     * 박혀 있으면 구역을 늘릴 때마다 프론트를 고쳐야 해서, DB 에 넣고 응답으로 내려보낸다.
+     */
+    private static final List<Object[]> ZONES = List.of(
+            new Object[]{"중앙 포토존 앞", "행사 중앙 포토존", 52, 44},
+            new Object[]{"에스컬레이터", "1층 에스컬레이터 앞", 25, 68},
+            new Object[]{"라운지", "휴게 라운지", 82, 60});
 
     /**
      * 프론트 목업의 카드와 <b>이름이 같아야 한다.</b> 화면이 목업 카드와 서버 카드를 이름으로
@@ -64,10 +69,25 @@ public class InitialDataSeeder implements ApplicationRunner {
                 .findFirst()
                 .orElseGet(() -> boothRepository.save(Booth.of("현대자동차 팝업", "자동차 포토카드 교환")));
 
+        List<Zone> existing = zoneRepository.findByBoothIdOrderByIdAsc(booth.getId());
+
         int zones = 0;
-        if (zoneRepository.findByBoothIdOrderByIdAsc(booth.getId()).isEmpty()) {
-            ZONES.forEach(zone -> zoneRepository.save(Zone.of(booth, zone[0], zone[1])));
+        if (existing.isEmpty()) {
+            ZONES.forEach(zone -> zoneRepository.save(
+                    Zone.of(booth, (String) zone[0], (String) zone[1], (int) zone[2], (int) zone[3])));
             zones = ZONES.size();
+        } else {
+            /*
+              이미 구역이 있는 DB 다. 약도 자리 컬럼이 나중에 생겨서 전부 기본값(50, 50)으로
+              들어가 있는데, 그러면 핀이 약도 한가운데 겹쳐 뜬다. 우리가 정해 둔 자리로 채워 준다.
+              어드민에서 옮긴 자리를 되돌리지 않도록 기본값인 것만 건드린다.
+            */
+            for (int i = 0; i < existing.size() && i < ZONES.size(); i++) {
+                Zone zone = existing.get(i);
+                if (zone.getMapX() == 50 && zone.getMapY() == 50) {
+                    zone.moveOnMap((int) ZONES.get(i)[2], (int) ZONES.get(i)[3]);
+                }
+            }
         }
 
         int items = 0;
