@@ -106,6 +106,94 @@ jobs:
       # 최상위 permissions 는 contents: read 뿐이라 여기서 따로 올려줘야 한다.
       packages: read
     steps:
+      # 앱 배포보다 먼저 띄운다 — 앱이 기동에 실패해도 Dozzle 이 이미 떠 있어야 원인을 볼 수 있다.
+      # continue-on-error: 모니터링 장애가 앱 배포를 막아서는 안 된다.
+      - name: Ensure Dozzle (log viewer) is running
+        uses: appleboy/ssh-action@v1
+        continue-on-error: true
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 3m
+          envs: DOZZLE_USERS_B64
+          script: |
+            set -euo pipefail
+
+            # users.yml 을 base64 로 감싸 전달하는 이유:
+            # 이 파일은 여러 줄이고 bcrypt 해시에 $ 가 들어간다($2a$11$...).
+            # ssh-action 의 envs 로 여러 줄·$ 포함 값을 넘기면 셸 이스케이프가 깨질 수 있다.
+            # base64 는 한 줄 영숫자라 그 문제가 원천적으로 없다.
+            #
+            # simple auth 는 /data/users.yml 파일이 반드시 있어야 한다 —
+            # 아이디/비밀번호를 환경변수로 주는 방법은 Dozzle 에 없다.
+            # 파일은 아래 명령으로 만든다(-it 를 붙이면 TTY 제어문자가 섞인다):
+            #   docker run --rm amir20/dozzle:v10.7.4 generate admin \
+            #     --password '<비밀번호>' --email <메일> --name '<이름>' | base64 | tr -d '\n'
+            if [ -z "${DOZZLE_USERS_B64:-}" ]; then
+              echo "DOZZLE_USERS_B64 미설정 — Dozzle 을 건너뜁니다."
+              exit 0
+            fi
+
+            mkdir -p /home/ubuntu/dozzle
+            umask 077
+            printf '%s' "$DOZZLE_USERS_B64" | base64 -d > /home/ubuntu/dozzle/users.yml
+
+            # Dozzle 은 상태를 갖지 않는다 — 로그는 Docker 의 json-file 에, 계정은 디스크에 있다.
+            # 그래서 매 배포마다 재생성해도 안전하고, 오히려 재생성해야 이 파일의 설정 변경이 반영된다.
+            docker rm -f dozzle 2>/dev/null || true
+
+            # docker.sock 의 :ro 는 Docker API 를 제한하지 못한다(소켓이라 마운트 플래그가
+            # API 시맨틱에 영향을 주지 않는다). 실질적 방어는 파괴적 기능을 켜지 않는 것이다 —
+            # DOZZLE_ENABLE_ACTIONS(start/stop/restart)와 DOZZLE_ENABLE_SHELL(컨테이너 exec)은
+            # 둘 다 기본값 off 이므로 명시적으로 켜지 않는다.
+            #
+            # 내부 포트는 8080 인데 앱과 겹치므로 호스트는 8081 로 매핑한다.
+            # :latest 대신 버전을 고정한다 — 릴리스가 매우 잦아 배포마다 버전이 달라질 수 있다.
+            #
+            # 필터를 name=^app$ 로 앵커링한다. Docker 의 name 필터는 부분 문자열 매칭이라
+            # name=app 이면 backend-app-2 같은 이름까지 걸린다(실측 확인). 앵커를 붙이면
+            # 정확히 app 하나만 잡힌다. Dozzle 은 정지된 컨테이너도 목록에 넣으므로
+            # 과거에 쓰던 이름이 남아 있으면 앵커 없이는 섞여 보인다.
+            #
+            # --memory 96m: 실측 유휴 37MiB 에 스트리밍·다중 접속 여유를 더한 값이다.
+            # 상한은 예약이 아니라 한도다 — 실사용 합계(app 153 + dozzle 37 + OS 180 ≈ 370MiB)는
+            # 906MiB 에 충분히 들어간다. 이 상한의 목적은 Dozzle 폭주가 앱을 죽이지 않게 하는 것.
+            docker run -d \
+              --name dozzle \
+              --restart unless-stopped \
+              -p 8081:8080 \
+              --memory 96m \
+              --log-opt max-size=5m --log-opt max-file=2 \
+              -v /var/run/docker.sock:/var/run/docker.sock:ro \
+              -v /home/ubuntu/dozzle:/data \
+              -e 'DOZZLE_FILTER=name=^app$' \
+              -e DOZZLE_AUTH_PROVIDER=simple \
+              amir20/dozzle:v10.7.4
+
+            # continue-on-error 라 스텝이 초록이 되므로, 문제는 경고로 남겨 눈에 띄게 한다.
+            #
+            # curl --retry 를 쓰지 않는다. --retry 는 타임아웃과 5xx 같은 "전송상 오류"만
+            # 재시도하고, 컨테이너가 아직 포트를 바인딩하지 않았을 때 나는
+            # errno 56(connection reset by peer)은 재시도 대상이 아니다.
+            # 실제로 컨테이너 시작 0.2초 뒤 단 한 번 찍고 실패해서, 정상 기동한 Dozzle 을
+            # 죽은 것으로 오판했다. 앱 배포 스텝과 같은 명시적 루프로 바꾼다.
+            #
+            # /healthcheck 를 대상으로 삼는다 — 인증을 켜도 200 을 주는 전용 엔드포인트다
+            # (/ 는 로그인으로 307, /api/* 는 401 이라 성공 판정이 애매하다).
+            for i in $(seq 1 15); do
+              if curl -fsS -o /dev/null http://localhost:8081/healthcheck 2>/dev/null; then
+                echo "dozzle up on :8081 (${i} tries)"
+                exit 0
+              fi
+              sleep 2
+            done
+
+            echo "::warning::Dozzle 응답 없음 — 아래 로그 확인"
+            docker logs --tail 50 dozzle || true
+        env:
+          DOZZLE_USERS_B64: ${{ secrets.DOZZLE_USERS_B64 }}
+
       - name: Pull & restart container over SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -114,7 +202,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           # 배포가 걸려도 러너를 물고 있지 않게 자른다.
           command_timeout: 5m
-          envs: IMAGE,GHCR_USER,GHCR_TOKEN
+          envs: IMAGE,GHCR_USER,GHCR_TOKEN,DB_URL,DB_USERNAME,DB_PASSWORD
           # script_stop 은 이 액션의 입력이 아니다(Unexpected input 경고).
           # 스크립트 첫 줄의 set -euo pipefail 이 같은 역할을 한다.
           script: |
@@ -147,19 +235,29 @@ jobs:
             #
             # MaxRAMPercentage=70 × 640m = 힙 448m.
             JVM_OPTS="-XX:MaxRAMPercentage=70.0 -XX:+UseG1GC"
+            # 컨테이너 기본 타임존은 UTC 다. 명시하지 않으면 LocalDateTime.now() 가 UTC 로 찍혀
+            # RDS 에 9시간 어긋난 값이 저장된다. JDBC URL 의 serverTimezone 과 같은 값으로 맞춘다.
+            JVM_OPTS="$JVM_OPTS -Duser.timezone=Asia/Seoul"
             JVM_OPTS="$JVM_OPTS -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/dumps/heapdump-%p.hprof"
             JVM_OPTS="$JVM_OPTS -Xlog:gc*,gc+heap=debug:file=/dumps/gc.log:time,uptime,level,tags:filecount=5,filesize=20m"
 
             docker rm -f app 2>/dev/null || true
 
+            # --log-opt 이 없으면 json-file 이 무제한으로 쌓인다.
+            # Dozzle 이 이 로그를 읽으므로 지금부터 로그에 의존하기 시작하는데,
+            # 상한이 없으면 루트 볼륨이 찬다. 20m×5 = 100MB 로 GC로그 예산과 같게 맞췄다.
             docker run -d \
               --name app \
               --restart unless-stopped \
               -p 8080:8080 \
               --memory 640m \
+              --log-opt max-size=20m --log-opt max-file=5 \
               -v /home/ubuntu/app/dumps:/dumps \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e JAVA_OPTS="$JVM_OPTS" \
+              -e DB_URL="$DB_URL" \
+              -e DB_USERNAME="$DB_USERNAME" \
+              -e DB_PASSWORD="$DB_PASSWORD" \
               "$IMAGE"
 
             # 배포를 fire-and-forget 으로 두지 않는다. 안 뜨면 로그를 남기고 워크플로를 실패시킨다.
@@ -180,6 +278,11 @@ jobs:
           IMAGE: ${{ needs.build.outputs.image }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # RDS 접속 정보. application.yml 의 prod 프로파일이 이 이름 그대로 ${DB_URL} 로 읽는다.
+          # 값이 비면 앱이 부팅 단계에서 placeholder 미해결로 죽고 health check 가 배포를 실패시킨다.
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
 
   notify:
     name: Notify Slack

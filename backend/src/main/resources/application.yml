@@ -1,20 +1,60 @@
+# JPA 가 클래스패스에 있으면 DataSource 없이는 앱이 아예 뜨지 않는다.
+# 그래서 기본/e2e/prod 세 프로파일 모두 datasource 를 갖는다.
+#
+# 기본 프로파일은 `./gradlew bootRun` 용이고, docker-compose.yml 의 mysql 이
+# 호스트 3306 에 열려 있는 것을 그대로 본다 (`docker compose up -d mysql`).
+#
+# 로컬 URL 의 allowPublicKeyRetrieval=true 는 MySQL 8 의 기본 인증 플러그인
+# (caching_sha2_password)이 SSL 을 끈 연결에서 서버 공개키를 요구하기 때문에 필요하다.
+# 없으면 "Public Key Retrieval is not allowed" 로 부팅이 실패한다.
+# prod 는 sslMode=REQUIRED 로 암호화된 연결을 쓰므로 이 옵션을 넣지 않는다.
 spring:
   application:
     name: helloiamoneteamnicetomeetyou
+  datasource:
+    url: jdbc:mysql://localhost:3306/hackathon?sslMode=DISABLED&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+    username: ${DB_USERNAME:hackathon}
+    password: ${DB_PASSWORD:hackathon}
+  jpa:
+    hibernate:
+      # 해커톤 기간에는 마이그레이션 도구를 넣지 않는다. 스키마를 바꾸면 팀에 알린다.
+      ddl-auto: update
+    # Lazy 로딩을 Controller 까지 끌고 가지 않는다.
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
 
 server:
   port: 8080
 
 ---
 # 로컬 docker compose E2E 테스트용 프로파일 (SPRING_PROFILES_ACTIVE=e2e)
+# compose 네트워크 안에서는 서비스 이름 mysql 이 그대로 호스트명이 된다.
 spring:
   config:
     activate:
       on-profile: e2e
+  datasource:
+    url: jdbc:mysql://mysql:3306/hackathon?sslMode=DISABLED&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+    username: hackathon
+    password: hackathon
 
 ---
 # EC2 배포용 프로파일 (SPRING_PROFILES_ACTIVE=prod)
+#
+# RDS 접속 정보는 GitHub Secrets → deploy-backend.yml 의 docker run -e 로 들어온다.
+# 기본값을 일부러 주지 않는다. 값이 빠지면 "Could not resolve placeholder 'DB_URL'" 로
+# 부팅 단계에서 바로 죽는 편이, 조용히 엉뚱한 DB 를 보는 것보다 낫다.
 spring:
   config:
     activate:
       on-profile: prod
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    properties:
+      hibernate:
+        format_sql: false
