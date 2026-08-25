@@ -18,6 +18,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseConnectionManage
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -43,36 +44,37 @@ public class AdminUserService {
     private final SseConnectionManager sseConnectionManager;
 
     /**
-     * 사용자 목록이다. 카드 수는 사람마다 따로 세지 않고 한 번에 묶어서 읽는다.
+     * 사용자 목록이다. 각자 들고 있는 카드까지 함께 담는다.
      *
-     * <p>사람마다 세면 사용자 수 곱하기 2 만큼 쿼리가 나간다. 부스 이틀이면 사람이 계속 쌓이는
-     * 화면이라 처음부터 묶어 두는 편이 낫다.
+     * <p>카드를 사람마다 따로 읽으면 사용자 수만큼 쿼리가 나간다. 전부 한 번에 읽어 와서
+     * 메모리에서 묶는다. 부스 규모에서는 이쪽이 훨씬 싸다.
      */
     public List<UserView> findUsers() {
-        Map<UUID, Long> haveCounts = toCountMap(userHaveItemRepository.countByUser());
-        Map<UUID, Long> wantCounts = toCountMap(userWantItemRepository.countByUser());
+        Map<UUID, List<ItemView>> have = groupHave();
+        Map<UUID, List<ItemView>> want = groupWant();
         Set<UUID> connected = sseConnectionManager.connectedUserIds();
 
         return userRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(user -> UserView.of(
                         user,
-                        haveCounts.getOrDefault(user.getId(), 0L).intValue(),
-                        wantCounts.getOrDefault(user.getId(), 0L).intValue(),
+                        have.getOrDefault(user.getId(), List.of()),
+                        want.getOrDefault(user.getId(), List.of()),
                         connected.contains(user.getId())))
                 .toList();
     }
 
-    private Map<UUID, Long> toCountMap(List<Object[]> rows) {
-        return rows.stream().collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
+    private Map<UUID, List<ItemView>> groupHave() {
+        return userHaveItemRepository.findAllWithItem().stream()
+                .collect(Collectors.groupingBy(
+                        row -> row.getUser().getId(),
+                        Collectors.mapping(row -> ItemView.of(row.getItem()), Collectors.toList())));
     }
 
-    public long countUsers() {
-        return userRepository.count();
-    }
-
-    /** 어드민이 세워 둔 더미 수. 시연 판이 차려져 있는지를 이 숫자로 본다. */
-    public long countDummies() {
-        return userRepository.findAll().stream().filter(User::isAdminManaged).count();
+    private Map<UUID, List<ItemView>> groupWant() {
+        return userWantItemRepository.findAllWithItem().stream()
+                .collect(Collectors.groupingBy(
+                        row -> row.getUser().getId(),
+                        Collectors.mapping(row -> ItemView.of(row.getItem()), Collectors.toList())));
     }
 
     /**
@@ -99,11 +101,11 @@ public class AdminUserService {
 
     private ItemDetailView toItemDetail(Long itemId, ItemView item, Set<UUID> connected) {
         List<UserView> holders = userHaveItemRepository.findAllByItemId(itemId).stream()
-                .map(have -> UserView.of(have.getUser(), 0, 0, connected.contains(have.getUser().getId())))
+                .map(have -> UserView.of(have.getUser(), List.of(), List.of(), connected.contains(have.getUser().getId())))
                 .toList();
 
         List<UserView> seekers = userWantItemRepository.findAllByItemId(itemId).stream()
-                .map(want -> UserView.of(want.getUser(), 0, 0, connected.contains(want.getUser().getId())))
+                .map(want -> UserView.of(want.getUser(), List.of(), List.of(), connected.contains(want.getUser().getId())))
                 .toList();
 
         return new ItemDetailView(item, holders, seekers);
@@ -135,6 +137,30 @@ public class AdminUserService {
     @Transactional
     public UUID createDummy(String username) {
         return userRepository.save(User.dummy(UUID.randomUUID(), username)).getId();
+    }
+
+    /**
+     * 카드까지 정해서 사용자 하나를 만든다.
+     *
+     * <p>더미를 한 번에 만드는 쪽은 카드를 고리로 알아서 배분하는데, 부스에서는 "이 카드를 가진
+     * 사람이 지금 하나 더 필요하다" 가 되는 경우가 더 많다. 그때 만들고 나서 카드를 따로 붙이면
+     * 손이 두 번 가고, 그 사이에 관람객이 기다린다.
+     *
+     * @param haveItemIds 내놓는 카드. 비어 있어도 된다
+     * @param wantItemIds 찾는 카드. 비어 있어도 된다
+     */
+    @Transactional
+    public UUID createDummy(String username, List<Long> haveItemIds, List<Long> wantItemIds) {
+        UUID userId = createDummy(username);
+
+        if (haveItemIds != null) {
+            haveItemIds.stream().filter(Objects::nonNull).forEach(itemId -> addHaveItem(userId, itemId, 1));
+        }
+        if (wantItemIds != null) {
+            wantItemIds.stream().filter(Objects::nonNull).forEach(itemId -> addWantItem(userId, itemId));
+        }
+
+        return userId;
     }
 
     @Transactional

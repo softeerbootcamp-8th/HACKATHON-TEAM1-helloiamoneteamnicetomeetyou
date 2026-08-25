@@ -1,6 +1,7 @@
 package com.helloiamoneteamnicetomeetyou.hackathon.admin.controller;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.service.AdminUserService;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -26,10 +27,21 @@ public class AdminUserController {
 
     private final AdminUserService adminUserService;
 
+    /**
+     * 사용자를 만든다. 내놓는 카드와 찾는 카드를 함께 고를 수 있다.
+     *
+     * <p>카드를 안 고르면 그냥 빈 사용자가 만들어진다. 이름만 먼저 만들어 두고 카드를 뒤에
+     * 붙이는 것도 부스에서 실제로 하는 순서다.
+     */
     @PostMapping
-    public String createDummy(@RequestParam String username, RedirectAttributes redirectAttributes) {
-        UUID userId = adminUserService.createDummy(username);
-        redirectAttributes.addFlashAttribute("toast", "더미를 만들었습니다.");
+    public String createDummy(
+            @RequestParam String username,
+            @RequestParam(required = false) List<Long> haveItemIds,
+            @RequestParam(required = false) List<Long> wantItemIds,
+            RedirectAttributes redirectAttributes) {
+
+        UUID userId = adminUserService.createDummy(username, haveItemIds, wantItemIds);
+        redirectAttributes.addFlashAttribute("toast", "%s 을(를) 만들었습니다.".formatted(username));
 
         return CONSOLE + userId;
     }

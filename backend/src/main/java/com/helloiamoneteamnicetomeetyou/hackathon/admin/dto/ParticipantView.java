@@ -11,4 +11,13 @@ import java.util.UUID;
  */
 public record ParticipantView(
         Long id, UUID userId, String shortId, String username, ParticipantStatus status, boolean dummy) {
+
+    public String statusLabel() {
+        return status.getLabel();
+    }
+
+    /** 이름이 없으면 UUID 앞자리로 부른다. 목록에서 빈칸이 보이면 누구인지 알 수 없다. */
+    public String displayName() {
+        return (username == null || username.isBlank()) ? shortId : username;
+    }
 }

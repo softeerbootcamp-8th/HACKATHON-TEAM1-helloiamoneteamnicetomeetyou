@@ -46,5 +46,14 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
     @Query("select h.user.id, count(h) from UserHaveItem h group by h.user.id")
     List<Object[]> countByUser();
 
+    /**
+     * 전부 카드까지 붙여서 읽는다. 사용자 목록이 누가 무엇을 들고 있는지 그림으로 보여 준다.
+     *
+     * <p>사람마다 따로 읽으면 목록 한 번 그리는 데 사람 수만큼 쿼리가 나간다. 부스 규모에서는
+     * 전부 읽어 와서 메모리에서 묶는 편이 훨씬 싸다.
+     */
+    @Query("select h from UserHaveItem h join fetch h.item join fetch h.user order by h.id asc")
+    List<UserHaveItem> findAllWithItem();
+
     void deleteByUserId(UUID userId);
 }

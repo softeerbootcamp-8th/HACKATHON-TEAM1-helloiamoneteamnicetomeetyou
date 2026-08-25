@@ -164,8 +164,35 @@
     });
   }
 
+  /* ------------------------------------------------------------------
+     카드 검색.
+
+     브라우저에서만 거른다. 서버를 다시 부르면 고르던 체크가 초기화되는데, 카드를 몇 장
+     골라 둔 상태에서 검색하는 것이 정상적인 순서라 그러면 쓸 수가 없다.
+
+     이미 고른 것은 검색어에 안 걸려도 남긴다. 안 보이는 채로 폼에 실려 나가면 무엇을
+     보냈는지 알 수 없게 된다.
+     ------------------------------------------------------------------ */
+  function cardSearch() {
+    document.querySelectorAll('[data-filter]').forEach(function (input) {
+      var grid = document.querySelector(input.dataset.filter);
+      if (!grid) return;
+
+      input.addEventListener('input', function () {
+        var q = input.value.trim().toLowerCase();
+
+        grid.querySelectorAll('.tile').forEach(function (tile) {
+          var checked = tile.querySelector('input').checked;
+          var hit = !q || (tile.dataset.name || '').indexOf(q) !== -1;
+          tile.classList.toggle('hidden', !hit && !checked);
+        });
+      });
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     origin();
+    cardSearch();
     stagger();
     toast();
     guardForms();

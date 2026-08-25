@@ -16,10 +16,17 @@
    아래 규칙들에는 색 리터럴을 쓰지 않는다.
    ========================================================================== */
 :root {
-  --brand: #2ced90;
-  --brand-strong: #16c47a;
-  --brand-soft: #e8fbf1;
-  --brand-ring: rgba(44, 237, 144, 0.28);
+  /*
+    시안(Figma Page 1 / 디자인 수정)의 파란색이다. hsl(198, 84%, 55%) 이고 나머지 셋은
+    같은 색상각에서 밝기만 옮긴 값이다.
+
+    --brand 는 채우는 자리(버튼 배경, 점, 선택된 알약)에 쓰고, 글자와 링크에는 --brand-strong
+    을 쓴다. --brand 위에 글자를 얹으면 흰 바탕에서 대비가 4:1 을 못 넘어서 읽기 힘들다.
+  */
+  --brand: #2cb3ed;
+  --brand-strong: #1081b2;
+  --brand-soft: #e8f7fd;
+  --brand-ring: rgba(44, 179, 237, 0.28);
 
   --ink: #111111;
   --ink-sub: #4a4f57;
@@ -96,6 +103,20 @@ h3 {
 }
 
 /* ==========================================================================
+   굵은 글씨를 어디에 쓰는가
+
+   전부 굵으면 아무것도 안 굵은 것과 같다. 굵기는 세 단으로만 쓴다.
+
+     700  그 줄이나 화면이 무엇인지 가리키는 이름 하나
+          (목록의 사람 이름, 카드 이름, 상세 화면의 제목)
+     600  눌러서 무언가 일어나는 것과 지금 고른 것
+          (버튼, 선택된 탭, 묶음 제목)
+     500  나머지 전부. 설명, 라벨, 배지, 부가 숫자
+
+   새 규칙을 쓸 때 700 을 붙이려면 "이 줄에서 이것 말고 이름이 또 있나" 를 먼저 본다.
+   ========================================================================== */
+
+/* ==========================================================================
    레이아웃 — 위에 탭, 아래는 왼쪽 목록과 오른쪽 상세
 
    화면이 한 장이다. 목록에서 고르면 오른쪽이 바뀔 뿐 페이지를 넘어가지 않는다.
@@ -119,7 +140,7 @@ h3 {
   align-items: center;
   gap: 8px;
   font-size: 17px;
-  font-weight: 800;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -137,7 +158,7 @@ h3 {
   background: var(--tile);
   color: var(--muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .tabs {
@@ -150,7 +171,7 @@ h3 {
   border-radius: 10px;
   color: var(--ink-sub);
   font-size: 14.5px;
-  font-weight: 600;
+  font-weight: 500;
   transition: background var(--out), color var(--out), transform var(--snap);
 }
 
@@ -165,7 +186,12 @@ h3 {
 .tabs a.on {
   background: var(--ink);
   color: var(--surface);
-  font-weight: 700;
+  font-weight: 600;
+}
+
+/* 상단 오른쪽의 주 동작 하나. 어느 탭에 있든 여기서 사용자를 만들러 간다. */
+.top-cta {
+  margin-left: auto;
 }
 
 .top-actions {
@@ -182,10 +208,51 @@ h3 {
   min-height: calc(100vh - 60px);
 }
 
-.wide {
-  padding: 20px;
-  max-width: 1100px;
+/* 폭을 가득 쓴다. 오른쪽에 애매한 여백이 남으면 목록이 좁아 보인다. */
+.full {
+  padding: 20px 22px 60px;
 }
+
+.page-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.page-title h1 {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.pick-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pick-desc {
+  margin: 4px 0 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* --- 왼쪽 목록 --------------------------------------------------------- */
 .pane-list {
@@ -202,11 +269,22 @@ h3 {
   padding: 15px 18px 11px;
   color: var(--muted);
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .pane-head b {
-  color: var(--ink);
+  color: var(--ink-sub);
+  font-weight: 600;
+}
+
+.pane-add {
+  float: right;
+  color: var(--brand-strong);
+  font-weight: 600;
+}
+
+.pane-add:hover {
+  text-decoration: underline;
 }
 
 .pick-list {
@@ -225,6 +303,8 @@ h3 {
   flex-direction: column;
   gap: 7px;
 }
+
+/* 목록 아래 폼의 작은 라벨. 입력이 무엇인지 한 줄로 말해 준다. */
 
 /* 목록 한 줄. 통째로 링크라 어디를 눌러도 열린다. */
 .pick {
@@ -294,13 +374,13 @@ h3 {
 
 .detail-head h1 {
   font-size: 22px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .title-input {
   max-width: 260px;
   font-size: 17px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* 상세 안의 묶음 하나. 카드보다 가벼운 테두리라 화면이 답답해지지 않는다. */
@@ -317,18 +397,34 @@ h3 {
   margin-top: 14px;
 }
 
+/*
+  나란히 놓인 상자에는 위 규칙을 적용하지 않는다.
+
+  인접 형제 선택자는 그리드 칸을 구분하지 않아서, 오른쪽 칸에 놓인 상자도 "바로 앞 상자"
+  뒤에 온다는 이유로 margin-top 을 받는다. 그러면 왼쪽과 오른쪽 상자의 시작 줄이 어긋난다.
+*/
+.grid-2 > .box {
+  margin-top: 0;
+}
+
 .box-head {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 16px;
+  /*
+    높이를 못박는다. 나란히 놓인 두 묶음의 머리에 들어가는 것이 다르면(한쪽에만 수량 칸이
+    있다든지) 머리 높이가 달라지고, 그러면 두 상자의 본문 시작 줄이 어긋나 보인다.
+  */
+  min-height: 56px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--line);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .box-head b {
   color: var(--ink);
+  font-weight: 600;
 }
 
 .box-head form {
@@ -380,7 +476,11 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 999px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
+}
+
+.party-one > a {
+  font-weight: 600;
 }
 
 /* ==========================================================================
@@ -401,7 +501,7 @@ h3 {
   background: var(--ink);
   color: var(--surface);
   font-size: 14.5px;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
   transition: transform var(--snap), background var(--out), box-shadow var(--out), opacity var(--out);
 }
@@ -521,9 +621,9 @@ h3 {
 }
 
 .field label {
-  color: var(--ink-sub);
-  font-size: 13px;
-  font-weight: 600;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
 .input,
@@ -595,6 +695,7 @@ select.input.sm {
   font-variant-numeric: tabular-nums;
 }
 
+
 .form-row {
   display: flex;
   gap: 10px;
@@ -665,7 +766,7 @@ a.row {
 
 .row .title {
   font-size: 14.5px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .row .meta {
@@ -693,7 +794,7 @@ a.row {
   background: var(--tile);
   color: var(--ink);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   overflow: hidden;
 }
 
@@ -731,7 +832,7 @@ a.row {
   background: var(--tile);
   color: var(--ink-sub);
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -818,7 +919,7 @@ a.row {
   background: var(--ink);
   color: var(--surface);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   box-shadow: var(--shadow-lg);
   transform: translateX(-50%);
   animation: toast-in var(--sheet) both;
@@ -898,7 +999,7 @@ dialog.sheet .sheet-body {
 
 dialog.sheet h3 {
   font-size: 19px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 dialog.sheet p {
@@ -1058,5 +1159,542 @@ dialog.sheet .sheet-actions {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* ==========================================================================
+   왼쪽 목록 두 벌
+
+   글자를 줄이고 그림으로 바꾼다. 부스에서 목록을 훑을 때 읽고 있을 시간이 없다.
+   ========================================================================== */
+.pick-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pick-row b {
+  font-size: 14.5px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 실제 사용자에게만 붙인다. 대부분이 더미라 더미마다 달면 아무 의미가 없다. */
+.tag-real {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.pick .live-dot {
+  position: static;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+/* 내놓는 것 → 찾는 것. 화살표 하나로 방향이 읽힌다. */
+.trade {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+}
+
+.trade-side {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.trade-arrow {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.trade-none {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* 목록 안의 아주 작은 카드 얼굴. */
+.chip-card.xs {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.chip-card.xs::before {
+  filter: blur(6px);
+}
+
+/* 찾는 쪽은 테두리만. 내놓는 것과 한눈에 갈려야 한다. */
+.chip-card.xs.ghost {
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  color: var(--muted);
+}
+
+.chip-card.xs.ghost::before {
+  display: none;
+}
+
+/* --- 카드 목록 --- */
+.pick.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pick.item .item-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.pick.item b {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.counts {
+  display: flex;
+  gap: 8px;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* 라벨과 숫자가 갈라져서 두 줄이 되면 무슨 숫자인지 알 수 없다. */
+.counts > span {
+  white-space: nowrap;
+}
+
+.counts b {
+  display: inline;
+  color: var(--ink-sub);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 0 이면 이 카드는 아무리 기다려도 짝이 안 난다. 숫자에 바로 표시한다. */
+.counts .zero,
+.counts .zero b {
+  color: var(--danger);
+}
+
+.pick.dead {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+
+/* ==========================================================================
+   카드 고르는 칸 (사용자 추가)
+   ========================================================================== */
+.picker header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.input.search {
+  width: 150px;
+}
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  user-select: none;
+  text-align: center;
+  transition: border-color var(--out), background var(--out), transform var(--snap);
+}
+
+.tile input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tile:hover {
+  border-color: var(--line-strong);
+}
+
+.tile:active {
+  transform: scale(0.96);
+}
+
+/* 카드 앞면. 목록의 것보다 크게 둬서 무엇인지 바로 보이게 한다. */
+.tile-face {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--tile);
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.tile-face::before {
+  content: '';
+  position: absolute;
+  width: 70%;
+  height: 70%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--brand) 0%, transparent 70%);
+  filter: blur(9px);
+}
+
+.tile-face > span,
+.tile-face > img {
+  position: relative;
+}
+
+.tile-face img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tile-name {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--ink-sub);
+}
+
+.tile-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: none;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--surface);
+  font-size: 10px;
+  line-height: 17px;
+}
+
+.tile:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.tile:has(input:checked) .tile-name {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.tile:has(input:checked) .tile-check {
+  display: block;
+}
+
+.tile:has(input:focus-visible) {
+  box-shadow: 0 0 0 4px var(--brand-ring);
+}
+
+/* 검색에 안 걸린 것 */
+.tile.hidden {
+  display: none;
+}
+
+/* ==========================================================================
+   매칭 케이스 고르기
+   ========================================================================== */
+.case-pick {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 620px;
+}
+
+.case {
+  position: relative;
+  display: block;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color var(--out), background var(--out), transform var(--snap);
+}
+
+.case input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.case:active {
+  transform: scale(0.985);
+}
+
+.case:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.case-body b {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+/* 고리 모양을 글로 설명하지 않고 그려 준다. */
+.case-flow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 9px 0 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.case-flow i {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--tile);
+  color: var(--ink-sub);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.case:has(input:checked) .case-flow i {
+  background: var(--brand);
+  color: var(--surface);
+}
+
+.case-desc {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.policy {
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   교환 목록
+
+   한 건이 카드 하나다. 표로 만들면 참가자가 2명일 때와 3명일 때 줄 높이가 달라져서
+   눈이 계속 다시 맞춰야 한다.
+   ========================================================================== */
+.seg {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--tile);
+  width: fit-content;
+}
+
+.seg a {
+  padding: 7px 13px;
+  border-radius: 9px;
+  color: var(--ink-sub);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background var(--out), color var(--out);
+}
+
+.seg a b {
+  margin-left: 3px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.seg a:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.seg a.on {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.seg a.on b {
+  color: var(--brand-strong);
+}
+
+.ex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+
+.ex {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  animation: row-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ex.st-in_progress {
+  border-left-color: var(--brand);
+}
+.ex.st-completed {
+  border-left-color: var(--brand-strong);
+}
+.ex.st-cancelled {
+  border-left-color: var(--danger);
+}
+.ex.st-pending {
+  border-left-color: var(--warn);
+}
+
+.ex > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 0;
+}
+
+.ex-id {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ex-state {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.ex-size {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--tile);
+  color: var(--ink-sub);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.ex-people {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 14px;
+}
+
+.ex-person {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+}
+
+.ex-person > a {
+  font-weight: 600;
+}
+
+.ex-person > a:hover {
+  text-decoration: underline;
+}
+
+.ex-ps {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.ex-ps.accepted {
+  color: var(--brand-strong);
+}
+.ex-ps.rejected {
+  color: var(--danger);
+}
+.ex-ps.pending {
+  margin-right: auto;
+}
+
+.ex > footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.ex-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ex-acts {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+@media (max-width: 1000px) {
+  .case-pick,
+  .picker header {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .input.search {
+    width: 100%;
   }
 }

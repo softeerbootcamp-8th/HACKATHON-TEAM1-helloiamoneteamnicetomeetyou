@@ -3,7 +3,11 @@ package com.helloiamoneteamnicetomeetyou.hackathon.admin.controller;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.service.AdminBoothService;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.service.AdminExchangeService;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.service.AdminUserService;
+import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ExchangeView;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeStatus;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -35,6 +39,7 @@ public class AdminConsoleController {
             @RequestParam(required = false) UUID userId,
             @RequestParam(required = false) Long itemId,
             @RequestParam(required = false) Long boothId,
+            @RequestParam(required = false) ExchangeStatus status,
             Model model) {
 
         model.addAttribute("tab", tab);
@@ -43,7 +48,9 @@ public class AdminConsoleController {
         switch (tab) {
             case "items" -> items(itemId, model);
             case "zones" -> zones(boothId, model);
-            case "exchanges" -> model.addAttribute("exchanges", adminExchangeService.findExchanges());
+            case "exchanges" -> exchanges(status, model);
+            // 사용자를 만드는 일은 목록 옆에 끼워 넣기에는 고를 것이 많다. 화면을 따로 준다.
+            case "new-user" -> model.addAttribute("allItems", adminBoothService.findAllItems());
             default -> users(userId, model);
         }
 
@@ -60,6 +67,10 @@ public class AdminConsoleController {
         var users = adminUserService.findUsers();
         model.addAttribute("users", users);
 
+        // 사용자가 하나도 없어도 "카드까지 정해서 만들기" 폼은 나와야 한다. 그 폼이 카드 목록을
+        // 쓰기 때문에, 고른 사람이 있든 없든 담아 둔다.
+        model.addAttribute("allItems", adminBoothService.findAllItems());
+
         UUID selected = userId != null ? userId : users.stream().findFirst().map(u -> u.id()).orElse(null);
         if (selected == null) {
             return;
@@ -68,8 +79,30 @@ public class AdminConsoleController {
         model.addAttribute("user", adminUserService.findUser(selected));
         model.addAttribute("haveItems", adminUserService.findHaveItems(selected));
         model.addAttribute("wantItems", adminUserService.findWantItems(selected));
-        model.addAttribute("allItems", adminBoothService.findAllItems());
         model.addAttribute("userExchanges", adminExchangeService.findExchangesOf(selected));
+    }
+
+    /**
+     * 교환 목록. 상태로 거르되 개수는 항상 전체 기준으로 센다.
+     *
+     * <p>끝난 것까지 다 보이는 것이 기본이다. 진행 중인 것만 보여 주면 방금 완료 처리한 건이
+     * 목록에서 사라져서, 제대로 처리된 것인지 확인할 방법이 없다.
+     */
+    private void exchanges(ExchangeStatus status, Model model) {
+        List<ExchangeView> all = adminExchangeService.findExchanges();
+
+        model.addAttribute("exchanges", all);
+        model.addAttribute("status", status);
+        model.addAttribute("shown", status == null
+                ? all
+                : all.stream().filter(view -> view.status() == status).toList());
+
+        // 상태 칸은 건수가 0 이어도 자리를 지킨다. 있다 없다 하면 누를 자리가 매번 움직인다.
+        Map<ExchangeStatus, Long> counts = new LinkedHashMap<>();
+        for (ExchangeStatus value : ExchangeStatus.values()) {
+            counts.put(value, all.stream().filter(view -> view.status() == value).count());
+        }
+        model.addAttribute("statusCounts", counts);
     }
 
     private void items(Long itemId, Model model) {
