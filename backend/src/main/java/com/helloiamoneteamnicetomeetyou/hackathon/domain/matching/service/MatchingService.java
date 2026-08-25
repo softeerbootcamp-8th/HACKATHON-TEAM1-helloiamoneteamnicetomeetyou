@@ -11,12 +11,12 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
-import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.entity.UserWantItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
 
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,21 +39,17 @@ public class MatchingService {
      *   toMe        : 후보ID → { 내가 받을 아이템ID → 교환가능수량 }  (내가 원하는 아이템을 보유한 상대)
      *   earliestReg : 후보ID → 최소 want_id  (동점 tiebreaker — 작을수록 먼저 등록)
      */
+    @Async("matchingExecutor")
     @Transactional
-    public void runMatching(
-            User myUser,
-            List<UserHaveItem> myHaveItems,
-            List<UserWantItem> myWantItems
-    ) {
-        if (myHaveItems.isEmpty() || myWantItems.isEmpty()) return;
-        if (exchangeParticipantRepository.existsPendingExchange(myUser.getId())) return;
-
+    public void runMatching(Long userId) {
         Map<Long, Long> earliestReg = new HashMap<>();
-        Map<Long, Map<Long, Integer>> toThem = buildToThem(myUser.getId(), earliestReg);
-        Map<Long, Map<Long, Integer>> toMe   = buildToMe(myUser.getId());
+        Map<Long, Map<Long, Integer>> toThem = buildToThem(userId, earliestReg);
+        Map<Long, Map<Long, Integer>> toMe   = buildToMe(userId);
+        if (toThem.isEmpty() || toMe.isEmpty()) return;
 
-        tryOneToOne(myUser, myHaveItems, toThem, toMe, earliestReg)
-                .or(() -> tryThreeWay(myUser, myHaveItems, toThem, toMe, earliestReg));
+        User myUser = userRepository.findById(userId).orElseThrow();
+        tryOneToOne(myUser, toThem, toMe, earliestReg)
+                .or(() -> tryThreeWay(myUser, toThem, toMe, earliestReg));
     }
 
     // ──────────────────────────────────────────
@@ -67,7 +63,6 @@ public class MatchingService {
      */
     private Optional<Exchange> tryOneToOne(
             User myUser,
-            List<UserHaveItem> myHaveItems,
             Map<Long, Map<Long, Integer>> toThem,
             Map<Long, Map<Long, Integer>> toMe,
             Map<Long, Long> earliestReg
@@ -82,7 +77,7 @@ public class MatchingService {
         Map<Long, Integer> receive = toMe.get(bestId);
         int exchangeQty = Math.min(sum(give), sum(receive));
 
-        return Optional.of(createExchange(myUser, bestId, myHaveItems,
+        return Optional.of(createExchange(myUser, bestId,
                 capTo(give, exchangeQty), capTo(receive, exchangeQty)));
     }
 
@@ -107,18 +102,18 @@ public class MatchingService {
 
     /**
      * 1대1 Exchange를 저장한다. give/receive는 이미 확정된 { itemId → qty }다.
-     * UserHaveItem.quantityLeft는 dirty checking으로 자동 반영된다.
+     * 매칭 시점에는 status를 RESERVED로 변경만 한다. quantityLeft 감소는 거래 완료 시점에 처리한다.
      */
     private Exchange createExchange(
             User myUser,
             Long bestId,
-            List<UserHaveItem> myHaveItems,
             Map<Long, Integer> give,
             Map<Long, Integer> receive
     ) {
         User bestUser = userRepository.findById(bestId).orElseThrow();
 
-        Map<Long, UserHaveItem> myMap   = indexByItemId(myHaveItems);
+        Map<Long, UserHaveItem> myMap   = indexByItemId(
+                userHaveItemRepository.findByUserIdAndItemIds(myUser.getId(), give.keySet()));
         Map<Long, UserHaveItem> bestMap = indexByItemId(
                 userHaveItemRepository.findByUserIdAndItemIds(bestId, receive.keySet()));
 
@@ -131,12 +126,12 @@ public class MatchingService {
         give.forEach((itemId, qty) -> {
             UserHaveItem hi = myMap.get(itemId);
             items.add(ExchangeItem.create(exchange, myUser, hi.getItem(), bestUser, qty));
-            hi.decreaseQuantityLeft(qty);
+            hi.reserve();
         });
         receive.forEach((itemId, qty) -> {
             UserHaveItem hi = bestMap.get(itemId);
             items.add(ExchangeItem.create(exchange, bestUser, hi.getItem(), myUser, qty));
-            hi.decreaseQuantityLeft(qty);
+            hi.reserve();
         });
         exchangeItemRepository.saveAll(items);
         return exchange;
@@ -153,7 +148,6 @@ public class MatchingService {
      */
     private Optional<Exchange> tryThreeWay(
             User myUser,
-            List<UserHaveItem> myHaveItems,
             Map<Long, Map<Long, Integer>> toThem,
             Map<Long, Map<Long, Integer>> toMe,
             Map<Long, Long> earliestReg
@@ -177,17 +171,16 @@ public class MatchingService {
         Long cToAItemId = toMe.get(cId).keySet().iterator().next();
 
         return Optional.of(createThreeWayExchange(
-                myUser, myHaveItems, bId, cId, aToBItemId, bToCItemId, cToAItemId
+                myUser, bId, cId, aToBItemId, bToCItemId, cToAItemId
         ));
     }
 
     /**
      * 3인 Exchange를 저장한다. 교환할 아이템 ID는 이미 결정된 상태로 받는다.
-     * UserHaveItem.quantityLeft는 dirty checking으로 자동 반영된다.
+     * 매칭 시점에는 status를 RESERVED로 변경만 한다. quantityLeft 감소는 거래 완료 시점에 처리한다.
      */
     private Exchange createThreeWayExchange(
             User myUser,
-            List<UserHaveItem> myHaveItems,
             Long bId,
             Long cId,
             Long aToBItemId,
@@ -197,9 +190,8 @@ public class MatchingService {
         User userB = userRepository.findById(bId).orElseThrow();
         User userC = userRepository.findById(cId).orElseThrow();
 
-        UserHaveItem myHaveItem = myHaveItems.stream()
-                .filter(uhi -> uhi.getItem().getId().equals(aToBItemId))
-                .findFirst().orElseThrow();
+        UserHaveItem myHaveItem = userHaveItemRepository
+                .findByUserIdAndItemIds(myUser.getId(), Set.of(aToBItemId)).get(0);
         UserHaveItem bHaveItem = userHaveItemRepository
                 .findByUserIdAndItemIds(bId, Set.of(bToCItemId)).get(0);
         UserHaveItem cHaveItem = userHaveItemRepository
@@ -213,14 +205,14 @@ public class MatchingService {
         ));
 
         exchangeItemRepository.saveAll(List.of(
-                ExchangeItem.create(exchange, myUser,  myHaveItem.getItem(), userB,  1),
-                ExchangeItem.create(exchange, userB,   bHaveItem.getItem(),  userC,  1),
-                ExchangeItem.create(exchange, userC,   cHaveItem.getItem(),  myUser, 1)
+                ExchangeItem.create(exchange, myUser, myHaveItem.getItem(), userB,  1),
+                ExchangeItem.create(exchange, userB,  bHaveItem.getItem(),  userC,  1),
+                ExchangeItem.create(exchange, userC,  cHaveItem.getItem(),  myUser, 1)
         ));
 
-        myHaveItem.decreaseQuantityLeft(1);
-        bHaveItem.decreaseQuantityLeft(1);
-        cHaveItem.decreaseQuantityLeft(1);
+        myHaveItem.reserve();
+        bHaveItem.reserve();
+        cHaveItem.reserve();
 
         return exchange;
     }

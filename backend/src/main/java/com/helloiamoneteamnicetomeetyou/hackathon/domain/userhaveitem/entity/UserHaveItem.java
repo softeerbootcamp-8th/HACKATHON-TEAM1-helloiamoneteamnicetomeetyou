@@ -68,16 +68,18 @@ public class UserHaveItem {
         return userHaveItem;
     }
 
-    public void decreaseQuantityLeft(int amount) {
+    public void reserve() {
+        this.status = ItemStatus.RESERVED;
+    }
+
+    public void completeExchange(int amount) {
         this.quantityLeft -= amount;
         if (this.quantityLeft <= 0) {
             this.quantityLeft = 0;
-            this.status = ItemStatus.RESERVED;
+            this.status = ItemStatus.OUT;
+        } else {
+            this.status = ItemStatus.LEFT;
         }
-    }
-
-    public void completeExchange() {
-        this.status = ItemStatus.OUT;
     }
 
     public void cancelReservation(int amount) {
