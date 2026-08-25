@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { CardStack } from '@/components/domain/CardStack'
+import { MyCardsSheet } from '@/components/domain/MyCardsSheet'
 import { BottomSheet } from '@/components/domain/BottomSheet'
 import { GoodsFace } from '@/components/domain/GoodsCard'
 import { RadarRings } from '@/components/domain/Radar'
@@ -34,6 +35,8 @@ export function Home() {
   } = usePoke()
   const { state: catalog } = useCatalog()
   const [sheetOpen, setSheetOpen] = useState(false)
+  // 내 카드 묶음을 펼쳐 본다 (시안 4_v1 / 4_v2).
+  const [myCardsOpen, setMyCardsOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   // 앱을 닫아 둔 사이의 알림. 여는 자리는 알림 목록 위다.
   const { state: pushState, enable: enablePush } = usePush(getDeviceId())
@@ -107,7 +110,12 @@ export function Home() {
    * 같은 카드를 든 사람이 여럿이면 한 명만 세운다. 다섯 칸뿐인데 같은 그림이 겹치면
    * 고를 것이 줄어든다.
    */
-  const serverRadar = useMemo(() => {
+  const useServerDataReady = pokeReady
+
+  const RADAR_SIZE = 5
+
+  /** 레이더에 세울 수 있는 후보 전체. 카드 종류마다 한 명씩, 먼저 등록된 순이다. */
+  const radarPool = useMemo(() => {
     const seen = new Set<number>()
     return serverWaiting
       .filter((row) => row.wanted)
@@ -118,8 +126,41 @@ export function Home() {
         seen.add(row.item.id)
         return true
       })
-      .slice(0, 5)
   }, [serverWaiting])
+
+  // "다른 카드 보기" 를 누른 횟수. 이만큼 뒤에서부터 다시 채운다.
+  const [radarOffset, setRadarOffset] = useState(0)
+
+  /**
+   * 지금 세울 다섯 명.
+   *
+   * 시안 규칙이다 (desc 165:3500 4번) — 표시된 것보다 후순위를 노출하고, 후순위가 다섯 개
+   * 미만이면 1순위부터 부족한 수만큼 다시 채운다. 그래서 나머지 연산으로 돌린다.
+   *
+   * <b>답변을 기다리는 상대는 자리를 지킨다.</b> "찔러보기 답변 대기 중 상태인 아이템은
+   * 새로고침하지 않고 화면에 계속 표시" 라서, 먼저 그 사람들을 앉히고 남은 칸만 돌린다.
+   */
+  const serverRadar = useMemo(() => {
+    const held = radarPool.filter((row) => pendingOwnerIds.has(row.ownerId)).slice(0, RADAR_SIZE)
+    const rest = radarPool.filter((row) => !pendingOwnerIds.has(row.ownerId))
+    const slots = RADAR_SIZE - held.length
+
+    const rotated =
+      rest.length === 0
+        ? []
+        : Array.from({ length: Math.min(slots, rest.length) }, (_, i) => {
+            return rest[(radarOffset * RADAR_SIZE + i) % rest.length]
+          })
+
+    return [...held, ...rotated]
+  }, [radarPool, pendingOwnerIds, radarOffset])
+
+  // 돌려 볼 것이 남아 있을 때만 버튼을 보여 준다. 다섯 명 이하면 눌러도 같은 얼굴이다.
+  const canShuffleRadar = useServerDataReady && radarPool.length > RADAR_SIZE
+  const shuffleRadar = () => {
+    tick(8)
+    setRadarOffset((n) => n + 1)
+  }
 
   /**
    * 서버 데이터를 쓸지, 목업으로 떨어질지.
@@ -132,7 +173,7 @@ export function Home() {
    * 목업으로 떨어지는 것은 서버가 아직 준비되지 않았을 때뿐이다(부스나 카드가 없거나 연결
    * 실패). 그때는 화면이 비면 볼 수 있는 것이 아무것도 없다.
    */
-  const useServerData = pokeReady
+  const useServerData = useServerDataReady
 
   /**
    * 레이더 한 칸. 서버와 목업을 같은 모양으로 맞춰 두면 배치와 끌어놓기 코드가 하나로 남는다.
@@ -354,9 +395,10 @@ export function Home() {
         <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
           <motion.button
             type="button"
-            onClick={() => navigate('/have')}
+            onClick={() => setMyCardsOpen(true)}
             whileTap={{ scale: 0.94 }}
             transition={springSnap}
+            aria-expanded={myCardsOpen}
             className="mx-auto mb-1 flex items-center gap-0.5 text-[11px] font-bold text-neutral-500 md:text-[14px]"
           >
             내 카드
@@ -388,7 +430,9 @@ export function Home() {
             }}
             onClick={() => {
               if (draggedRef.current) return
-              navigate('/have')
+              // 시안 desc 165:3500 3번 — 묶음을 누르면 have 에 등록한 카드를 펼쳐 보여 준다.
+              // 편집으로 바로 보내면 무엇을 등록했는지 확인할 자리가 없다.
+              setMyCardsOpen(true)
             }}
             whileDrag={{ zIndex: 60, cursor: 'grabbing' }}
             data-my-cards
@@ -399,13 +443,29 @@ export function Home() {
         </div>
       </div>
 
-      <p className="mt-5 shrink-0 text-center text-[12px] text-neutral-400 md:text-[14px]">
-        {dragging
-          ? '놓아주면 찔러보기가 전송돼요'
-          : radarSlots.length === 0
-            ? '상대가 나타나면 알려 드려요'
-            : '상대 카드를 누르거나, 내 카드 묶음을 끌어다 놓아보세요'}
-      </p>
+      <div className="mt-5 flex shrink-0 flex-col items-center gap-2">
+        <p className="text-center text-[12px] text-neutral-400 md:text-[14px]">
+          {dragging
+            ? '놓아주면 찔러보기가 전송돼요'
+            : radarSlots.length === 0
+              ? '상대가 나타나면 알려 드려요'
+              : '상대 카드를 누르거나, 내 카드 묶음을 끌어다 놓아보세요'}
+        </p>
+
+        {/* 시안 desc 165:3500 의 "다른 카드 보기". 지금 뜬 것보다 후순위 카드를 보여 준다.
+            뜰 상대가 다섯 명 이하면 돌려 봐야 같은 얼굴이라 감춘다. */}
+        {canShuffleRadar && (
+          <motion.button
+            type="button"
+            onClick={shuffleRadar}
+            whileTap={{ scale: 0.96 }}
+            transition={springSnap}
+            className="rounded-full border border-neutral-200 px-3.5 py-1.5 text-[12px] font-semibold text-neutral-500 md:text-[13px]"
+          >
+            다른 카드 보기
+          </motion.button>
+        )}
+      </div>
     </div>
   )
 
@@ -581,9 +641,16 @@ export function Home() {
   // 레이더와 같은 기준이다. 서버가 붙어 있으면 비어 있는 것도 서버가 준 답이다.
   const listPanel = useServerData ? serverListPanel : mockListPanel
 
-  // 머리에 적히는 개수는 실제로 그리는 목록의 개수여야 한다. 목업 개수를 그대로 쓰면
-  // 서버에 아무도 없는데 "전체 10개" 라고 적혀서 목록이 안 뜬 것처럼 보인다.
-  const listCount = useServerData ? serverWaiting.length : list.length
+  /**
+   * 머리에 적히는 개수.
+   *
+   * <b>아이템 기준으로 센다</b>(시안 desc 165:3500 5번 "아이템 기준으로 전체 개수 계산").
+   * 같은 카드를 세 사람이 내놓았어도 고를 수 있는 카드는 한 종류라, 보유 등록 줄을 세면
+   * 목록에 보이는 것보다 큰 숫자가 나온다.
+   */
+  const listCount = useServerData
+    ? new Set(serverWaiting.map((row) => row.item.id)).size
+    : list.length
 
   return (
     <div className="relative flex h-full flex-col">
@@ -771,6 +838,16 @@ export function Home() {
           if (kind === 'poke-received') navigate('/poke/received')
           else if (kind === 'match' || kind === 'poke-accepted') navigate('/match')
           else if (kind === 'time-request') navigate('/time')
+        }}
+      />
+
+      <MyCardsSheet
+        open={myCardsOpen}
+        have={state.have}
+        onClose={() => setMyCardsOpen(false)}
+        onEdit={() => {
+          setMyCardsOpen(false)
+          navigate('/have')
         }}
       />
     </div>
