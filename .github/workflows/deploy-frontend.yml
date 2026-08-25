@@ -53,32 +53,13 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
-      - name: 토큰이 쓸 수 있는 상태인지 확인
-        # 토큰이 없거나 스코프가 다르면 vercel pull 이 "Could not retrieve Project Settings" 라는
-        # 인증과 상관없어 보이는 메시지로 죽는다. 원인이 보이도록 여기서 먼저 끊는다.
+      - name: 토큰이 있는지 확인
+        # 여기서 whoami 나 teams ls 로 토큰을 검사하지 않는다. 프로젝트 스코프 토큰은 그 둘을
+        # 정상적으로 거부하기 때문에, 멀쩡한 토큰을 잘못된 것으로 판정하게 된다.
+        # 토큰이 실제로 쓸 수 있는지는 아래 pull 단계가 판정한다.
         run: |
           if [ -z "$VERCEL_TOKEN" ]; then
             echo "::error::VERCEL_TOKEN 시크릿이 없습니다. 저장소 Settings > Secrets and variables > Actions 에 추가하세요."
-            exit 1
-          fi
-
-          # 파이프를 거치면 종료 코드가 tail 것이 되어 실패를 놓친다. 출력을 먼저 받고 판정한다.
-          if ! account=$(npx --yes vercel@latest whoami 2>&1); then
-            echo "$account"
-            echo "::error::VERCEL_TOKEN 으로 인증하지 못했습니다. 값이 잘못되었거나 만료되었습니다."
-            exit 1
-          fi
-          account=$(echo "$account" | tail -1)
-          case "$account" in
-            *Error*|"")
-              echo "::error::VERCEL_TOKEN 이 유효하지 않습니다 ($account). 토큰을 다시 발급해서 시크릿을 갱신하세요."
-              exit 1
-              ;;
-          esac
-          echo "인증된 계정: $account"
-
-          if ! npx --yes vercel@latest teams ls 2>&1 | grep -q "$VERCEL_ORG_ID"; then
-            echo "::error::이 토큰으로는 $VERCEL_ORG_ID 스코프가 보이지 않습니다. 토큰 발급 시 Scope 를 확인하세요."
             exit 1
           fi
 
@@ -95,7 +76,14 @@ jobs:
           fi
 
       # Vercel 에 등록된 환경변수(VITE_API_BASE_URL 등)와 빌드 설정을 내려받는다.
-      - run: npx --yes vercel@latest pull --yes --environment=${{ steps.target.outputs.environment }}
+      - name: Vercel 설정과 환경변수 내려받기
+        # 실패하면 대부분 토큰 문제라서, 원인 후보를 로그에 같이 남긴다.
+        run: |
+          if ! npx --yes vercel@latest pull --yes --environment=${{ steps.target.outputs.environment }}; then
+            echo "::error::Vercel 프로젝트 설정을 가져오지 못했습니다. VERCEL_TOKEN 이 이 프로젝트($VERCEL_PROJECT_ID)에 접근할 수 있는지 확인하세요. 토큰 Scope 를 특정 프로젝트 하나로 잡았다면 그 프로젝트가 맞는지, 아니면 All Projects 나 Full Account 로 다시 발급해야 합니다."
+            exit 1
+          fi
+
 
       - run: npx --yes vercel@latest build ${{ steps.target.outputs.flag }}
 
