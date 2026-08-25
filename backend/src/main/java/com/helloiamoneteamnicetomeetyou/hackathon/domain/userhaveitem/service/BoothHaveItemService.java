@@ -42,12 +42,15 @@ public class BoothHaveItemService {
     /**
      * 나를 뺀 다른 사용자의 보유 카드를 정렬해 한 페이지 내려준다.
      *
-     * <p><b>필터가 아니라 정렬이다.</b> 내 희망 카드를 위로 올리지만 나머지도 아래에 전부 나온다.
-     * 원하는 카드가 없어도 화면이 비지 않고, 눈으로 보고 마음이 바뀌는 경우를 막지 않는다.
+     * <p><b>내 희망 카드와 맞는 것만 준다.</b> 시안이 그렇게 정해 뒀다
+     * (desc 204:4928 "사용자의 wanted와 일치 &amp; 시스템에 등록된 모든 아이템 표시").
+     * 이슈 #28 본문은 "필터가 아니라 정렬" 이었는데, 화면 쪽 규칙이 더 구체적이라 시안을 따랐다.
      *
-     * <p>순서는 내 희망 카드 → 교환이 바로 성립하는 것(줄 수 있는 카드가 있음) →
-     * {@code haveItemId} 오름차순이다. <b>마지막 기준이 없으면 안 된다.</b> 앞의 두 기준이 같은
-     * 행끼리 순서가 매번 달라져서, 페이지를 넘길 때 같은 줄이 두 번 나오거나 빠진다.
+     * <p>희망 카드를 등록하지 않은 사람에게는 빈 목록이 간다. 화면이 그 상태를 안내로 덮는다.
+     *
+     * <p>순서는 교환이 바로 성립하는 것(줄 수 있는 카드가 있음) → {@code haveItemId}
+     * 오름차순이다. <b>마지막 기준이 없으면 안 된다.</b> 앞 기준이 같은 행끼리 순서가 매번
+     * 달라져서, 페이지를 넘길 때 같은 줄이 두 번 나오거나 빠진다.
      */
     public PageResponse<BoothHaveItemResponseDto> findByBooth(
             Long boothId, UUID userId, int page, int size) {
@@ -78,12 +81,13 @@ public class BoothHaveItemService {
         Map<UUID, Set<Long>> wantItemIdsByOwner = wantItemIdsByOwner(ownerWants);
 
         List<BoothHaveItemResponseDto> sorted = rows.stream()
+                // 내 희망 카드만 남긴다. wanted 필드는 걸러진 뒤라 늘 true 지만, 화면이
+                // 그것으로 배지를 가르기 때문에 응답에서 빼지 않는다.
+                .filter(row -> myWantItemIds.contains(row.getItem().getId()))
                 .map(row -> toDto(row, myWantItemIds, myHaveItemNames,
                         wantNamesByOwner, wantItemIdsByOwner))
                 .sorted(Comparator
-                        .comparing(BoothHaveItemResponseDto::wanted).reversed()
-                        .thenComparing(Comparator
-                                .comparing(BoothHaveItemResponseDto::exchangeable).reversed())
+                        .comparing(BoothHaveItemResponseDto::exchangeable).reversed()
                         .thenComparing(BoothHaveItemResponseDto::haveItemId))
                 .toList();
 

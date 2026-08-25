@@ -74,9 +74,9 @@ class BoothHaveItemServiceTest {
     }
 
     @Test
-    @DisplayName("내 희망 카드를 위로 올리고, 나머지도 아래에 전부 내려준다")
-    void 내_희망_카드가_위로_올라간다() {
-        // 1L 은 내 희망 카드가 아니고 2L 은 내 희망 카드다. id 는 1L 이 앞인데 정렬로 뒤집혀야 한다.
+    @DisplayName("내 희망 카드와 맞는 것만 내려준다")
+    void 희망_카드만_내려준다() {
+        // 1L 은 내 희망 카드가 아니라 목록에서 빠져야 한다 (시안 desc 204:4928).
         List<UserHaveItem> rows =
                 List.of(row(1L, OTHER_A, 10L, "i20 N", 1), row(2L, OTHER_B, 20L, "IONIQ 5 N", 1));
         List<UserWantItem> myWants = List.of(want(ME, 20L, "IONIQ 5 N"));
@@ -85,11 +85,23 @@ class BoothHaveItemServiceTest {
 
         PageResponse<BoothHaveItemResponseDto> result = findFirstPage();
 
-        assertThat(result.content()).hasSize(2);
+        assertThat(result.content()).hasSize(1);
         assertThat(result.content().get(0).haveItemId()).isEqualTo(2L);
         assertThat(result.content().get(0).wanted()).isTrue();
-        assertThat(result.content().get(1).haveItemId()).isEqualTo(1L);
-        assertThat(result.content().get(1).wanted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("희망 카드를 등록하지 않았으면 빈 목록이다")
+    void 희망_카드가_없으면_비어_있다() {
+        List<UserHaveItem> rows = List.of(row(1L, OTHER_A, 10L, "i20 N", 1));
+
+        stub(rows, List.of(), List.of(), List.of());
+
+        PageResponse<BoothHaveItemResponseDto> result = findFirstPage();
+
+        assertThat(result.content()).isEmpty();
+        assertThat(result.size()).isZero();
+        assertThat(result.hasNext()).isFalse();
     }
 
     @Test
@@ -135,10 +147,12 @@ class BoothHaveItemServiceTest {
     @DisplayName("수량이 0 인 내 카드는 줄 수 있는 카드로 세지 않는다")
     void 수량이_0인_내_카드는_제외한다() {
         List<UserHaveItem> rows = List.of(row(1L, OTHER_A, 10L, "i20 N", 1));
+        // 목록이 희망 카드만 남기므로, 그 줄이 남아 있도록 희망에 넣어 둔다.
+        List<UserWantItem> myWants = List.of(want(ME, 10L, "i20 N"));
         List<UserHaveItem> myHaves = List.of(row(9L, ME, 99L, "AVANTE N", 0));
         List<UserWantItem> ownerWants = List.of(want(OTHER_A, 99L, "AVANTE N"));
 
-        stub(rows, List.of(), myHaves, ownerWants);
+        stub(rows, myWants, myHaves, ownerWants);
 
         assertThat(findFirstPage().content().get(0).givableItemNames()).isEmpty();
     }
@@ -164,8 +178,11 @@ class BoothHaveItemServiceTest {
                 row(1L, OTHER_A, 10L, "i20 N", 1),
                 row(2L, OTHER_B, 20L, "IONIQ 5 N", 1),
                 row(3L, OTHER_C, 30L, "AVANTE N", 1));
+        // 셋 다 희망 카드여야 목록에 남는다.
+        List<UserWantItem> myWants = List.of(
+                want(ME, 10L, "i20 N"), want(ME, 20L, "IONIQ 5 N"), want(ME, 30L, "AVANTE N"));
 
-        stub(rows, List.of(), List.of(), List.of());
+        stub(rows, myWants, List.of(), List.of());
 
         PageResponse<BoothHaveItemResponseDto> first =
                 boothHaveItemService.findByBooth(BOOTH_ID, ME, 0, 2);
