@@ -25,7 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class UserWantItemControllerTest {
 
     private static final String BODY = """
-            {"userId":"550e8400-e29b-41d4-a716-446655440000","itemId":1}""";
+            {"userId":"550e8400-e29b-41d4-a716-446655440000","itemId":1,"quantity":2}""";
 
     private final MockMvc mockMvc;
 
@@ -40,7 +40,7 @@ class UserWantItemControllerTest {
     @Test
     @DisplayName("새로 등록하면 201 을 내려준다")
     void 새로_등록하면_201_이다() throws Exception {
-        given(userWantItemService.register(any(UUID.class), anyLong())).willReturn(true);
+        given(userWantItemService.register(any(UUID.class), anyLong(), any())).willReturn(true);
 
         mockMvc.perform(post("/api/want-items").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isCreated())
@@ -51,7 +51,7 @@ class UserWantItemControllerTest {
     @Test
     @DisplayName("이미 등록됐으면 200 을 내려준다")
     void 이미_등록됐으면_200_이다() throws Exception {
-        given(userWantItemService.register(any(UUID.class), anyLong())).willReturn(false);
+        given(userWantItemService.register(any(UUID.class), anyLong(), any())).willReturn(false);
 
         mockMvc.perform(post("/api/want-items").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk())
@@ -62,7 +62,7 @@ class UserWantItemControllerTest {
     @DisplayName("등록되지 않은 사용자면 404 를 내려준다")
     void 등록되지_않은_사용자면_404_다() throws Exception {
         willThrow(new ApplicationException(ErrorCode.USER_NOT_FOUND))
-                .given(userWantItemService).register(any(UUID.class), anyLong());
+                .given(userWantItemService).register(any(UUID.class), anyLong(), any());
 
         mockMvc.perform(post("/api/want-items").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isNotFound())

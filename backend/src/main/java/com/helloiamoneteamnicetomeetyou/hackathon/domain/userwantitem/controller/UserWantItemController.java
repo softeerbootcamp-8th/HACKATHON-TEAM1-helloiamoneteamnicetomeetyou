@@ -18,12 +18,13 @@ public class UserWantItemController {
 
     private final UserWantItemService userWantItemService;
 
-    /** 멱등하다. 이미 등록한 카드면 200 으로 답한다. */
+    /** 이미 등록한 카드면 원하는 개수를 덮어쓰고 200 으로 답한다. */
     @PostMapping
     public ResponseEntity<CommonResponse<Void>> register(
             @RequestBody WantItemRegisterRequestDto request) {
 
-        boolean created = userWantItemService.register(request.userId(), request.itemId());
+        boolean created = userWantItemService.register(
+                request.userId(), request.itemId(), request.quantity());
 
         return ResponseEntity.status(created ? HttpStatus.CREATED : HttpStatus.OK)
                 .body(CommonResponse.ok("등록했습니다."));
