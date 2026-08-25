@@ -21,6 +21,10 @@ dependencies {
     // Spring
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 
+    // 어드민 화면(/admin)을 서버에서 그려 내려보낸다.
+    // 부스 운영자만 쓰는 화면이라 별도 프론트 배포 없이 백엔드 하나로 끝내려고 골랐다.
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+
     // Persistence — RDS(MySQL) 연결과 엔티티 매핑에 필요하다.
     // 버전은 io.spring.dependency-management 가 Boot BOM 으로 맞춰 준다.
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'

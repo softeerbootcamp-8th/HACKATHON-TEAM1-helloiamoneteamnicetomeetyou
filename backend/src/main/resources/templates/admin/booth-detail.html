@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" th:replace="~{admin/layout :: page(${booth.name}, ~{::content})}">
+  <body>
+    <th:block th:fragment="content" th:remove="tag">
+      <div class="page-head">
+        <div>
+          <h1 th:text="${booth.name}">부스</h1>
+          <p th:text="${booth.description} ?: '설명이 없습니다.'"></p>
+        </div>
+        <a class="btn ghost" href="/admin/booths">목록으로</a>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>부스 정보</h2>
+        </div>
+        <div class="card-body">
+          <form method="post" th:action="@{'/admin/booths/' + ${booth.id}}" class="form-row">
+            <div class="field">
+              <label>이름</label>
+              <input class="input" name="name" th:value="${booth.name}" required />
+            </div>
+            <div class="field grow-2">
+              <label>설명</label>
+              <input class="input" name="description" th:value="${booth.description}" />
+            </div>
+            <button class="btn" type="submit">고치기</button>
+          </form>
+        </div>
+      </div>
+
+      <!--/* 카드. 부스 운영 중에 제일 자주 손대는 쪽이라 구역보다 위에 둔다. */-->
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>카드</h2>
+            <p class="sub">참가자가 주고받는 굿즈입니다. 이미지가 없으면 이름에서 뽑은 약칭이 대신 나옵니다.</p>
+          </div>
+          <span class="badge"><span th:text="${#lists.size(items)}">0</span>종</span>
+        </div>
+
+        <div class="card-body tight">
+          <form method="post" th:action="@{'/admin/booths/' + ${booth.id} + '/items'}" class="form-row">
+            <div class="field">
+              <label for="item-name">이름</label>
+              <input class="input" id="item-name" name="name" placeholder="N Vision 74" required />
+            </div>
+            <div class="field">
+              <label for="item-desc">설명</label>
+              <input class="input" id="item-desc" name="description" placeholder="비워 둬도 됩니다" />
+            </div>
+            <div class="field">
+              <label for="item-image">이미지 주소</label>
+              <input class="input" id="item-image" name="imageUrl" placeholder="https://..." />
+            </div>
+            <button class="btn brand" type="submit">추가</button>
+          </form>
+        </div>
+
+        <div class="rows" th:if="${!#lists.isEmpty(items)}">
+          <div class="row" th:each="item : ${items}">
+            <div class="chip-card">
+              <img th:if="${item.imageUrl}" th:src="${item.imageUrl}" th:alt="${item.name}" />
+              <span th:unless="${item.imageUrl}" th:text="${item.code}">N74</span>
+            </div>
+
+            <form
+              method="post"
+              th:action="@{'/admin/booths/' + ${booth.id} + '/items/' + ${item.id}}"
+              class="grow"
+              style="display: flex; gap: 8px; align-items: center"
+            >
+              <input class="input" name="name" th:value="${item.name}" required style="flex: 1" />
+              <input class="input" name="description" th:value="${item.description}" placeholder="설명" style="flex: 1" />
+              <input class="input" name="imageUrl" th:value="${item.imageUrl}" placeholder="이미지 주소" style="flex: 1" />
+              <button class="btn outline sm" type="submit">저장</button>
+            </form>
+
+            <form
+              method="post"
+              th:action="@{'/admin/booths/' + ${booth.id} + '/items/' + ${item.id} + '/delete'}"
+              th:data-confirm="'카드 ' + ${item.name} + ' 을(를) 지웁니다. 이 카드를 들고 있는 사람이 있으면 지워지지 않습니다.'"
+            >
+              <button class="icon-btn danger" type="submit" aria-label="지우기">×</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="empty" th:if="${#lists.isEmpty(items)}">
+          <strong>카드가 없습니다</strong>
+          카드가 없으면 참가자가 고를 것이 없어서 매칭이 시작되지 않습니다.
+        </div>
+      </div>
+
+      <!--/* 구역. 약속 장소로 쓰인다. */-->
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>구역</h2>
+            <p class="sub">참가자가 만나기로 정하는 자리입니다.</p>
+          </div>
+          <span class="badge"><span th:text="${#lists.size(zones)}">0</span>개</span>
+        </div>
+
+        <div class="card-body tight">
+          <form method="post" th:action="@{'/admin/booths/' + ${booth.id} + '/zones'}" class="form-row">
+            <div class="field">
+              <label for="zone-name">이름</label>
+              <input class="input" id="zone-name" name="name" placeholder="A 구역" required />
+            </div>
+            <div class="field grow-2">
+              <label for="zone-loc">위치 설명</label>
+              <input class="input" id="zone-loc" name="location" placeholder="부스 입구 왼쪽" />
+            </div>
+            <button class="btn brand" type="submit">추가</button>
+          </form>
+        </div>
+
+        <div class="rows" th:if="${!#lists.isEmpty(zones)}">
+          <div class="row" th:each="zone : ${zones}">
+            <form
+              method="post"
+              th:action="@{'/admin/booths/' + ${booth.id} + '/zones/' + ${zone.id}}"
+              class="grow"
+              style="display: flex; gap: 8px; align-items: center"
+            >
+              <input class="input" name="name" th:value="${zone.name}" required style="flex: 1" />
+              <input class="input" name="location" th:value="${zone.location}" placeholder="위치 설명" style="flex: 2" />
+              <button class="btn outline sm" type="submit">저장</button>
+            </form>
+
+            <form
+              method="post"
+              th:action="@{'/admin/booths/' + ${booth.id} + '/zones/' + ${zone.id} + '/delete'}"
+              th:data-confirm="'구역 ' + ${zone.name} + ' 을(를) 지웁니다.'"
+            >
+              <button class="icon-btn danger" type="submit" aria-label="지우기">×</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="empty" th:if="${#lists.isEmpty(zones)}">
+          <strong>구역이 없습니다</strong>
+          약속 장소를 고르는 화면이 비어 버립니다.
+        </div>
+      </div>
+    </th:block>
+  </body>
+</html>

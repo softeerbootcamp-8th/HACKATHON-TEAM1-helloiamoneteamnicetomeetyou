@@ -1,0 +1,1075 @@
+/*
+  어드민 화면 스타일.
+
+  프론트(frontend/src/index.css)의 디자인 토큰을 그대로 옮겼다. 부스 시연 중에 어드민 화면도
+  같이 보여 줄 수 있어서 두 화면이 같은 인상이어야 한다.
+
+  Tailwind 를 쓰지 않은 것은 백엔드에 빌드 단계를 하나 더 만들지 않기 위해서고, CDN 을 걸지
+  않은 것은 부스 네트워크가 흔들릴 때 화면이 통째로 무너지기 때문이다. 폰트도 있으면 쓰고
+  없으면 시스템 폰트로 떨어지게 두었다.
+*/
+
+/* ==========================================================================
+   색상 토큰
+
+   색은 전부 여기에만 있다. 테마를 바꿀 때 이 블록만 갈아끼우면 화면 전체가 따라온다.
+   아래 규칙들에는 색 리터럴을 쓰지 않는다.
+   ========================================================================== */
+:root {
+  --brand: #2ced90;
+  --brand-strong: #16c47a;
+  --brand-soft: #e8fbf1;
+  --brand-ring: rgba(44, 237, 144, 0.28);
+
+  --ink: #111111;
+  --ink-sub: #4a4f57;
+  --muted: #9aa0a8;
+
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --tile: #eef0f4;
+  --disabled: #f1f1f0;
+  --line: #ececec;
+  --line-strong: #dfe2e7;
+
+  --danger: #ff5a5a;
+  --danger-soft: #ffefef;
+  --warn: #ff9f2e;
+  --warn-soft: #fff4e5;
+
+  --overlay: rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 1px 2px rgba(17, 17, 17, 0.04), 0 2px 8px rgba(17, 17, 17, 0.04);
+  --shadow-md: 0 4px 16px rgba(17, 17, 17, 0.08);
+  --shadow-lg: 0 18px 48px rgba(17, 17, 17, 0.18);
+
+  /* 손가락 밑에서 바로 반응하는 것. frontend 의 springSnap 자리다. */
+  --snap: 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* 사라지는 것은 빠르게. 기다리게 하면 답답하다. */
+  --out: 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* 시트나 다이얼로그처럼 무게감이 있어야 하는 것. */
+  --sheet: 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ==========================================================================
+   바탕
+   ========================================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui,
+    'Apple SD Gothic Neo', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
+}
+
+button {
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+/* ==========================================================================
+   레이아웃 — 왼쪽 내비게이션 + 본문
+
+   부스 운영자는 노트북이나 태블릿으로 본다. 좁아지면 내비게이션이 위로 눕는다.
+   ========================================================================== */
+.shell {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  min-height: 100vh;
+}
+
+.side {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 26px 16px;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.brandmark {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 8px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.brandmark .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 0 4px var(--brand-ring);
+}
+
+.brandmark .tag {
+  margin-left: 2px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--tile);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  color: var(--ink-sub);
+  font-size: 14.5px;
+  font-weight: 600;
+  transition: background var(--out), color var(--out), transform var(--snap);
+}
+
+.nav a:hover {
+  background: var(--bg);
+}
+
+.nav a:active {
+  transform: scale(0.975);
+}
+
+.nav a.on {
+  background: var(--brand-soft);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* 활성 항목 왼쪽의 초록 막대. 어느 화면인지 곁눈으로도 보이게 한다. */
+.nav a.on::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 18px;
+  border-radius: 0 3px 3px 0;
+  background: var(--brand);
+  transform: translateY(-50%);
+  animation: nav-bar var(--snap) both;
+}
+
+@keyframes nav-bar {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: 18px;
+    opacity: 1;
+  }
+}
+
+.side-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 4px;
+}
+
+.env {
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+  word-break: break-all;
+}
+
+.env b {
+  display: block;
+  color: var(--ink-sub);
+  font-size: 12px;
+}
+
+.main {
+  padding: 30px 34px 90px;
+  max-width: 1180px;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.page-head h1 {
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.page-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ==========================================================================
+   카드와 섹션
+   ========================================================================== */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.card + .card {
+  margin-top: 16px;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.card-head h2 {
+  font-size: 16.5px;
+  font-weight: 700;
+}
+
+.card-head .sub {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.card-body {
+  padding: 18px 20px;
+}
+
+.card-body.tight {
+  padding: 12px 20px 18px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* ==========================================================================
+   요약 타일 — 대시보드 맨 위의 큰 숫자
+   ========================================================================== */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.stat {
+  padding: 18px 18px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.stat .label {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.stat .value {
+  margin-top: 7px;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat .value .unit {
+  margin-left: 3px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.stat.alert {
+  background: var(--danger-soft);
+  border-color: transparent;
+}
+
+.stat.alert .value {
+  color: var(--danger);
+}
+
+.stat.good {
+  background: var(--brand-soft);
+  border-color: transparent;
+}
+
+/* ==========================================================================
+   버튼 — 시안의 알약 버튼
+
+   누르는 느낌이 반드시 있어야 한다. 화면에 마우스가 있어도 눌린 티가 나야 방금 눌렀는지
+   아닌지를 헷갈리지 않는다.
+   ========================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 14.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: transform var(--snap), background var(--out), box-shadow var(--out), opacity var(--out);
+}
+
+.btn:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 4px var(--brand-ring);
+}
+
+.btn.brand {
+  background: var(--brand);
+  color: var(--surface);
+}
+
+.btn.brand:hover {
+  background: var(--brand-strong);
+}
+
+.btn.outline {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+
+.btn.outline:hover {
+  background: var(--bg);
+}
+
+.btn.ghost {
+  background: transparent;
+  color: var(--muted);
+}
+
+.btn.ghost:hover {
+  background: var(--bg);
+  color: var(--ink-sub);
+}
+
+.btn.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.btn.danger:hover {
+  background: var(--danger);
+  color: var(--surface);
+}
+
+.btn.sm {
+  height: 34px;
+  padding: 0 13px;
+  font-size: 13px;
+}
+
+.btn.wide {
+  width: 100%;
+}
+
+.btn:disabled {
+  background: var(--disabled);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 아이콘만 있는 작은 원형 버튼. 수량 스테퍼와 줄 삭제에 쓴다. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink-sub);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  transition: transform var(--snap), background var(--out), color var(--out);
+}
+
+.icon-btn:hover {
+  background: var(--bg);
+}
+
+.icon-btn:active {
+  transform: scale(0.88);
+}
+
+.icon-btn.danger:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--surface);
+}
+
+/* ==========================================================================
+   입력
+   ========================================================================== */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  color: var(--ink-sub);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.input,
+select.input {
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14.5px;
+  transition: border-color var(--out), box-shadow var(--out);
+  appearance: none;
+}
+
+select.input {
+  padding-right: 34px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 20px, calc(100% - 12px) 20px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.input::placeholder {
+  color: var(--muted);
+}
+
+.input:focus {
+  outline: 0;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px var(--brand-ring);
+}
+
+.input.narrow {
+  width: 76px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.form-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.form-row .field {
+  flex: 1;
+  min-width: 150px;
+}
+
+.form-row .field.grow-2 {
+  flex: 2;
+}
+
+/* ==========================================================================
+   목록
+
+   한꺼번에 나타나면 싸구려로 보인다. 순서대로 뜨게 한다.
+   ========================================================================== */
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 20px;
+  border-top: 1px solid var(--line);
+  transition: background var(--out);
+  animation: row-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.rows > .row:first-child {
+  border-top: 0;
+}
+
+.row:hover {
+  background: var(--bg);
+}
+
+.row.linked:active {
+  transform: scale(0.995);
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.row .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.row .title {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.row .meta {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.row .actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 카드 앞면. 굿즈 이미지가 아직 없어서 프론트처럼 약칭을 초록 빛무리 위에 얹는다. */
+.chip-card {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--tile);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  overflow: hidden;
+}
+
+.chip-card::before {
+  content: '';
+  position: absolute;
+  width: 70%;
+  height: 70%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--brand) 0%, transparent 70%);
+  filter: blur(9px);
+}
+
+.chip-card span {
+  position: relative;
+}
+
+.chip-card img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ==========================================================================
+   배지
+   ========================================================================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--tile);
+  color: var(--ink-sub);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge.brand {
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+
+.badge.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.badge.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.badge.live::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand);
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ==========================================================================
+   수요와 공급 막대
+
+   숫자만 있으면 어느 쪽이 모자란지 한 번 계산해야 한다. 막대를 나란히 두면 눈으로 바로 잡힌다.
+   ========================================================================== */
+.demand {
+  display: grid;
+  grid-template-columns: 44px 1fr 132px 92px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+  animation: row-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.demand:first-child {
+  border-top: 0;
+}
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.bar .track {
+  flex: 1;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--tile);
+  overflow: hidden;
+}
+
+.bar .fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  /* 값은 인라인 style 의 --w 로 들어온다. 화면이 뜰 때 0 에서 자란다. */
+  width: var(--w, 0%);
+  background: var(--brand);
+  animation: bar-grow 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bar.seek .fill {
+  background: var(--ink);
+}
+
+.bar .num {
+  width: 20px;
+  text-align: right;
+  color: var(--ink-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes bar-grow {
+  from {
+    width: 0;
+  }
+}
+
+/* ==========================================================================
+   빈 상태
+   ========================================================================== */
+.empty {
+  padding: 44px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.empty strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--ink-sub);
+  font-size: 15px;
+}
+
+/* ==========================================================================
+   토스트 — 아래에서 밀려 올라오고 스스로 사라진다
+   ========================================================================== */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  z-index: 90;
+  max-width: 420px;
+  padding: 14px 22px;
+  border-radius: 16px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-50%);
+  animation: toast-in var(--sheet) both;
+}
+
+.toast.danger {
+  background: var(--danger);
+}
+
+.toast.gone {
+  animation: toast-out var(--out) both;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 22px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(0.98);
+  }
+}
+
+/* ==========================================================================
+   다이얼로그
+
+   반드시 닫힌다. 바깥을 누르는 것, Esc, 취소 버튼 셋 다 닫는 길이다. 하나라도 막히면
+   쓰는 사람이 갇힌다.
+   ========================================================================== */
+dialog.sheet {
+  padding: 0;
+  border: 0;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  width: min(420px, calc(100vw - 40px));
+  color: var(--ink);
+}
+
+dialog.sheet::backdrop {
+  background: var(--overlay);
+  animation: fade-in var(--out) both;
+}
+
+dialog.sheet[open] {
+  animation: sheet-in var(--sheet) both;
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+dialog.sheet .sheet-body {
+  padding: 24px 24px 20px;
+}
+
+dialog.sheet h3 {
+  font-size: 19px;
+  font-weight: 800;
+}
+
+dialog.sheet p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+dialog.sheet .sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 24px 24px;
+}
+
+/* ==========================================================================
+   화면 전체가 뜰 때
+   ========================================================================== */
+.main > * {
+  animation: page-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   로그인
+   ========================================================================== */
+.login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.login .card {
+  width: min(380px, 100%);
+  padding: 34px 30px 30px;
+  border-radius: 26px;
+  box-shadow: var(--shadow-md);
+  animation: sheet-in var(--sheet) both;
+}
+
+.login .logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.login h1 {
+  margin-top: 20px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.login p.hint {
+  margin: 7px 0 24px;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.login form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login .error {
+  margin-top: 14px;
+  padding: 11px 14px;
+  border-radius: 13px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+  animation: shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* 비밀번호가 틀렸을 때. 글자를 읽기 전에 틀렸다는 것이 먼저 전달된다. */
+@keyframes shake {
+  10%,
+  90% {
+    transform: translateX(-2px);
+  }
+  20%,
+  80% {
+    transform: translateX(3px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-5px);
+  }
+  40%,
+  60% {
+    transform: translateX(5px);
+  }
+}
+
+/* ==========================================================================
+   좁은 화면 — 부스에서 태블릿으로 볼 때
+   ========================================================================== */
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .side {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+  }
+
+  .nav {
+    flex-direction: row;
+  }
+
+  .nav a.on::before {
+    display: none;
+  }
+
+  .side-foot {
+    margin-top: 0;
+  }
+
+  .env {
+    display: none;
+  }
+
+  .main {
+    padding: 20px 16px 80px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .demand {
+    grid-template-columns: 40px 1fr;
+    row-gap: 10px;
+  }
+
+  .demand .bars,
+  .demand .demand-tail {
+    grid-column: 1 / -1;
+  }
+}
+
+/* 모션을 줄이겠다고 한 사람에게는 전환을 걷어낸다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

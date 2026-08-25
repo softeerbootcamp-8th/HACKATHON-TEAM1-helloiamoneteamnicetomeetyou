@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" th:replace="~{admin/layout :: page('사용자', ~{::content})}">
+  <body>
+    <th:block th:fragment="content" th:remove="tag">
+      <div class="page-head">
+        <div>
+          <h1>사용자와 카드</h1>
+          <p>매칭이 안 붙을 때 여기서 카드를 붙였다 뗐다 하면서 짝이 나게 만듭니다.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>더미 사용자 만들기</h2>
+            <p class="sub">UUID 는 서버가 발급합니다. 어드민이 대신 조작할 수 있는 사람입니다.</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <form method="post" th:action="@{/admin/users}" class="form-row">
+            <div class="field grow-2">
+              <label for="dummy-name">표시 이름</label>
+              <input class="input" id="dummy-name" name="username" placeholder="아이오닉러버" required />
+            </div>
+            <button class="btn brand" type="submit">만들기</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>사용자 목록</h2>
+            <p class="sub">방금 들어온 사람이 위에 옵니다.</p>
+          </div>
+          <span class="badge"><span th:text="${#lists.size(users)}">0</span>명</span>
+        </div>
+
+        <div class="rows" th:if="${!#lists.isEmpty(users)}">
+          <div class="row linked" th:each="user : ${users}" th:data-href="'/admin/users/' + ${user.id}">
+            <div class="grow">
+              <div class="title">
+                <span th:text="${user.username} ?: '이름 없음'">이름</span>
+                <span class="mono" th:text="${user.shortId}">00000000</span>
+              </div>
+              <div class="meta">
+                보유 <span th:text="${user.haveCount}">0</span>종 · 희망
+                <span th:text="${user.wantCount}">0</span>종 ·
+                <span th:text="${#temporals.format(user.createdAt, 'MM/dd HH:mm')}"></span>
+              </div>
+            </div>
+
+            <span class="badge live" th:if="${user.online}">접속 중</span>
+            <span class="badge brand" th:if="${user.dummy}">더미</span>
+            <a class="btn outline sm" th:href="'/admin/users/' + ${user.id}">열기</a>
+          </div>
+        </div>
+
+        <div class="empty" th:if="${#lists.isEmpty(users)}">
+          <strong>사용자가 없습니다</strong>
+          현황 화면에서 시연 한 판을 차리면 더미가 한 번에 만들어집니다.
+        </div>
+      </div>
+    </th:block>
+  </body>
+</html>

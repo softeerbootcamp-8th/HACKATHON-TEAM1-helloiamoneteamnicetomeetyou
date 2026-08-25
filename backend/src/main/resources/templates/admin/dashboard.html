@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" th:replace="~{admin/layout :: page('현황', ~{::content})}">
+  <body>
+    <th:block th:fragment="content" th:remove="tag">
+      <div class="page-head">
+        <div>
+          <h1>부스 현황</h1>
+          <p>매칭이 안 붙으면 아래 표에서 모자란 카드를 찾아 그 카드를 가진 더미를 넣습니다.</p>
+        </div>
+        <div class="btn-row">
+          <a class="btn outline" href="/admin/users">사용자 관리</a>
+          <a class="btn" href="/admin/booths">카드 등록</a>
+        </div>
+      </div>
+
+      <!--/* 큰 숫자 넷. 부스에서 곁눈으로 보게 되는 자리라 계산이 필요한 값을 두지 않는다. */-->
+      <div class="stats">
+        <div class="stat">
+          <div class="label">등록된 카드</div>
+          <div class="value">
+            <span th:text="${#lists.size(demand)}">0</span><span class="unit">종</span>
+          </div>
+        </div>
+        <div class="stat" th:classappend="${connectedTotal > 0} ? 'good'">
+          <div class="label">지금 접속 중</div>
+          <div class="value">
+            <span th:text="${connectedTotal}">0</span><span class="unit">명</span>
+          </div>
+        </div>
+        <div class="stat" th:classappend="${deadEndCount > 0} ? 'alert'">
+          <div class="label">짝이 날 수 없는 카드</div>
+          <div class="value">
+            <span th:text="${deadEndCount}">0</span><span class="unit">종</span>
+          </div>
+        </div>
+        <div class="stat">
+          <div class="label">부스</div>
+          <div class="value">
+            <span th:text="${#lists.size(booths)}">0</span><span class="unit">개</span>
+          </div>
+        </div>
+      </div>
+
+      <!--/* 수요와 공급. 이 화면에서 제일 중요한 자리라 맨 위에 크게 둔다. */-->
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>카드별 수요와 공급</h2>
+            <p class="sub">내놓는 사람과 찾는 사람이 둘 다 있어야 짝이 납니다. 손봐야 할 카드가 위에 옵니다.</p>
+          </div>
+        </div>
+
+        <div class="demand-list" th:if="${!#lists.isEmpty(demand)}">
+          <div class="demand" th:each="row : ${demand}">
+            <div class="chip-card">
+              <img th:if="${row.item.imageUrl}" th:src="${row.item.imageUrl}" th:alt="${row.item.name}" />
+              <span th:unless="${row.item.imageUrl}" th:text="${row.item.code}">N74</span>
+            </div>
+
+            <div>
+              <div class="title" th:text="${row.item.name}">N Vision 74</div>
+              <div class="meta" th:if="${row.item.description}" th:text="${row.item.description}"></div>
+            </div>
+
+            <div class="bars">
+              <!--/*
+                막대 길이는 두 값 중 큰 쪽을 100% 로 잡는다. 절대 수량이 아니라 어느 쪽이
+                모자란지를 보는 표라서, 전체 최댓값에 맞추면 값이 작은 카드가 전부 납작해진다.
+              */-->
+              <div class="bar">
+                <span>보유</span>
+                <span class="track">
+                  <span
+                    class="fill"
+                    th:style="'--w:' + ${row.holders + row.seekers == 0 ? 0 : (row.holders * 100 / (row.holders > row.seekers ? row.holders : row.seekers))} + '%'"
+                  ></span>
+                </span>
+                <span class="num" th:text="${row.holders}">0</span>
+              </div>
+              <div class="bar seek">
+                <span>희망</span>
+                <span class="track">
+                  <span
+                    class="fill"
+                    th:style="'--w:' + ${row.holders + row.seekers == 0 ? 0 : (row.seekers * 100 / (row.holders > row.seekers ? row.holders : row.seekers))} + '%'"
+                  ></span>
+                </span>
+                <span class="num" th:text="${row.seekers}">0</span>
+              </div>
+            </div>
+
+            <div class="demand-tail">
+              <span class="badge danger" th:if="${row.deadEnd}">짝 없음</span>
+              <span class="badge warn" th:if="${!row.deadEnd and row.short}">보유 부족</span>
+              <span class="badge brand" th:if="${!row.deadEnd and !row.short}">매칭 가능</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="empty" th:if="${#lists.isEmpty(demand)}">
+          <strong>등록된 카드가 없습니다</strong>
+          부스와 카드를 먼저 만들거나, 아래에서 시연 한 판을 차리세요.
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top: 16px">
+        <!--/* 시연 준비. 부스에서 제일 자주 누르게 될 버튼이다. */-->
+        <div class="card" style="margin-top: 0">
+          <div class="card-head">
+            <div>
+              <h2>시연 한 판 차리기</h2>
+              <p class="sub">더미와 카드를 고리로 엮어서 짝이 반드시 나게 만듭니다.</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <form method="post" th:action="@{/admin/seed}" class="form-row">
+              <div class="field grow-2">
+                <label for="seed-booth">부스</label>
+                <select class="input" id="seed-booth" name="boothId" required>
+                  <option th:each="booth : ${booths}" th:value="${booth.id}" th:text="${booth.name}"></option>
+                </select>
+              </div>
+              <div class="field" style="flex: 0 0 auto; min-width: 0">
+                <label for="seed-count">더미 수</label>
+                <input class="input narrow" id="seed-count" name="dummyCount" type="number" min="2" max="20" value="6" />
+              </div>
+              <button class="btn brand" type="submit">세우기</button>
+            </form>
+            <p class="sub" style="margin: 12px 0 0; color: var(--muted); font-size: 12.5px">
+              카드나 구역이 하나도 없는 부스면 기본값으로 같이 만들어 줍니다.
+            </p>
+          </div>
+        </div>
+
+        <!--/* 정리. 되돌릴 수 없어서 부스 이름을 직접 입력해야 실행된다. */-->
+        <div class="card" style="margin-top: 0">
+          <div class="card-head">
+            <div>
+              <h2>시연 정리하기</h2>
+              <p class="sub">더미와 그 교환 기록만 지웁니다. 부스와 구역, 카드는 남습니다.</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <form
+              method="post"
+              th:action="@{/admin/reset}"
+              class="form-row"
+              data-confirm="더미 사용자와 그들이 남긴 교환 기록을 모두 지웁니다. 되돌릴 수 없습니다."
+            >
+              <div class="field">
+                <label for="reset-booth">부스</label>
+                <select class="input" id="reset-booth" name="boothId" required>
+                  <option th:each="booth : ${booths}" th:value="${booth.id}" th:text="${booth.name}"></option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="reset-name">부스 이름을 그대로 입력</label>
+                <input class="input" id="reset-name" name="confirmName" placeholder="부스 이름" required />
+              </div>
+              <button class="btn danger" type="submit">지우기</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!--/* 접속 현황. 화면이 안 바뀔 때 폰 문제인지 서버 문제인지 여기서 가른다. */-->
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>부스별 접속</h2>
+            <p class="sub">SSE 로 붙어 있는 사람 수입니다. 0 이면 아무 폰도 이벤트를 못 받습니다.</p>
+          </div>
+        </div>
+        <div class="rows" th:if="${!#lists.isEmpty(booths)}">
+          <div class="row linked" th:each="booth : ${booths}" th:data-href="'/admin/booths/' + ${booth.id}">
+            <div class="grow">
+              <div class="title" th:text="${booth.name}">부스</div>
+              <div class="meta">
+                구역 <span th:text="${booth.zoneCount}">0</span>개 · 카드
+                <span th:text="${booth.itemCount}">0</span>종
+              </div>
+            </div>
+            <span class="badge live" th:if="${booth.connectedCount > 0}">
+              <span th:text="${booth.connectedCount}">0</span>명 접속 중
+            </span>
+            <span class="badge" th:if="${booth.connectedCount == 0}">접속 없음</span>
+          </div>
+        </div>
+        <div class="empty" th:if="${#lists.isEmpty(booths)}">
+          <strong>부스가 없습니다</strong>
+          부스를 먼저 만들어야 카드와 구역을 등록할 수 있습니다.
+        </div>
+      </div>
+    </th:block>
+  </body>
+</html>

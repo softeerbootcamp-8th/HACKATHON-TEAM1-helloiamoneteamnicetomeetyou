@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" th:replace="~{admin/layout :: page('교환 현황', ~{::content})}">
+  <body>
+    <th:block th:fragment="content" th:remove="tag">
+      <div class="page-head">
+        <div>
+          <h1>교환 현황</h1>
+          <p>더미에게 온 요청은 어드민이 대신 눌러 줘야 흐름이 이어집니다.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>진행 중인 교환</h2>
+            <p class="sub">최근 것이 위에 옵니다. 실제 참가자의 수락은 대신 누를 수 없습니다.</p>
+          </div>
+          <span class="badge"><span th:text="${#lists.size(exchanges)}">0</span>건</span>
+        </div>
+
+        <div class="rows" th:if="${!#lists.isEmpty(exchanges)}">
+          <div class="row" th:each="ex : ${exchanges}" style="align-items: flex-start">
+            <div class="grow">
+              <div class="title">
+                <span th:text="'#' + ${ex.id}">#1</span>
+                <span class="badge brand" th:if="${ex.status.name() == 'IN_PROGRESS'}">진행 중</span>
+                <span class="badge" th:if="${ex.status.name() == 'PENDING'}">시간 조율 중</span>
+                <span class="badge brand" th:if="${ex.status.name() == 'COMPLETED'}">완료</span>
+                <span class="badge danger" th:if="${ex.status.name() == 'CANCELLED'}">취소됨</span>
+                <span class="badge warn" th:if="${ex.hasDummy}">더미 포함</span>
+              </div>
+
+              <div class="meta">
+                <span th:text="${ex.boothName} ?: '부스 미정'"></span>
+                · <span th:text="${ex.zoneName} ?: '장소 미정'"></span>
+                ·
+                <span
+                  th:text="${ex.exchangeTime != null} ? ${#temporals.format(ex.exchangeTime, 'MM/dd HH:mm')} + ' 약속' : '시간 미정'"
+                ></span>
+              </div>
+
+              <!--/* 참가자별 한 줄. 더미면 대신 누를 버튼이 붙는다. */-->
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px">
+                <div
+                  th:each="p : ${ex.participants}"
+                  style="display: flex; align-items: center; gap: 7px; padding: 6px 8px 6px 12px; border: 1px solid var(--line); border-radius: 999px"
+                >
+                  <span style="font-size: 13px; font-weight: 700" th:text="${p.username} ?: ${p.shortId}"></span>
+
+                  <span class="badge brand" th:if="${p.status.name() == 'ACCEPTED'}">수락</span>
+                  <span class="badge" th:if="${p.status.name() == 'PENDING'}">대기</span>
+                  <span class="badge danger" th:if="${p.status.name() == 'REJECTED'}">거절</span>
+
+                  <th:block th:if="${p.dummy and p.status.name() == 'PENDING'}">
+                    <form method="post" th:action="@{'/admin/exchanges/participants/' + ${p.id} + '/accept'}">
+                      <button class="btn brand sm" type="submit">대신 수락</button>
+                    </form>
+                    <form method="post" th:action="@{'/admin/exchanges/participants/' + ${p.id} + '/reject'}">
+                      <button class="btn outline sm" type="submit">거절</button>
+                    </form>
+                  </th:block>
+                </div>
+              </div>
+            </div>
+
+            <div class="actions" th:if="${ex.status.name() != 'COMPLETED' and ex.status.name() != 'CANCELLED'}">
+              <form
+                method="post"
+                th:action="@{'/admin/exchanges/' + ${ex.id} + '/complete'}"
+                th:data-confirm="'교환 #' + ${ex.id} + ' 을(를) 완료 처리합니다.'"
+              >
+                <button class="btn outline sm" type="submit">완료 처리</button>
+              </form>
+              <form
+                method="post"
+                th:action="@{'/admin/exchanges/' + ${ex.id} + '/cancel'}"
+                th:data-confirm="'교환 #' + ${ex.id} + ' 을(를) 취소합니다. 참가자 화면이 바뀝니다.'"
+              >
+                <button class="btn danger sm" type="submit">취소</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="empty" th:if="${#lists.isEmpty(exchanges)}">
+          <strong>진행 중인 교환이 없습니다</strong>
+          참가자가 앱에서 상대를 고르면 여기에 나타납니다.
+        </div>
+      </div>
+
+      <!--/* 아직 못 하는 것을 화면에 적어 둔다. 부스에서 찾다가 시간을 버리지 않게 한다. */-->
+      <div class="card">
+        <div class="card-head">
+          <h2>아직 안 되는 것</h2>
+        </div>
+        <div class="card-body">
+          <p style="margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.7">
+            더미 대신 <b>시간 슬롯을 고르는 것</b>과 <b>약속을 확정하는 것</b>은 아직 없습니다. 그 계산이
+            이슈 #29 의 <span class="mono">ExchangeService</span> 에 있어서, 그것이 dev 에 들어온 뒤에
+            같은 서비스를 불러서 붙일 자리입니다. 격자 계산을 여기서 다시 만들면 두 벌이 어긋납니다.
+          </p>
+        </div>
+      </div>
+    </th:block>
+  </body>
+</html>

@@ -45,4 +45,20 @@ public class Exchange {
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    /**
+     * 부스 운영자가 막힌 교환을 끊는다.
+     *
+     * <p>시연 중에 한쪽 사람이 자리를 뜨거나 화면이 죽어서 약속이 어중간하게 남는 일이 생긴다.
+     * 그 교환이 남아 있으면 같은 사람으로 다음 시연을 시작할 수 없어서, 어드민이 상태만 바꿔
+     * 정리할 수 있게 열어 둔다.
+     */
+    public void cancelByAdmin() {
+        this.status = ExchangeStatus.CANCELLED;
+    }
+
+    /** 실물 교환은 끝났는데 화면에서 완료 처리가 안 된 건을 어드민이 닫는다. */
+    public void completeByAdmin() {
+        this.status = ExchangeStatus.COMPLETED;
+    }
 }
