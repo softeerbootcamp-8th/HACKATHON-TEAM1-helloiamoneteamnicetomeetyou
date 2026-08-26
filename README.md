@@ -146,23 +146,11 @@ Caddy 를 두고 sslip.io 도메인을 쓰는 쪽을 골랐습니다. 인스턴�
 
 ## 팀 구성
 
-<table>
-  <tr>
-    <td align="center" width="33%"><img src="https://github.com/user-attachments/assets/508bd507-dd85-49d5-baa6-f250ce1141c8" width="130" alt="기승민" /></td>
-    <td align="center" width="33%"><img src="https://github.com/bigbell999.png" width="130" alt="유승종" /></td>
-    <td align="center" width="33%"><img src="https://github.com/user-attachments/assets/c00b45ee-9954-4f84-8120-c44b0544dbbd" width="130" alt="최서지" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>기승민</b><br/><a href="https://github.com/KiSeungMin">@KiSeungMin</a></td>
-    <td align="center"><b>유승종</b><br/><a href="https://github.com/bigbell999">@bigbell999</a></td>
-    <td align="center"><b>최서지</b><br/><a href="https://github.com/choiseoji">@choiseoji</a></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>어드민 콘솔<br/>카드 카탈로그와 부스<br/>프론트엔드 배포</sub></td>
-    <td align="center"><sub>교환 대기장과 찔러보기<br/>SSE 실시간 연결<br/>백엔드 배포</sub></td>
-    <td align="center"><sub>자동 매칭 (1:1, 삼자)<br/>매칭 수락과 거절<br/>알림</sub></td>
-  </tr>
-</table>
+| 이름 | GitHub | 맡은 것 |
+| --- | --- | --- |
+| **기승민** | [@KiSeungMin](https://github.com/KiSeungMin) | 어드민 콘솔, 카드 카탈로그와 부스, 프론트엔드 배포 |
+| **유승종** | [@bigbell999](https://github.com/bigbell999) | 교환 대기장과 찔러보기, SSE 실시간 연결, 백엔드 배포 |
+| **최서지** | [@choiseoji](https://github.com/choiseoji) | 자동 매칭(1:1, 삼자), 매칭 수락과 거절, 알림 |
 
 <br>
 
