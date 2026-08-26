@@ -12,6 +12,7 @@ import { RadarUser } from '@/components/domain/RadarUser'
 import { BellIcon } from '@/components/ui/icons'
 import { useCatalog } from '@/features/catalog/useCatalog'
 import { useNotification } from '@/features/notification/useNotification'
+import type { BoothHaveItem } from '@/features/poke/api'
 import { usePoke } from '@/features/poke/usePoke'
 import { cn } from '@/lib/cn'
 import { tick } from '@/lib/haptics'
@@ -20,7 +21,13 @@ import { usePush, type PushState } from '@/lib/use-push'
 import { itemById, type Item } from '@/mocks/data'
 import { appointmentStatus, sortedAppointments } from '@/store/appointment-status'
 import { getDeviceId } from '@/store/identity'
-import { radarUsers, sortedWaitingList, waitingStatus, wantedFromMe } from '@/store/matching'
+import {
+  radarUsers,
+  sortedWaitingList,
+  waitingStatus,
+  wantedFromMe,
+  type WaitingStatus,
+} from '@/store/matching'
 import { useStore } from '@/store/useStore'
 
 export function Home() {
@@ -119,7 +126,8 @@ export function Home() {
    * 레이더에 세울 상대를 서버 목록에서 뽑는다.
    *
    * 시안 규칙이다 (desc 165:3500 2번) — 먼저 등록된 순으로 최대 5개, 카드 종류마다 한 명씩.
-   * 목록 자체가 이미 내 희망 카드만 담고 있어서 여기서 다시 걸러내지 않는다.
+   * 무엇을 담을지는 서버가 이미 정해서 준다(희망 카드가 있으면 그와 맞는 것만, 없으면 내가
+   * 가진 카드를 뺀 전부). 여기서 다시 걸러내지 않는다.
    *
    * <b>목업에 짝이 없는 카드는 세우지 않는다.</b> 카드 그림과 약칭이 목업에만 있어서 그릴
    * 수가 없다. 어드민 시드를 목업 이름과 맞추면 이 일이 생기지 않는다.
@@ -443,14 +451,14 @@ export function Home() {
   /**
    * 서버에 등록한 사람들의 카드. 배지는 시안 desc 204:4948 기준으로 가른다.
    *
-   * "매칭됨" 은 서버가 내려주지 않는다. 나와 그 사람 사이에 이미 성사된 교환이 있는지의
-   * 이야기라, 화면이 들고 있는 현재 매칭 상태에서 판단해야 한다.
+   * "매칭됨" 은 서버가 `matched` 로 내려준다. 화면이 들고 있는 매칭 상태로 판단하면
+   * 알림을 놓치거나 새로고침한 순간 이미 매칭된 상대가 "교환 가능" 으로 되돌아간다.
    */
   const serverListPanel =
     serverWaiting.length === 0 ? (
       <p className="py-10 text-center text-[13px] leading-[1.7] text-neutral-400">
         {needIds.length === 0
-          ? '찾는 카드를 등록하면 그 카드를 가진 사람이 여기 나타나요.'
+          ? '아직 이 부스에 카드를 내놓은 사람이 없어요.'
           : '아직 이 부스에 찾는 카드를 내놓은 사람이 없어요.'}
       </p>
     ) : (
@@ -463,7 +471,7 @@ export function Home() {
         {serverWaiting.map((row) => {
           const item = mockItemOf?.(row.item.id)
           const waitingReply = pendingOwnerIds.has(row.ownerId)
-          const status = row.givableItemNames.length > 0 ? '교환 가능' : '그래도 찔러보기'
+          const status = waitingStatusOf(row)
 
           return (
             <motion.li key={row.haveItemId} variants={staggerChild}>
@@ -788,8 +796,19 @@ export function Home() {
   )
 }
 
+/**
+ * 서버 목록 한 줄의 상태. 세 가지를 위에서부터 본다 (시안 desc 204:4948).
+ *
+ * 매칭된 상대에게 줄 카드가 있어도 "매칭됨" 이 먼저다. 이미 만나기로 한 사람을
+ * "교환 가능" 으로 두면 아직 아무것도 정해지지 않은 것처럼 읽힌다.
+ */
+function waitingStatusOf(row: BoothHaveItem): WaitingStatus {
+  if (row.matched) return '매칭됨'
+  return row.givableItemNames.length > 0 ? '교환 가능' : '그래도 찔러보기'
+}
+
 /** 전체리스트 오른쪽 상태. 매칭됐거나 교환이 되는 상대만 브랜드색으로 눈에 띈다. */
-function WaitingStatusTag({ status }: { status: string }) {
+function WaitingStatusTag({ status }: { status: WaitingStatus }) {
   const dim = status === '그래도 찔러보기'
   return (
     <span

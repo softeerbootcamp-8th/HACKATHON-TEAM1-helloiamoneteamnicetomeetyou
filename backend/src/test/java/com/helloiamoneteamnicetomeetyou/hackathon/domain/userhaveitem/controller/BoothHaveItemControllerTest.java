@@ -51,6 +51,7 @@ class BoothHaveItemControllerTest {
                 new ItemResponseDto(10L, "IONIQ 5 N", null, null),
                 2,
                 true,
+                true,
                 List.of("AVANTE N"),
                 List.of("AVANTE N", "PONY Vision 74"));
 
@@ -70,6 +71,7 @@ class BoothHaveItemControllerTest {
                 .andExpect(jsonPath("$.data.content[0].item.name").value("IONIQ 5 N"))
                 .andExpect(jsonPath("$.data.content[0].quantity").value(2))
                 .andExpect(jsonPath("$.data.content[0].wanted").value(true))
+                .andExpect(jsonPath("$.data.content[0].matched").value(true))
                 .andExpect(jsonPath("$.data.content[0].givableItemNames[0]").value("AVANTE N"))
                 .andExpect(jsonPath("$.data.content[0].ownerWantedItemNames.length()").value(2))
                 // 아직 채우지 않는 값은 @JsonInclude(NON_NULL) 로 응답에서 빠진다.
