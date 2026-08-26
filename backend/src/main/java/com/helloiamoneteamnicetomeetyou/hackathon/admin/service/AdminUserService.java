@@ -10,10 +10,13 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.service.UserHaveItemService;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.entity.UserWantItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.service.UserWantItemService;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.event.MatchTriggerEvent;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseConnectionManager;
 import java.util.Comparator;
 import java.util.List;
@@ -23,6 +26,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +45,9 @@ public class AdminUserService {
     private final ItemRepository itemRepository;
     private final UserHaveItemRepository userHaveItemRepository;
     private final UserWantItemRepository userWantItemRepository;
+    private final UserHaveItemService userHaveItemService;
+    private final UserWantItemService userWantItemService;
+    private final ApplicationEventPublisher eventPublisher;
     private final SseConnectionManager sseConnectionManager;
 
     /**
@@ -174,42 +181,66 @@ public class AdminUserService {
      * <p>같은 카드를 두 줄로 두면 매칭이 그 사람을 두 번 세게 된다. 부스에서 실수로 두 번 누르는
      * 일이 생길 자리라 여기서 막는다.
      */
+    /**
+     * 내놓는 카드를 붙인다.
+     *
+     * <p><b>사용자 화면과 같은 서비스를 부른다.</b> 예전에는 리포지토리에 직접 썼는데, 그러면
+     * {@code MatchTriggerEvent} 가 안 나가서 매칭이 돌지 않았다. 어드민으로 더미에게 딱 맞는
+     * 카드를 붙여 놓고도 상대 화면에 매칭이 안 뜨는 것이 여기서 생긴 일이다.
+     *
+     * <p>부스 목록을 갱신하는 {@code USER_JOINED} 도 그 서비스가 함께 내보낸다.
+     */
     @Transactional
     public void addHaveItem(UUID userId, Long itemId, int quantity) {
-        userHaveItemRepository.findByUserIdAndItemId(userId, itemId).ifPresentOrElse(
-                have -> have.changeQuantity(have.getQuantity() + quantity),
-                () -> userHaveItemRepository.save(UserHaveItem.of(findUser(userId), findItem(itemId), quantity)));
+        userHaveItemService.register(userId, itemId, quantity);
     }
 
     @Transactional
     public void changeHaveQuantity(Long haveId, int quantity) {
-        userHaveItemRepository.findById(haveId)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.RESOURCE_NOT_FOUND))
-                .changeQuantity(quantity);
-    }
+        UserHaveItem have = userHaveItemRepository.findById(haveId)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.RESOURCE_NOT_FOUND));
+        have.changeQuantity(quantity);
 
-    @Transactional
-    public void removeHaveItem(Long haveId) {
-        userHaveItemRepository.deleteById(haveId);
+        // 0개였던 카드가 1개가 되면 그 순간부터 매칭 후보가 된다. 다시 돌려 준다.
+        eventPublisher.publishEvent(new MatchTriggerEvent(have.getUser().getId()));
     }
 
     /**
-     * 희망 카드를 붙인다. 이미 있으면 아무것도 하지 않는다.
+     * 카드를 뗀다.
      *
-     * <p>어드민 화면에는 아직 찾는 개수를 넣는 자리가 없어서 1 로 만든다. 사용자용
-     * {@code POST /api/want-items} 는 개수를 받는다.
+     * <p>떼고 나서도 매칭을 다시 돌린다. 이 사람이 물고 있던 조합이 사라지면서 다른 조합이
+     * 열릴 수 있고, 무엇보다 어드민에서 카드를 갈아 끼우는 것이 "떼고 붙이기" 라서 뗀 직후
+     * 상태가 그대로 굳으면 붙이기 전까지 매칭이 멈춘 것처럼 보인다.
+     */
+    @Transactional
+    public void removeHaveItem(Long haveId) {
+        userHaveItemRepository.findById(haveId)
+                .map(have -> have.getUser().getId())
+                .ifPresent(userId -> {
+                    userHaveItemRepository.deleteById(haveId);
+                    eventPublisher.publishEvent(new MatchTriggerEvent(userId));
+                });
+    }
+
+    /**
+     * 찾는 카드를 붙인다. 이미 있으면 개수만 덮어쓴다.
+     *
+     * <p>{@link #addHaveItem} 과 같은 이유로 사용자 화면과 같은 서비스를 부른다. 어드민에는
+     * 찾는 개수를 넣는 자리가 없어서 1 로 만든다.
      */
     @Transactional
     public void addWantItem(UUID userId, Long itemId) {
-        if (userWantItemRepository.existsByUserIdAndItemId(userId, itemId)) {
-            return;
-        }
-        userWantItemRepository.save(UserWantItem.of(findUser(userId), findItem(itemId), 1));
+        userWantItemService.register(userId, itemId, 1);
     }
 
     @Transactional
     public void removeWantItem(Long wantId) {
-        userWantItemRepository.deleteById(wantId);
+        userWantItemRepository.findById(wantId)
+                .map(want -> want.getUser().getId())
+                .ifPresent(userId -> {
+                    userWantItemRepository.deleteById(wantId);
+                    eventPublisher.publishEvent(new MatchTriggerEvent(userId));
+                });
     }
 
     /**
