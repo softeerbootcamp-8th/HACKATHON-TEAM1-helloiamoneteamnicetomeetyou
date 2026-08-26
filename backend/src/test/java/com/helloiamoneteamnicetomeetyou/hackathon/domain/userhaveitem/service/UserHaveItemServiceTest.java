@@ -3,10 +3,12 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.entity.Booth;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.repository.ItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
@@ -15,6 +17,8 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.Use
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
+import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventPublisher;
+import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventType;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +37,7 @@ class UserHaveItemServiceTest {
 
     private static final UUID USER_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
     private static final Long ITEM_ID = 1L;
+    private static final Long BOOTH_ID = 9L;
 
     @Mock
     private UserHaveItemRepository userHaveItemRepository;
@@ -46,6 +51,9 @@ class UserHaveItemServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private SseEventPublisher sseEventPublisher;
+
     @InjectMocks
     private UserHaveItemService userHaveItemService;
 
@@ -53,7 +61,7 @@ class UserHaveItemServiceTest {
     @DisplayName("처음 등록하는 카드면 새로 만든다")
     void 처음_등록하는_카드면_새로_만든다() {
         User user = User.of(USER_ID);
-        Item item = Mockito.mock(Item.class);
+        Item item = itemInBooth();
         given(userHaveItemRepository.findByUserIdAndItemId(USER_ID, ITEM_ID))
                 .willReturn(Optional.empty());
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
@@ -68,6 +76,9 @@ class UserHaveItemServiceTest {
         assertThat(captor.getValue().getUser()).isEqualTo(user);
         assertThat(captor.getValue().getItem()).isEqualTo(item);
         assertThat(captor.getValue().getQuantity()).isEqualTo(2);
+
+        // 같은 부스를 보고 있는 사람들이 새로고침 없이 이 등록을 보려면 알림이 나가야 한다.
+        verify(sseEventPublisher).toBooth(eq(BOOTH_ID), eq(SseEventType.USER_JOINED), any());
     }
 
     @Test
@@ -147,5 +158,20 @@ class UserHaveItemServiceTest {
                 .isEqualTo(ErrorCode.INVALID_INPUT);
 
         verify(userHaveItemRepository, never()).save(any(UserHaveItem.class));
+    }
+
+    /**
+     * 부스까지 물린 카드다.
+     *
+     * <p>등록이 부스에 알림을 보내면서 {@code item.getBooth().getId()} 를 읽는다. 부스를 물리지
+     * 않은 mock 을 넘기면 그 자리에서 NPE 가 난다.
+     */
+    private static Item itemInBooth() {
+        Booth booth = Mockito.mock(Booth.class);
+        given(booth.getId()).willReturn(BOOTH_ID);
+
+        Item item = Mockito.mock(Item.class);
+        given(item.getBooth()).willReturn(booth);
+        return item;
     }
 }

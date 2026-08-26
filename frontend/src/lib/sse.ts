@@ -21,6 +21,11 @@ export const SSE_EVENT_TYPES = [
   'MATCH_ACCEPTED',
   'MATCH_REJECTED',
 
+  // 찔러보기. 자동 매칭과 문구도 열어야 하는 화면도 달라서 따로 둔다.
+  'POKE_RECEIVED',
+  'POKE_ACCEPTED',
+  'POKE_REJECTED',
+
   // 교환 약속. 만나는 자리(구역)가 정해지거나 바뀌면 EXCHANGE_PLACE_UPDATED 로 온다.
   'EXCHANGE_CREATED',
   'EXCHANGE_TIME_UPDATED',

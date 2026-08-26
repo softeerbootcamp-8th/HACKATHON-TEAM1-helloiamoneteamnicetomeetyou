@@ -1,5 +1,6 @@
 package com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.service;
 
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.dto.BoothRosterChangedDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.repository.ItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.event.MatchTriggerEvent;
@@ -9,6 +10,8 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.Use
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
+import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventPublisher;
+import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventType;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +28,7 @@ public class UserHaveItemService {
     private final UserRepository userRepository;
     private final ItemRepository itemRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final SseEventPublisher sseEventPublisher;
 
     /**
      * 내놓을 카드를 등록한다. 이미 등록한 카드면 개수를 덮어쓴다.
@@ -51,6 +55,7 @@ public class UserHaveItemService {
         Optional<UserHaveItem> existing =
                 userHaveItemRepository.findByUserIdAndItemId(userId, itemId);
         if (existing.isPresent()) {
+            // 개수만 바뀐 것이라 목록에 없던 카드가 새로 생기지는 않는다. 알리지 않는다.
             existing.get().changeQuantity(quantity);
             eventPublisher.publishEvent(new MatchTriggerEvent(userId));
             return false;
@@ -63,6 +68,16 @@ public class UserHaveItemService {
 
         userHaveItemRepository.save(UserHaveItem.of(user, item, quantity));
         eventPublisher.publishEvent(new MatchTriggerEvent(userId));
+
+        // 같은 부스를 보고 있는 사람들의 목록이 이 등록으로 달라진다. 알리지 않으면 상대가
+        // 새로고침할 때까지 레이더에 뜨지 않는다.
+        //
+        // 부스 전체로 가는 이벤트라 웹푸시로는 나가지 않는다. PushEventDispatcher 가 사용자
+        // 지정 이벤트만 푸시한다. 등록 한 번에 전원의 잠금 화면이 울리면 스팸이다.
+        sseEventPublisher.toBooth(
+                item.getBooth().getId(),
+                SseEventType.USER_JOINED,
+                new BoothRosterChangedDto(item.getBooth().getId(), item.getId()));
 
         return true;
     }

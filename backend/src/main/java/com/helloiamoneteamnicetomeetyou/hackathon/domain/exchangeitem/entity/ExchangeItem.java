@@ -54,4 +54,16 @@ public class ExchangeItem {
         exchangeItem.quantity = quantity;
         return exchangeItem;
     }
+
+    /**
+     * "누가 누구에게 어떤 카드를" 한 줄이다. 1:1 교환이면 방향이 다른 두 줄이 생긴다.
+     *
+     * <p>인자 순서가 그대로 문장이 되게 뒀다. 주는 사람과 받는 사람을 뒤집어 넣으면 화면에는
+     * 그럴듯하게 보이지만 실제 교환이 반대로 기록된다.
+     *
+     * <p>찔러보기 수락은 카드 한 장씩만 오간다. 수량은 여기서 1로 고정한다.
+     */
+    public static ExchangeItem of(Exchange exchange, User fromUser, Item item, User toUser) {
+        return create(exchange, fromUser, item, toUser, 1);
+    }
 }

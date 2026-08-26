@@ -1,6 +1,6 @@
 import { ALL_WAITING, FIXED_ZONE, itemById } from '@/mocks/data'
 
-import { wantedFromMe, type ExchangePair, type MatchResult } from './matching'
+import type { ExchangePair, MatchResult } from './matching'
 import { earliestOverlap } from './time'
 import type { ActiveMatch, Appointment, IncomingPoke, State } from './types'
 
@@ -42,7 +42,7 @@ export type Action =
   | { type: 'open-match' }
   | { type: 'decline-match' }
   | { type: 'send-poke'; targetUserId: string }
-  | { type: 'poke-answered'; accepted: boolean }
+  | { type: 'poke-answered'; accepted: boolean; chosenItemId?: string }
   | { type: 'receive-poke'; poke: IncomingPoke }
   | { type: 'release-held-poke' }
   | { type: 'accept-incoming'; chosenItemId: string }
@@ -239,12 +239,12 @@ export function reducer(state: State, action: Action): State {
         }
       }
 
-      // 상대가 내 묶음 중 자기가 원하는 카드를 골랐다고 본다.
-      const wanted = wantedFromMe(
-        target,
-        state.have.map((s) => s.itemId),
-      )
-      const giveItemId = wanted[0] ?? state.have[0]?.itemId ?? target.needsItemIds[0]
+      // 상대가 내 묶음에서 무엇을 골랐는지는 고른 쪽만 안다.
+      //
+      // 전에는 wantedFromMe 로 짐작했는데, 찔러보기는 정의상 "상대 희망 ∩ 내 보유" 가
+      // 비어 있어서 그 계산이 늘 빈 배열이었다. 그래서 항상 have[0] 으로 떨어져 보낸 사람
+      // 화면에 엉뚱한 카드가 떴다. 고른 카드를 받아 쓰고, 없을 때만 첫 장으로 떨어진다.
+      const giveItemId = action.chosenItemId ?? state.have[0]?.itemId ?? target.needsItemIds[0]
 
       const match: ActiveMatch = {
         kind: 'ONE_TO_ONE',

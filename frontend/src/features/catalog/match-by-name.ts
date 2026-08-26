@@ -23,6 +23,14 @@ export type NameMatch = {
   serverIdOf: (mockItemId: string) => number | undefined
   /** 서버 카드 id → 목업 카드 id. 매칭 알림처럼 서버 id 로 오는 걸 화면에 그릴 때 쓴다. */
   mockIdOf: (serverItemId: number) => string | undefined
+  /**
+   * 서버 카드 id → 목업 카드. 서버에서 받은 것을 화면에 그릴 때 쓴다.
+   *
+   * 찔러보기는 상대의 카드와 내 묶음을 서버에서 받아 오는데, 카드 그림과 약칭·한글 이름은
+   * 목업 쪽에만 있다. 짝을 못 찾으면 `undefined` 라서 부르는 쪽이 그 줄을 건너뛰거나
+   * 이름만이라도 보여 줄 수 있다.
+   */
+  mockItemOf: (serverItemId: number) => Item | undefined
   /** 서버에서 짝을 찾지 못한 목업 카드들. 화면이 이유를 설명하는 데 쓴다. */
   unmatched: Item[]
 }
@@ -41,6 +49,7 @@ export function matchByName(mockItems: Item[], serverItems: ServerItem[]): NameM
   }
 
   const resolved = new Map<string, number>()
+  const reversed = new Map<number, Item>()
   const unmatched: Item[] = []
 
   for (const mock of mockItems) {
@@ -50,6 +59,7 @@ export function matchByName(mockItems: Item[], serverItems: ServerItem[]): NameM
       continue
     }
     resolved.set(mock.id, found)
+    reversed.set(found, mock)
   }
 
   const byServerId = new Map<number, string>()
@@ -58,6 +68,7 @@ export function matchByName(mockItems: Item[], serverItems: ServerItem[]): NameM
   return {
     serverIdOf: (mockItemId) => resolved.get(mockItemId),
     mockIdOf: (serverItemId) => byServerId.get(serverItemId),
+    mockItemOf: (serverItemId) => reversed.get(serverItemId),
     unmatched,
   }
 }

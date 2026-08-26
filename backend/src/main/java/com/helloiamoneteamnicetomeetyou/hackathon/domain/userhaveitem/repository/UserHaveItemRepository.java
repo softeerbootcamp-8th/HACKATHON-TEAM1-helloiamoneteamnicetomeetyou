@@ -22,6 +22,30 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
     Optional<UserHaveItem> findByUserIdAndItemId(UUID userId, Long itemId);
 
     /**
+     * 부스 안에서 <b>나를 뺀</b> 다른 사용자들의 보유 카드다.
+     *
+     * <p>{@code User} 와 {@code Booth} 를 잇는 관계가 없어서 "같은 부스의 사용자" 를 그 부스
+     * 카드를 하나라도 보유 등록한 사람으로 유도한다. 부스에 왔지만 아직 등록하지 않은 사람은
+     * 목록에 뜨지 않는다.
+     *
+     * <p>수량이 0 인 줄은 뺀다. 교환으로 다 나간 카드를 찔러봐도 성사될 수 없다.
+     *
+     * <p>정렬 기준이 행마다 달라져서(내 희망 카드인지, 줄 수 있는 카드가 있는지) SQL 로 옮길 수
+     * 없다. 여기서는 {@code id} 오름차순으로만 고정해 두고 나머지는 서비스가 메모리에서 정렬한다.
+     * 부스 규모에서는 전부 읽어 오는 편이 싸다.
+     */
+    @Query("""
+            select h from UserHaveItem h
+            join fetch h.item i
+            join fetch h.user
+            where i.booth.id = :boothId
+              and h.user.id <> :userId
+              and h.quantity > 0
+            order by h.id asc
+            """)
+    List<UserHaveItem> findAllByBoothIdExcludingUser(Long boothId, UUID userId);
+
+    /**
      * 이 카드를 가진 사람들. 카드 화면 오른쪽에 명단 그대로 띄운다.
      *
      * <p>숫자만 보여 주면 "3명이 가지고 있다" 까지는 알아도 누구인지 알 수 없어서, 카드를

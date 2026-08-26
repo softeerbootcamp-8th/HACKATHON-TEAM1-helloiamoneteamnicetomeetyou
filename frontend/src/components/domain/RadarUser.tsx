@@ -3,10 +3,21 @@ import { motion } from 'motion/react'
 import { CARD_SHELL, ItemCardBody } from '@/components/domain/GoodsCard'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
-import { itemById, type WaitingUser } from '@/mocks/data'
+import type { Item } from '@/mocks/data'
 
 type Props = {
-  user: WaitingUser
+  /**
+   * 끌어다 놓기의 표적이다. `hitTest` 가 `data-radar-user` 로 이 값을 읽어 누구 위에 있는지
+   * 판단하고, 그대로 찔러보기 대상이 된다.
+   *
+   * 목업은 대기자 id(`u3`), 서버는 보유 등록 줄 id(`haveItemId`)를 넣는다. 어느 쪽이든
+   * 이 컴포넌트는 문자열로만 다룬다.
+   */
+  targetId: string
+  /** 이 사람이 내놓은 카드 */
+  item: Item
+  /** 읽어 주는 이름. 목업은 닉네임, 서버는 사람 이름이 아직 없어 카드 이름을 쓴다. */
+  label: string
   /** 지금 내 카드 묶음이 이 사람 위에 올라와 있는지 */
   hovered: boolean
   /** 이미 찔러보기를 보내고 답을 기다리는 중인지 */
@@ -19,12 +30,19 @@ type Props = {
 }
 
 /** 레이더 위에 서 있는 상대 한 명. */
-export function RadarUser({ user, hovered, pending, burst = false, onSelect, index }: Props) {
-  const item = itemById(user.itemId)
-
+export function RadarUser({
+  targetId,
+  item,
+  label,
+  hovered,
+  pending,
+  burst = false,
+  onSelect,
+  index,
+}: Props) {
   return (
     <motion.div
-      data-radar-user={user.id}
+      data-radar-user={targetId}
       initial={{ opacity: 0, scale: 0.6 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ ...springSnap, delay: 0.08 * index }}
@@ -60,7 +78,7 @@ export function RadarUser({ user, hovered, pending, burst = false, onSelect, ind
         type="button"
         onClick={onSelect}
         disabled={pending || !onSelect}
-        aria-label={`${user.nickname}님에게 찔러보기`}
+        aria-label={`${label}에게 찔러보기`}
         whileTap={pending ? undefined : { scale: 0.94 }}
         animate={{ scale: hovered ? 1.08 : 1 }}
         transition={springSnap}

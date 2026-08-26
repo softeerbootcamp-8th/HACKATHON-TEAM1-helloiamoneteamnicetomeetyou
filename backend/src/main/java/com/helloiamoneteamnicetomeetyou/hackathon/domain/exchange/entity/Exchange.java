@@ -57,6 +57,16 @@ public class Exchange {
         return exchange;
     }
 
+    /**
+     * 두 사람 사이의 교환을 만든다. 찔러보기가 수락된 순간이 여기다.
+     *
+     * <p>{@code zone} 과 {@code exchangeTime} 은 비워 둔다. 어디서 언제 만날지는 성사된 뒤에
+     * 두 사람이 약속 화면에서 정하는 것이라, 만드는 시점에는 알 수 없다.
+     */
+    public static Exchange oneToOne() {
+        return create(ExchangeType.ONE_TO_ONE);
+    }
+
     /** 참가자가 매칭 결과를 확인하고 장소를 잡으러 들어갔다. */
     public void startProgress() {
         this.status = ExchangeStatus.IN_PROGRESS;
