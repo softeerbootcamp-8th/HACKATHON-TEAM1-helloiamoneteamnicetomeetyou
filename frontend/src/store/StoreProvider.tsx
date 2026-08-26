@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, type ReactNode } from 'rea
 
 import { fetchMyHaveItems, fetchMyWantItems, type RegisteredItem } from '@/features/catalog/api'
 import { useCatalog } from '@/features/catalog/useCatalog'
-import { fetchActiveExchange, fetchExchange, fetchZones } from '@/lib/exchange'
+import { fetchActiveExchange, fetchExchange } from '@/lib/exchange'
 import { useBoothEvents } from '@/lib/use-booth-events'
 
 import { StoreContext } from './context'
@@ -16,8 +16,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { state: catalog, userId: myUserId } = useCatalog()
 
   /*
-    부스는 CatalogProvider 가 이미 골라 놨다. 그 부스의 교환 장소를 받아 두고, 진행 중인 약속이
-    있으면 그 자리로 돌아온다. 새로고침하면 화면 상태가 통째로 사라지기 때문에 필요하다.
+    부스는 CatalogProvider 가 이미 골라 놨다. 부스 id 를 넣어 두고(실시간 구독이 이걸 쓴다),
+    진행 중인 약속이 있으면 그 자리로 돌아온다. 새로고침하면 화면 상태가 통째로 사라지기
+    때문에 필요하다.
+
+    만나는 자리는 따로 읽지 않는다. 자리는 교환마다 서버가 정해서 `Exchange.zone` 으로 같이
+    내려주고, 화면은 그것만 보여준다.
 
     카탈로그가 준비되기 전에는 아무것도 하지 않는다. 부스를 모르면 읽을 것도 없다.
   */
@@ -30,9 +34,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const load = async () => {
       try {
-        const zones = await fetchZones(boothId)
-        if (cancelled) return
-        dispatch({ type: 'booth-loaded', boothId, zones })
+        dispatch({ type: 'booth-loaded', boothId })
 
         const active = await fetchActiveExchange(myUserId)
         if (active && !cancelled) {

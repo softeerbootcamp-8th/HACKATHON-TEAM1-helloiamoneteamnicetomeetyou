@@ -313,26 +313,18 @@ class ExchangeServiceTest {
     }
 
     @Test
-    @DisplayName("자리를 옮기면 저장하고 옮긴 사람을 뺀 나머지에게 알린다")
-    void 자리를_옮기면_상대에게만_알린다() throws Exception {
+    @DisplayName("어드민이 자리를 옮기면 저장하고 참가자 전원에게 알린다")
+    void 자리를_옮기면_전원에게_알린다() throws Exception {
         Booth booth = exchange.getZone().getBooth();
         Zone lounge = withId(Zone.of(booth, "라운지", "2층 라운지"), 2L);
         given(zoneRepository.findById(2L)).willReturn(Optional.of(lounge));
 
-        exchangeService.updateZone(EXCHANGE_ID, ME, 2L);
+        exchangeService.updateZoneByAdmin(EXCHANGE_ID, 2L);
 
         assertThat(exchange.getZone()).isEqualTo(lounge);
+        // 옮긴 사람이 참가자가 아니라 운영자다. 알림에서 뺄 사람이 없다.
+        verify(sseEventPublisher).toUser(eq(ME), eq(SseEventType.EXCHANGE_PLACE_UPDATED), any());
         verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_PLACE_UPDATED), any());
-        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
-    }
-
-    @Test
-    @DisplayName("참가자가 아니면 자리를 옮길 수 없다")
-    void 참가자가_아니면_자리를_못_옮긴다() {
-        assertThatThrownBy(() -> exchangeService.updateZone(EXCHANGE_ID, OUTSIDER, 2L))
-                .isInstanceOf(ApplicationException.class)
-                .extracting(e -> ((ApplicationException) e).getErrorType())
-                .isEqualTo(ErrorCode.NOT_EXCHANGE_PARTICIPANT);
     }
 
     @Test
@@ -342,7 +334,7 @@ class ExchangeServiceTest {
         Zone otherZone = withId(Zone.of(otherBooth, "남의 부스 자리", "저쪽"), 3L);
         given(zoneRepository.findById(3L)).willReturn(Optional.of(otherZone));
 
-        assertThatThrownBy(() -> exchangeService.updateZone(EXCHANGE_ID, ME, 3L))
+        assertThatThrownBy(() -> exchangeService.updateZoneByAdmin(EXCHANGE_ID, 3L))
                 .isInstanceOf(ApplicationException.class)
                 .extracting(e -> ((ApplicationException) e).getErrorType())
                 .isEqualTo(ErrorCode.ZONE_NOT_FOUND);
@@ -353,7 +345,7 @@ class ExchangeServiceTest {
     void 없는_자리로는_못_옮긴다() {
         given(zoneRepository.findById(404L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> exchangeService.updateZone(EXCHANGE_ID, ME, 404L))
+        assertThatThrownBy(() -> exchangeService.updateZoneByAdmin(EXCHANGE_ID, 404L))
                 .isInstanceOf(ApplicationException.class)
                 .extracting(e -> ((ApplicationException) e).getErrorType())
                 .isEqualTo(ErrorCode.ZONE_NOT_FOUND);
@@ -367,7 +359,7 @@ class ExchangeServiceTest {
         given(participantRepository.findAllByExchangeId(77L))
                 .willReturn(List.of(ExchangeParticipant.accepted(pending, me)));
 
-        assertThatThrownBy(() -> exchangeService.updateZone(77L, ME, 2L))
+        assertThatThrownBy(() -> exchangeService.updateZoneByAdmin(77L, 2L))
                 .isInstanceOf(ApplicationException.class)
                 .extracting(e -> ((ApplicationException) e).getErrorType())
                 .isEqualTo(ErrorCode.EXCHANGE_NOT_ACCEPTED);
