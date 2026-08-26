@@ -850,8 +850,16 @@ a.row {
   position: relative;
 }
 
+/*
+  이미지가 약칭을 덮는다.
+
+  약칭은 마크업에서 이미지 뒤에 오기 때문에 그냥 두면 이미지 위에 겹쳐 찍힌다. z-index 로
+  이미지를 위로 올려서 평소에는 약칭이 안 보이게 하고, 주소가 깨져 admin.js 가 이미지를
+  걷어내면 그때 약칭이 드러나게 한다.
+*/
 .chip-card img {
   position: absolute;
+  z-index: 1;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -1428,6 +1436,7 @@ dialog.sheet .sheet-actions {
 
 .tile-face img {
   position: absolute;
+  z-index: 1;
   inset: 0;
   width: 100%;
   height: 100%;

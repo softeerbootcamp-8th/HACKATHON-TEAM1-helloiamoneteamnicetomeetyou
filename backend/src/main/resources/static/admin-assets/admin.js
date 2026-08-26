@@ -190,7 +190,36 @@
     });
   }
 
+  /* ------------------------------------------------------------------
+     카드 이미지가 깨지면 약칭으로 되돌린다.
+
+     주소는 운영자가 손으로 넣는 값이라 오타나 만료된 링크가 들어올 수 있고, 부스 네트워크가
+     흔들리면 멀쩡한 주소도 안 뜬다. 그때 깨진 이미지 아이콘이 남으면 무엇을 가리키는 카드인지
+     알 수 없게 된다.
+
+     약칭은 이미지 아래에 늘 깔려 있다. 이미지를 걷어내면 그대로 드러난다.
+
+     load 이벤트를 기다리지 않고 error 만 보는 것은, 이미 캐시에서 뜬 이미지는 이 스크립트가
+     붙기 전에 로드가 끝나 있기 때문이다. 그런 경우까지 잡으려고 complete 를 함께 본다.
+     ------------------------------------------------------------------ */
+  function imageFallback() {
+    function drop(img) {
+      img.remove();
+    }
+
+    document.querySelectorAll('.chip-card img, .tile-face img').forEach(function (img) {
+      if (img.complete && img.naturalWidth === 0) {
+        drop(img);
+        return;
+      }
+      img.addEventListener('error', function () {
+        drop(img);
+      });
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
+    imageFallback();
     origin();
     cardSearch();
     stagger();

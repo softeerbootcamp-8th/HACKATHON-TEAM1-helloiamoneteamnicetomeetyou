@@ -69,7 +69,7 @@
                 <span class="trade-side">
                   <span class="chip-card xs" th:each="i : ${u.haveItems}" th:title="${i.name}">
                     <img th:if="${i.imageUrl}" th:src="${i.imageUrl}" th:alt="${i.name}" />
-                    <span th:unless="${i.imageUrl}" th:text="${i.code}">N74</span>
+                    <span th:text="${i.code}">N74</span>
                   </span>
                   <span class="trade-none" th:if="${#lists.isEmpty(u.haveItems)}">없음</span>
                 </span>
@@ -79,7 +79,7 @@
                 <span class="trade-side">
                   <span class="chip-card xs ghost" th:each="i : ${u.wantItems}" th:title="${i.name}">
                     <img th:if="${i.imageUrl}" th:src="${i.imageUrl}" th:alt="${i.name}" />
-                    <span th:unless="${i.imageUrl}" th:text="${i.code}">N74</span>
+                    <span th:text="${i.code}">N74</span>
                   </span>
                   <span class="trade-none" th:if="${#lists.isEmpty(u.wantItems)}">없음</span>
                 </span>
@@ -130,7 +130,7 @@
                 <div class="row" th:each="h : ${haveItems}">
                   <div class="chip-card">
                     <img th:if="${h.item.imageUrl}" th:src="${h.item.imageUrl}" th:alt="${h.item.name}" />
-                    <span th:unless="${h.item.imageUrl}" th:text="${h.item.code}">N74</span>
+                    <span th:text="${h.item.code}">N74</span>
                   </div>
                   <div class="grow"><div class="title" th:text="${h.item.name}">카드</div></div>
 
@@ -169,7 +169,7 @@
                 <div class="row" th:each="w : ${wantItems}">
                   <div class="chip-card">
                     <img th:if="${w.item.imageUrl}" th:src="${w.item.imageUrl}" th:alt="${w.item.name}" />
-                    <span th:unless="${w.item.imageUrl}" th:text="${w.item.code}">N74</span>
+                    <span th:text="${w.item.code}">N74</span>
                   </div>
                   <div class="grow"><div class="title" th:text="${w.item.name}">카드</div></div>
                   <form method="post" th:action="@{'/admin/users/' + ${user.id} + '/want/' + ${w.id} + '/delete'}">
@@ -219,7 +219,7 @@
             >
               <span class="chip-card">
                 <img th:if="${i.item.imageUrl}" th:src="${i.item.imageUrl}" th:alt="${i.item.name}" />
-                <span th:unless="${i.item.imageUrl}" th:text="${i.item.code}">N74</span>
+                <span th:text="${i.item.code}">N74</span>
               </span>
 
               <span class="item-body">
@@ -245,7 +245,7 @@
           <div class="detail-head">
             <div class="chip-card lg">
               <img th:if="${item.item.imageUrl}" th:src="${item.item.imageUrl}" th:alt="${item.item.name}" />
-              <span th:unless="${item.item.imageUrl}" th:text="${item.item.code}">N74</span>
+              <span th:text="${item.item.code}">N74</span>
             </div>
             <h1 class="grow" th:text="${item.item.name}">카드</h1>
             <span class="badge danger" th:if="${item.deadEnd}">매칭 안 됨</span>
@@ -539,7 +539,7 @@
                   <input type="checkbox" name="haveItemIds" th:value="${i.id}" />
                   <span class="tile-face">
                     <img th:if="${i.imageUrl}" th:src="${i.imageUrl}" th:alt="${i.name}" />
-                    <span th:unless="${i.imageUrl}" th:text="${i.code}">N74</span>
+                    <span th:text="${i.code}">N74</span>
                   </span>
                   <span class="tile-name" th:text="${i.name}">카드</span>
                   <span class="tile-check">✓</span>
@@ -560,7 +560,7 @@
                   <input type="checkbox" name="wantItemIds" th:value="${i.id}" />
                   <span class="tile-face">
                     <img th:if="${i.imageUrl}" th:src="${i.imageUrl}" th:alt="${i.name}" />
-                    <span th:unless="${i.imageUrl}" th:text="${i.code}">N74</span>
+                    <span th:text="${i.code}">N74</span>
                   </span>
                   <span class="tile-name" th:text="${i.name}">카드</span>
                   <span class="tile-check">✓</span>
