@@ -7,9 +7,12 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.Exc
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.repository.ExchangeParticipantRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.event.MatchTriggerEvent;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventPublisher;
@@ -34,6 +37,7 @@ public class ExchangeService {
     private final ExchangeParticipantRepository exchangeParticipantRepository;
     private final ExchangeItemRepository exchangeItemRepository;
     private final UserHaveItemRepository userHaveItemRepository;
+    private final UserWantItemRepository userWantItemRepository;
     private final SseEventPublisher sseEventPublisher;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -85,6 +89,61 @@ public class ExchangeService {
             }
             eventPublisher.publishEvent(new MatchTriggerEvent(participantId));
         }
+    }
+
+    /**
+     * 참가자가 실물 교환을 마쳤다고 확인한다. 이 시점에 카드 수량을 실제로 옮긴다.
+     *
+     * <p>둘 중 아무나 한 번만 눌러도 충분하다. {@code accept} 와 같은 이유로 "둘 다 눌러야"
+     * 조건을 걸지 않는다 — 실물 교환은 만나서 실제로 카드를 주고받는 행위라 한쪽이 확인하면
+     * 충분하다.
+     */
+    @Transactional
+    public void complete(Long exchangeId, UUID userId) {
+        Exchange exchange = findExchange(exchangeId);
+        findParticipant(exchangeId, userId);
+
+        if (exchange.getStatus() != ExchangeStatus.IN_PROGRESS) {
+            return;
+        }
+
+        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
+            giveAway(item);
+            receive(item);
+        }
+
+        exchange.complete();
+    }
+
+    /** 준 사람 쪽 재고를 줄인다. */
+    private void giveAway(ExchangeItem item) {
+        userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
+                .ifPresent(hi -> hi.completeExchange(item.getQuantity()));
+    }
+
+    /**
+     * 받은 사람 쪽에 반영한다. 보유 카드는 늘리고, 그 카드를 찾고 있었으면 찾는 수량에서 뺀다.
+     *
+     * <p>보유 카드에 더하는 것과 재교환 가능하게 만드는 것은 다른 문제다. {@link UserHaveItem#acquired}
+     * 와 {@link UserHaveItem#receiveMore} 둘 다 받은 몫을 곧바로 매칭 후보로 올리지 않는다.
+     */
+    private void receive(ExchangeItem item) {
+        User toUser = item.getToUser();
+        Item receivedItem = item.getItem();
+        int quantity = item.getQuantity();
+
+        userHaveItemRepository.findByUserIdAndItemId(toUser.getId(), receivedItem.getId())
+                .ifPresentOrElse(
+                        existing -> existing.receiveMore(quantity),
+                        () -> userHaveItemRepository.save(UserHaveItem.acquired(toUser, receivedItem, quantity)));
+
+        userWantItemRepository.findByUserIdAndItemId(toUser.getId(), receivedItem.getId())
+                .ifPresent(want -> {
+                    want.reduceQuantity(quantity);
+                    if (want.getQuantity() <= 0) {
+                        userWantItemRepository.delete(want);
+                    }
+                });
     }
 
     private Exchange findExchange(Long exchangeId) {

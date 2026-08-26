@@ -31,4 +31,11 @@ public class ExchangeController {
         exchangeService.reject(exchangeId, request.userId());
         return CommonResponse.ok("거절했습니다.");
     }
+
+    @PostMapping("/{exchangeId}/complete")
+    public CommonResponse<Void> complete(
+            @PathVariable Long exchangeId, @RequestBody ExchangeParticipantActionRequestDto request) {
+        exchangeService.complete(exchangeId, request.userId());
+        return CommonResponse.ok("완료했습니다.");
+    }
 }

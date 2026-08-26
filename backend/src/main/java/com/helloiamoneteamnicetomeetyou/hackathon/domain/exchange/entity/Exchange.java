@@ -88,8 +88,13 @@ public class Exchange {
         cancel();
     }
 
+    /** 참가자가 실물 교환을 마쳤다. */
+    public void complete() {
+        this.status = ExchangeStatus.COMPLETED;
+    }
+
     /** 실물 교환은 끝났는데 화면에서 완료 처리가 안 된 건을 어드민이 닫는다. */
     public void completeByAdmin() {
-        this.status = ExchangeStatus.COMPLETED;
+        complete();
     }
 }
