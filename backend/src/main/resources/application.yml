@@ -57,16 +57,6 @@ sse:
   emitter-timeout-ms: 1800000
   heartbeat-interval-ms: 15000
 
-# 더미 상대의 자동 응답이다. 혼자 시연할 때 상대가 시간을 고르는 것을 대신한다.
-# 매칭 알고리즘(이슈 #20)이 붙기 전까지만 쓰는 임시 설정이라, 그때 이 절과
-# domain/exchange/demo 패키지를 함께 지운다.
-#
-# 실제 두 기기를 붙여 시연할 때는 false 로 끈다. 켜 두면 사람이 고르자마자
-# 더미가 답해 버려서 상대의 진짜 선택을 볼 수 없다.
-demo:
-  auto-respond: true
-  respond-delay-ms: 1500
-
 # 웹푸시(VAPID) 키다. `npx web-push generate-vapid-keys --json` 으로 만든 값을 그대로 쓴다.
 # 값은 팀에서 따로 공유하고 저장소에 넣지 않는다. 배포는 GitHub Secrets 로 들어온다.
 #

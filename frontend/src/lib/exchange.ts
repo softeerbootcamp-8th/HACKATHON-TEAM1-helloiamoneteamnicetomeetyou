@@ -3,8 +3,8 @@
  *
  * 백엔드의 `domain/booth` 와 `domain/exchange` 에 대응한다. 응답 형식이 바뀌면 양쪽을 같이 고친다.
  *
- * 부스 목록과 카드 목록, 사용자 등록은 `features/catalog/api.ts` 에 있다. 앱을 열 때 한 번 맞추는
- * 것들이라 그쪽이 먼저 부르고, 여기서는 그 결과로 받은 `boothId` 를 쓴다.
+ * 교환을 만드는 것은 여기 없다. 매칭이 상대를 찾거나 찔러보기가 성사될 때 서버가 만들고,
+ * 화면은 그 결과를 `GET /api/exchanges/active` 나 실시간 알림으로 받는다.
  */
 import { api, apiData } from './api'
 
@@ -69,23 +69,6 @@ export type Exchange = {
 
 export function fetchZones(boothId: number): Promise<Zone[]> {
   return apiData<Zone[]>(`/api/booths/${boothId}/zones`)
-}
-
-/**
- * 교환을 만든다.
- *
- * 매칭이 아직 화면 쪽 목업이라 프론트가 부르는 임시 엔드포인트다. 서버가 매칭을 하게 되면
- * 이 호출은 사라지고, 교환은 매칭 결과 알림으로 내려온다.
- */
-export function createExchange(input: {
-  boothId: number
-  type: ExchangeType
-  participantUserIds: string[]
-}): Promise<Exchange> {
-  return apiData<Exchange>('/api/exchanges', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  })
 }
 
 /**

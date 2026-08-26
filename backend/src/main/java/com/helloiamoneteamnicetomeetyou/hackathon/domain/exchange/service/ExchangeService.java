@@ -8,12 +8,17 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchang
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeStatus;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.repository.ExchangeParticipantRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangetimeslot.entity.ExchangeTimeSlot;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangetimeslot.repository.ExchangeTimeSlotRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.event.MatchTriggerEvent;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.entity.Zone;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.repository.ZoneRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
@@ -31,6 +36,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,7 +75,10 @@ public class ExchangeService {
     private final ExchangeTimeSlotRepository timeSlotRepository;
     private final UserRepository userRepository;
     private final ZoneRepository zoneRepository;
+    private final ExchangeItemRepository exchangeItemRepository;
+    private final UserHaveItemRepository userHaveItemRepository;
     private final SseEventPublisher sseEventPublisher;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 교환을 만든다.
@@ -80,11 +89,6 @@ public class ExchangeService {
      * <p>격자 시작점을 여기서 한 번 정하는 것이 이 메서드의 핵심이다. 참가자들이 각자 자기 시계로
      * 격자를 만들면 같은 칸 번호가 서로 다른 시각을 뜻하게 된다.
      */
-    @Transactional
-    public ExchangeResponseDto create(Long boothId, ExchangeType type, List<UUID> participantUserIds) {
-        return toResponse(createExchange(boothId, type, participantUserIds));
-    }
-
     /**
      * 교환을 만들고 엔티티를 돌려준다.
      *
@@ -106,9 +110,8 @@ public class ExchangeService {
                 .findFirst()
                 .orElseThrow(() -> new ApplicationException(ErrorCode.ZONE_NOT_FOUND));
 
-        Exchange exchange = exchangeRepository.save(
-                Exchange.of(zone, type, TimeSlotGrid.baseTimeFrom(LocalDateTime.now())));
-        assignFreeIdentity(exchange);
+        Exchange exchange = exchangeRepository.save(Exchange.create(type));
+        prepareAppointment(exchange, boothId);
 
         for (UUID userId : distinctIds) {
             User user = userRepository.findById(userId)
@@ -119,6 +122,60 @@ public class ExchangeService {
         notifyParticipants(exchange.getId(), distinctIds, SseEventType.EXCHANGE_CREATED);
 
         return exchange;
+    }
+
+    /**
+     * 매칭 결과를 보고 장소를 잡으러 들어간다.
+     *
+     * <p>상대가 아직 수락 전이어도 바로 IN_PROGRESS 로 옮긴다. 지금 화면 흐름은 양쪽이 서로의
+     * 수락을 기다리지 않고 각자 장소·시간 화면으로 들어가 맞춰 보는 방식이라, "둘 다 눌러야
+     * 진행 중" 같은 조건을 걸 이유가 없다.
+     */
+    @Transactional
+    public void accept(Long exchangeId, UUID userId) {
+        Exchange exchange = getExchange(exchangeId);
+        getParticipant(exchangeId, userId).accept();
+
+        if (exchange.getStatus() == ExchangeStatus.PENDING) {
+            exchange.startProgress();
+        }
+    }
+
+    /**
+     * 매칭 결과를 거절한다. 이 교환은 참가자 전원에게 끝난 거래가 되고, 거절한 사람을 뺀
+     * 나머지는 다시 상대를 찾아야 한다.
+     *
+     * <p>재매칭은 {@link MatchTriggerEvent} 로 미룬다. 카드 등록 때와 같은 이유다 —
+     * {@code runMatching} 이 비동기라 이 트랜잭션의 커밋보다 먼저 돌면 방금 풀어 준 카드가
+     * 아직 예약 중인 채로 재매칭에 잡혀 후보에서 빠진다.
+     */
+    @Transactional
+    public void reject(Long exchangeId, UUID userId) {
+        Exchange exchange = getExchange(exchangeId);
+        if (exchange.getStatus() != ExchangeStatus.PENDING && exchange.getStatus() != ExchangeStatus.IN_PROGRESS) {
+            return;
+        }
+
+        List<ExchangeParticipant> participants = participantRepository.findAllByExchangeId(exchangeId);
+        participants.stream()
+                .filter(p -> p.getUser().getId().equals(userId))
+                .findFirst()
+                .orElseThrow(() -> new ApplicationException(ErrorCode.NOT_EXCHANGE_PARTICIPANT))
+                .reject();
+        exchange.cancel();
+
+        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
+            userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
+                    .ifPresent(UserHaveItem::cancelReservation);
+        }
+
+        for (ExchangeParticipant participant : participants) {
+            UUID participantId = participant.getUser().getId();
+            if (!participantId.equals(userId)) {
+                sseEventPublisher.toUser(participantId, SseEventType.MATCH_REJECTED, Map.of("exchangeId", exchangeId));
+            }
+            eventPublisher.publishEvent(new MatchTriggerEvent(participantId));
+        }
     }
 
     public ExchangeResponseDto find(Long exchangeId) {
@@ -272,6 +329,35 @@ public class ExchangeService {
     }
 
     /**
+     * 만날 자리와 시간 격자, 약속 식별자를 붙인다.
+     *
+     * <p>교환을 만드는 길이 셋이다. 매칭, 찔러보기, 그리고 임시 엔드포인트. 어디로 들어오든
+     * 약속을 잡으려면 이 셋이 있어야 해서 한곳에 모았다.
+     */
+    private void prepareAppointment(Exchange exchange, Long boothId) {
+        Zone zone = zoneRepository.findByBoothIdOrderByIdAsc(boothId).stream()
+                .findFirst()
+                .orElseThrow(() -> new ApplicationException(ErrorCode.ZONE_NOT_FOUND));
+
+        int[] identity = freeIdentity(exchange.getId());
+        exchange.prepareAppointment(
+                zone, TimeSlotGrid.baseTimeFrom(LocalDateTime.now()), identity[0], identity[1]);
+    }
+
+    /**
+     * 교환이 어느 부스의 것인지. 참가자가 주고받는 카드를 보고 찾는다.
+     *
+     * <p>교환 자체는 부스를 들고 있지 않다. 만날 자리가 정해지면 그 구역을 통해 알 수 있지만,
+     * 자리를 정하기 전에는 카드가 유일한 단서다.
+     */
+    private Long boothIdOf(Exchange exchange) {
+        return exchangeItemRepository.findByExchangeId(exchange.getId()).stream()
+                .findFirst()
+                .map(item -> item.getItem().getBooth().getId())
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EXCHANGE_NOT_FOUND));
+    }
+
+    /**
      * 진행 중인 어느 교환과도 겹치지 않는 식별자를 골라 넣는다.
      *
      * <p><b>겹치면 안 되는 이유가 화면에 있다.</b> 같은 화면을 든 사람이 내 상대라고 안내하기
@@ -285,9 +371,9 @@ public class ExchangeService {
      * 같은 순간에 만들어지면 이론상 같은 값을 고를 수 있는데, 서버가 한 대이고 교환 생성이 초당
      * 수십 건씩 일어나는 흐름이 아니라 지금은 여기까지만 한다.
      */
-    private void assignFreeIdentity(Exchange exchange) {
+    private int[] freeIdentity(Long exchangeId) {
         Set<Integer> used = new HashSet<>(exchangeRepository.findIdentityCodesByStatuses(ACTIVE_STATUSES));
-        int start = Math.floorMod(exchange.getId() * 37, IDENTITY_CAPACITY);
+        int start = Math.floorMod(exchangeId * 37, IDENTITY_CAPACITY);
 
         for (int step = 0; step < IDENTITY_CAPACITY; step++) {
             int index = (start + step) % IDENTITY_CAPACITY;
@@ -295,15 +381,14 @@ public class ExchangeService {
             int number = IDENTITY_NUMBER_MIN + index % IDENTITY_NUMBER_COUNT;
 
             if (!used.contains(mark * 100 + number)) {
-                exchange.assignIdentity(mark, number);
-                return;
+                return new int[]{mark, number};
             }
         }
 
         // 720개를 동시에 쓰고 있다는 뜻이라 이 행사 규모에서는 오지 않는 자리다. 그래도 교환을
         // 못 만들게 막지는 않는다. 식별 화면이 헷갈리는 것보다 교환이 안 되는 쪽이 더 나쁘다.
-        log.warn("식별자를 모두 쓰고 있어 겹치는 값을 준다: exchangeId={}", exchange.getId());
-        exchange.assignIdentity(start / IDENTITY_NUMBER_COUNT, IDENTITY_NUMBER_MIN + start % IDENTITY_NUMBER_COUNT);
+        log.warn("식별자를 모두 쓰고 있어 겹치는 값을 준다: exchangeId={}", exchangeId);
+        return new int[]{start / IDENTITY_NUMBER_COUNT, IDENTITY_NUMBER_MIN + start % IDENTITY_NUMBER_COUNT};
     }
 
     private Exchange getExchange(Long exchangeId) {

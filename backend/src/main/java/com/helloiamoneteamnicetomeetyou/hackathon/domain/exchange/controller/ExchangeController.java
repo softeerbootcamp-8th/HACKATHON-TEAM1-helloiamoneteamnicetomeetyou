@@ -1,6 +1,7 @@
 package com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.controller;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeActorRequestDto;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeParticipantActionRequestDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.TimeSlotUpdateRequestDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service.ExchangeService;
@@ -53,6 +54,27 @@ public class ExchangeController {
         }
 
         return ResponseEntity.ok(CommonResponse.ok(exchange, "진행 중인 약속입니다."));
+    }
+
+    /**
+     * 매칭 결과를 받아들이고 장소를 잡으러 들어간다.
+     *
+     * <p>상대의 수락을 기다리지 않는다. 각자 장소와 시간 화면으로 들어가 맞춰 보는 흐름이라
+     * 둘 다 눌러야 진행되는 조건을 걸 이유가 없다.
+     */
+    @PostMapping("/{exchangeId}/accept")
+    public CommonResponse<Void> accept(
+            @PathVariable Long exchangeId, @RequestBody ExchangeParticipantActionRequestDto request) {
+        exchangeService.accept(exchangeId, request.userId());
+        return CommonResponse.ok("수락했습니다.");
+    }
+
+    /** 매칭 결과를 거절한다. 나머지 참가자는 다시 상대를 찾는다. */
+    @PostMapping("/{exchangeId}/reject")
+    public CommonResponse<Void> reject(
+            @PathVariable Long exchangeId, @RequestBody ExchangeParticipantActionRequestDto request) {
+        exchangeService.reject(exchangeId, request.userId());
+        return CommonResponse.ok("거절했습니다.");
     }
 
     @GetMapping("/{exchangeId}")

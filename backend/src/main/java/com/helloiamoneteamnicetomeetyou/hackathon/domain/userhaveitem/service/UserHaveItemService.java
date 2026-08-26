@@ -3,6 +3,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.service;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.dto.BoothRosterChangedDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.repository.ItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.event.MatchTriggerEvent;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
@@ -14,6 +15,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventType;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +27,7 @@ public class UserHaveItemService {
     private final UserHaveItemRepository userHaveItemRepository;
     private final UserRepository userRepository;
     private final ItemRepository itemRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final SseEventPublisher sseEventPublisher;
 
     /**
@@ -54,6 +57,7 @@ public class UserHaveItemService {
         if (existing.isPresent()) {
             // 개수만 바뀐 것이라 목록에 없던 카드가 새로 생기지는 않는다. 알리지 않는다.
             existing.get().changeQuantity(quantity);
+            eventPublisher.publishEvent(new MatchTriggerEvent(userId));
             return false;
         }
 
@@ -63,6 +67,7 @@ public class UserHaveItemService {
                 .orElseThrow(() -> new ApplicationException(ErrorCode.ITEM_NOT_FOUND));
 
         userHaveItemRepository.save(UserHaveItem.of(user, item, quantity));
+        eventPublisher.publishEvent(new MatchTriggerEvent(userId));
 
         // 같은 부스를 보고 있는 사람들의 목록이 이 등록으로 달라진다. 알리지 않으면 상대가
         // 새로고침할 때까지 레이더에 뜨지 않는다.

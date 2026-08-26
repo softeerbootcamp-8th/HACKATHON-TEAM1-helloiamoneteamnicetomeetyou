@@ -3,11 +3,33 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.re
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
 import java.util.List;
 import java.util.UUID;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ExchangeParticipantRepository extends JpaRepository<ExchangeParticipant, Long> {
 
+    @Query("SELECT ep FROM ExchangeParticipant ep JOIN FETCH ep.user WHERE ep.exchange.id = :exchangeId")
+    List<ExchangeParticipant> findByExchangeId(@Param("exchangeId") Long exchangeId);
+
+    @Query("SELECT ep FROM ExchangeParticipant ep JOIN FETCH ep.exchange WHERE ep.user.id = :userId ORDER BY ep.joinedAt DESC")
+    List<ExchangeParticipant> findByUserId(@Param("userId") Long userId);
+
+    /**
+     * 이 사용자가 지금 PENDING 이나 IN_PROGRESS 인 교환에 끼어 있는지.
+     *
+     * <p>한 사용자는 동시에 하나의 매칭만 가져야 한다. {@code runMatching} 이 겹쳐 돌면
+     * (카드 등록을 연달아 두 번 하는 경우 등) 서로 다른 카드로 서로 다른 상대와 동시에 두 건이
+     * 생길 수 있는데 — 같은 물리 카드를 다투는 게 아니라서 낙관적 락으로는 안 막힌다. 매칭을
+     * 시작하기 전에 여기서 먼저 걸러야 한다.
+     */
+    @Query("""
+            SELECT COUNT(ep) > 0 FROM ExchangeParticipant ep
+            WHERE ep.user.id = :userId
+              AND ep.exchange.status IN ('PENDING', 'IN_PROGRESS')
+            """)
+    boolean existsActiveExchange(@Param("userId") UUID userId);
     /**
      * 참가자와 그 사용자를 한 번에 읽는다.
      *

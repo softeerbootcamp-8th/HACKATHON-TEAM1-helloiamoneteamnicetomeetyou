@@ -483,6 +483,6 @@ class PokeServiceTest {
      * 채우지 않는다.
      */
     private static Exchange 성사된_교환() {
-        return Exchange.of(null, ExchangeType.ONE_TO_ONE, LocalDateTime.now());
+        return Exchange.create(ExchangeType.ONE_TO_ONE);
     }
 }

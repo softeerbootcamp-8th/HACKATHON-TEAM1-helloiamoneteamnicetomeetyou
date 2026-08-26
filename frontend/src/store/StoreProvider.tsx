@@ -99,13 +99,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // 지금 다루고 있는 약속. 아래 효과들이 이것만 보고 돌면 되므로 밖에서 한 번 꺼내 둔다.
 
-  // 자동 매칭. 켜져 있는 동안 짧은 간격으로 상대를 찾는다.
-  useEffect(() => {
-    if (!state.autoMatching) return
-    const timer = window.setTimeout(() => dispatch({ type: 'auto-match-tick' }), 2600)
-    return () => window.clearTimeout(timer)
-  }, [state.autoMatching, state.have, state.needs])
-
   // 매칭이 끝나면 붙잡아 둔 찔러보기를 그때 알린다.
   useEffect(() => {
     if (state.autoMatching || !state.heldIncoming) return

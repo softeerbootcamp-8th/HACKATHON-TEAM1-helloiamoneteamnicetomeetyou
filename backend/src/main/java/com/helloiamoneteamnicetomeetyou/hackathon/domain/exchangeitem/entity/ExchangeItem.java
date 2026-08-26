@@ -3,6 +3,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -41,11 +42,17 @@ public class ExchangeItem {
     @JoinColumn(name = "to_user_id", nullable = false)
     private User toUser;
 
-    private ExchangeItem(Exchange exchange, User fromUser, Item item, User toUser) {
-        this.exchange = exchange;
-        this.fromUser = fromUser;
-        this.item = item;
-        this.toUser = toUser;
+    @Column(nullable = false)
+    private Integer quantity;
+
+    public static ExchangeItem create(Exchange exchange, User fromUser, Item item, User toUser, int quantity) {
+        ExchangeItem exchangeItem = new ExchangeItem();
+        exchangeItem.exchange = exchange;
+        exchangeItem.fromUser = fromUser;
+        exchangeItem.item = item;
+        exchangeItem.toUser = toUser;
+        exchangeItem.quantity = quantity;
+        return exchangeItem;
     }
 
     /**
@@ -53,8 +60,10 @@ public class ExchangeItem {
      *
      * <p>인자 순서가 그대로 문장이 되게 뒀다. 주는 사람과 받는 사람을 뒤집어 넣으면 화면에는
      * 그럴듯하게 보이지만 실제 교환이 반대로 기록된다.
+     *
+     * <p>찔러보기 수락은 카드 한 장씩만 오간다. 수량은 여기서 1로 고정한다.
      */
     public static ExchangeItem of(Exchange exchange, User fromUser, Item item, User toUser) {
-        return new ExchangeItem(exchange, fromUser, item, toUser);
+        return create(exchange, fromUser, item, toUser, 1);
     }
 }

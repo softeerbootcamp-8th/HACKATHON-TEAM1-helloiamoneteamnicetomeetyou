@@ -80,7 +80,9 @@ class ExchangeServiceTest {
         Booth booth = withId(Booth.of("현대자동차 팝업", null), BOOTH_ID);
         Zone zone = withId(Zone.of(booth, "중앙 포토존 앞", "행사 중앙 포토존"), 1L);
 
-        exchange = withId(Exchange.of(zone, ExchangeType.ONE_TO_ONE, BASE_TIME), EXCHANGE_ID);
+        exchange = withId(Exchange.create(ExchangeType.ONE_TO_ONE), EXCHANGE_ID);
+        // 만날 자리와 격자, 식별자는 참가자가 장소를 잡으러 들어올 때 붙는다.
+        exchange.prepareAppointment(zone, BASE_TIME, 2, 28);
         me = User.of(ME, "레몬 28");
         partner = User.of(PARTNER, "블루N");
 
@@ -101,7 +103,7 @@ class ExchangeServiceTest {
         given(exchangeRepository.findIdentityCodesByStatuses(any())).willReturn(List.of());
 
         ExchangeResponseDto response =
-                exchangeService.create(BOOTH_ID, ExchangeType.ONE_TO_ONE, List.of(ME, PARTNER));
+                toResponseOf(exchangeService.createExchange(BOOTH_ID, ExchangeType.ONE_TO_ONE, List.of(ME, PARTNER)));
 
         assertThat(response.slotBaseTime()).isEqualTo(BASE_TIME);
         assertThat(response.slotCount()).isEqualTo(TimeSlotGrid.SLOT_COUNT);
@@ -126,7 +128,7 @@ class ExchangeServiceTest {
         given(exchangeRepository.findIdentityCodesByStatuses(any())).willReturn(List.of(taken));
 
         ExchangeResponseDto response =
-                exchangeService.create(BOOTH_ID, ExchangeType.ONE_TO_ONE, List.of(ME, PARTNER));
+                toResponseOf(exchangeService.createExchange(BOOTH_ID, ExchangeType.ONE_TO_ONE, List.of(ME, PARTNER)));
 
         assertThat(response.identityMark() * 100 + response.identityNumber()).isNotEqualTo(taken);
     }
@@ -140,7 +142,7 @@ class ExchangeServiceTest {
     @Test
     @DisplayName("참가자가 한 명이면 교환을 만들지 않는다")
     void 참가자가_한_명이면_막는다() {
-        assertThatThrownBy(() -> exchangeService.create(BOOTH_ID, ExchangeType.ONE_TO_ONE, List.of(ME, ME)))
+        assertThatThrownBy(() -> exchangeService.createExchange(BOOTH_ID, ExchangeType.ONE_TO_ONE, List.of(ME, ME)))
                 .isInstanceOf(ApplicationException.class)
                 .extracting(e -> ((ApplicationException) e).getErrorType())
                 .isEqualTo(ErrorCode.INVALID_EXCHANGE_PARTICIPANTS);
@@ -302,5 +304,10 @@ class ExchangeServiceTest {
         field.setAccessible(true);
         field.set(entity, id);
         return entity;
+    }
+
+    /** 만든 교환을 화면이 받는 모양으로 읽는다. 조회 경로와 같은 값을 보게 된다. */
+    private ExchangeResponseDto toResponseOf(Exchange created) {
+        return exchangeService.find(created.getId());
     }
 }

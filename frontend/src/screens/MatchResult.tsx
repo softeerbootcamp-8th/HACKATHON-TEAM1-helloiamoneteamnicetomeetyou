@@ -7,9 +7,10 @@ import { EmptyState } from '@/components/domain/EmptyState'
 import { OneToOneView, ThreeWayView } from '@/components/domain/ExchangeCards'
 import { Button, TextButton } from '@/components/ui/Button'
 import { TopBar } from '@/components/ui/TopBar'
+import { acceptExchange, rejectExchange } from '@/features/matching/api'
 import { springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
-import { createExchange } from '@/lib/exchange'
+import { fetchExchange } from '@/lib/exchange'
 import { getDeviceId } from '@/store/identity'
 import { useStore } from '@/store/useStore'
 
@@ -26,41 +27,38 @@ export function MatchResult() {
   const { state, dispatch } = useStore()
   const [rejectOpen, setRejectOpen] = useState(false)
   const match = useLastDefined(state.match)
-  const [creating, setCreating] = useState(false)
+  const [accepting, setAccepting] = useState(false)
 
   /**
-   * 교환을 서버에 만들고 장소 화면으로 넘어간다.
+   * 매칭 결과를 받아들이고 장소 화면으로 넘어간다.
    *
-   * 상대는 아직 화면이 목업으로 고르지만, 그 사람들은 서버에 실제로 있는 사용자다. 여기서
-   * 만들어진 교환에 시간과 장소가 붙고, 참가자들은 실시간으로 서로의 선택을 본다.
+   * 서버가 이때 만날 자리와 시간 격자, 약속 식별자를 붙인다. 매칭이 교환을 만드는 시점에는
+   * 아직 제안일 뿐이라 그것들이 비어 있다.
    *
-   * 매칭이 서버로 옮겨가면 이 호출은 사라진다. 교환은 매칭 결과 알림으로 내려오게 된다.
+   * 상대의 수락을 기다리지 않는다. 각자 장소와 시간 화면으로 들어가 맞춰 보는 흐름이다.
    */
   const goToPlace = async () => {
-    if (!match || state.boothId === null) {
-      dispatch({ type: 'toast', message: '서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요' })
+    if (!match) return
+
+    // 목업으로 심어 준 매칭은 서버에 교환이 없다. 화면만 넘긴다.
+    if (match.exchangeId === null) {
+      navigate('/place')
       return
     }
 
-    const partnerUserIds =
-      match.kind === 'ONE_TO_ONE'
-        ? [match.partner.userId]
-        : [match.giver.userId, match.receiver.userId]
-
-    setCreating(true)
+    const myUserId = getDeviceId()
+    setAccepting(true)
     try {
-      const myUserId = getDeviceId()
-      const exchange = await createExchange({
-        boothId: state.boothId,
-        type: match.kind === 'ONE_TO_ONE' ? 'ONE_TO_ONE' : 'MULTI_WAY',
-        participantUserIds: [myUserId, ...partnerUserIds],
-      })
+      await acceptExchange(match.exchangeId, myUserId)
+
+      // 수락한 직후의 약속을 바로 읽어 둔다. 알림을 기다리면 장소 화면이 잠깐 비어 보인다.
+      const exchange = await fetchExchange(match.exchangeId)
       dispatch({ type: 'exchange-synced', exchange, myUserId, match, activate: true })
       navigate('/place')
     } catch {
-      dispatch({ type: 'toast', message: '교환을 시작하지 못했어요. 잠시 후 다시 시도해주세요' })
+      dispatch({ type: 'toast', message: '교환 장소를 열지 못했어요. 잠시 후 다시 시도해주세요' })
     } finally {
-      setCreating(false)
+      setAccepting(false)
     }
   }
 
@@ -132,8 +130,8 @@ export function MatchResult() {
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
-        <Button disabled={creating} onClick={() => void goToPlace()}>
-          {creating ? '교환을 시작하는 중' : '교환 장소 확인하기'}
+        <Button disabled={accepting} onClick={() => void goToPlace()}>
+          {accepting ? '교환 장소를 여는 중' : '교환 장소 확인하기'}
         </Button>
         {!fromPoke && <TextButton onClick={() => setRejectOpen(true)}>거절하기</TextButton>}
       </div>
@@ -143,6 +141,11 @@ export function MatchResult() {
         onKeep={() => setRejectOpen(false)}
         onReject={() => {
           setRejectOpen(false)
+          if (match.exchangeId !== null) {
+            rejectExchange(match.exchangeId, getDeviceId()).catch((error: unknown) =>
+              console.error('[exchange] 거절 실패', error),
+            )
+          }
           dispatch({ type: 'decline-match' })
           navigate('/home')
         }}

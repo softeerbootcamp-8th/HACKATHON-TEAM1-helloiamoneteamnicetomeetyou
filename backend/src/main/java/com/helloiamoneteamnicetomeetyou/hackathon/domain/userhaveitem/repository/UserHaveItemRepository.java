@@ -2,10 +2,12 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repositor
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long> {
 
@@ -80,4 +82,74 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
     List<UserHaveItem> findAllWithItem();
 
     void deleteByUserId(UUID userId);
+    // 내 LEFT 아이템 전체 (want-item 등록 후 매칭 트리거용)
+    @Query("SELECT uhi FROM UserHaveItem uhi JOIN FETCH uhi.item WHERE uhi.user.id = :userId AND uhi.status = 'LEFT' AND uhi.quantityLeft > 0")
+    List<UserHaveItem> findMyLeftItems(@Param("userId") UUID userId);
+
+    /**
+     * 쿼리 B: 내가 원하는 아이템을 가진 후보와 교환 가능 수량 (LEAST로 cap)
+     *
+     * <p>userId 를 UUID 가 아니라 String 으로 받는 이유는 {@code findToThemData} 와 같다.
+     * user_id 는 varchar(36) 인데 네이티브 쿼리에 UUID 를 넘기면 binary(16) 으로 바인딩된다.
+     */
+    @Query(value = """
+        SELECT uhi.user_id, uhi.item_id,
+               LEAST(uhi.quantity_left, my_uwi.quantity) AS qty
+        FROM user_have_items uhi
+        JOIN user_want_items my_uwi
+            ON my_uwi.item_id = uhi.item_id
+           AND my_uwi.user_id = :myUserId
+        WHERE uhi.user_id != :myUserId
+          AND uhi.status = 'LEFT'
+          AND uhi.quantity_left > 0
+          AND uhi.user_id NOT IN (
+              SELECT ep.user_id FROM exchange_participants ep
+              JOIN exchanges e ON e.id = ep.exchange_id
+              WHERE e.status IN ('PENDING', 'IN_PROGRESS')
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM exchange_items ei
+              JOIN exchanges e2 ON e2.id = ei.exchange_id
+              WHERE e2.status = 'CANCELLED'
+                AND ei.from_user_id = uhi.user_id
+                AND ei.to_user_id = :myUserId
+                AND ei.item_id = uhi.item_id
+          )
+        ORDER BY uhi.created_at ASC
+        """, nativeQuery = true)
+    List<Object[]> findToMeData(@Param("myUserId") String myUserId);
+
+    /**
+     * 3인 교환 쿼리: B가 C에게 줄 수 있는 아이템과 수량 (B ∈ bIds, C ∈ cIds)
+     *
+     * <p>같은 (B, 카드, C) 조합이 예전에 거절돼 취소된 적 있으면 뺀다. {@code findToThemData},
+     * {@code findToMeData} 의 거절 이력 필터와 같은 규칙이다 — 사람이 아니라 그 카드 조합만
+     * 막아서, B 나 C 가 다른 카드로는 계속 매칭될 수 있게 한다.
+     */
+    @Query(value = """
+        SELECT uhi.user_id, uwi.user_id,
+               uhi.item_id,
+               LEAST(uhi.quantity_left, uwi.quantity) AS qty
+        FROM user_have_items uhi
+        JOIN user_want_items uwi ON uwi.item_id = uhi.item_id
+        WHERE uhi.user_id IN :bIds
+          AND uwi.user_id IN :cIds
+          AND uhi.user_id != uwi.user_id
+          AND uhi.status = 'LEFT'
+          AND uhi.quantity_left > 0
+          AND NOT EXISTS (
+              SELECT 1 FROM exchange_items ei
+              JOIN exchanges e2 ON e2.id = ei.exchange_id
+              WHERE e2.status = 'CANCELLED'
+                AND ei.from_user_id = uhi.user_id
+                AND ei.to_user_id = uwi.user_id
+                AND ei.item_id = uhi.item_id
+          )
+        ORDER BY uhi.created_at ASC
+        """, nativeQuery = true)
+    List<Object[]> findBToCData(@Param("bIds") Set<String> bIds, @Param("cIds") Set<String> cIds);
+
+    // createExchange에서 UserHaveItem 엔티티 로드 (quantityLeft 감소용)
+    @Query("SELECT uhi FROM UserHaveItem uhi JOIN FETCH uhi.item WHERE uhi.user.id = :userId AND uhi.item.id IN :itemIds AND uhi.status = 'LEFT' AND uhi.quantityLeft > 0")
+    List<UserHaveItem> findByUserIdAndItemIds(@Param("userId") UUID userId, @Param("itemIds") Set<Long> itemIds);
 }
