@@ -82,6 +82,45 @@ class AdminExchangeServiceTest {
      * 실제 참가자 줄은 그 사람이 자기 화면에서 고른 것이다. 운영자가 덮어쓰면 하지 않은 일이
      * 그 사람 이름으로 남는다. 화면에 폼을 안 그리는 것과 별개로 서버에서도 막는다.
      */
+    /**
+     * 예전에는 {@code participant.accept()} 만 해서 만날 자리도 시간 격자도 안 붙었다.
+     * 교환이 "진행 중 · 장소 미정" 으로 남고 시간 격자가 뜨지 않던 원인이라 테스트로 고정한다.
+     */
+    @Test
+    @DisplayName("수락은 사용자 화면과 같은 경로로 보내 약속까지 준비한다")
+    void 수락은_교환_서비스를_그대로_부른다() {
+        given(exchangeParticipantRepository.findById(PARTICIPANT_ID))
+                .willReturn(Optional.of(participant(DUMMY, true)));
+
+        adminExchangeService.acceptAsDummy(PARTICIPANT_ID);
+
+        verify(exchangeService).accept(EXCHANGE_ID, DUMMY);
+    }
+
+    @Test
+    @DisplayName("거절도 교환 서비스를 그대로 부른다")
+    void 거절은_교환_서비스를_그대로_부른다() {
+        given(exchangeParticipantRepository.findById(PARTICIPANT_ID))
+                .willReturn(Optional.of(participant(DUMMY, true)));
+
+        adminExchangeService.rejectAsDummy(PARTICIPANT_ID);
+
+        verify(exchangeService).reject(EXCHANGE_ID, DUMMY);
+    }
+
+    @Test
+    @DisplayName("도착도 더미 줄에만 열린다")
+    void 도착은_더미만_찍을_수_있다() {
+        given(exchangeParticipantRepository.findById(PARTICIPANT_ID))
+                .willReturn(Optional.of(participant(REAL, false)));
+
+        assertThatThrownBy(() -> adminExchangeService.arriveAsDummy(PARTICIPANT_ID))
+                .isInstanceOf(ApplicationException.class)
+                .hasFieldOrPropertyWithValue("errorType", ErrorCode.NOT_EXCHANGE_PARTICIPANT);
+
+        verify(exchangeService, never()).arrive(anyLong(), any());
+    }
+
     @Test
     @DisplayName("실제 참가자 줄은 운영자가 덮어쓸 수 없다")
     void 더미가_아니면_막는다() {
