@@ -30,6 +30,7 @@ export function toAppointment(
     identityNumber: exchange.identityNumber,
     mySlots: me?.slots ?? [],
     myName: me?.username ?? '나',
+    myTimeConfirmed: me?.timeConfirmed ?? false,
     myArrived: me?.arrived ?? false,
     partners: exchange.participants
       .filter((p) => p.userId !== myUserId)

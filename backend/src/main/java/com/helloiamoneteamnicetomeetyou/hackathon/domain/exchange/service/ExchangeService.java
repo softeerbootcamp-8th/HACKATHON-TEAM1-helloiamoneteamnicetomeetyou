@@ -35,6 +35,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -262,7 +263,7 @@ public class ExchangeService {
         List<Integer> distinctSlots = slots.stream().distinct().sorted().toList();
         TimeSlotGrid.validateAll(distinctSlots);
 
-        boolean matchedBefore = earliestOverlap(exchangeId) != null;
+        Integer overlapBefore = earliestOverlap(exchangeId);
 
         timeSlotRepository.deleteAllByExchangeIdAndUserId(exchangeId, userId);
         timeSlotRepository.saveAll(
@@ -272,7 +273,22 @@ public class ExchangeService {
         // 사람도 받아야 같은 사람이 탭을 여러 개 열어 뒀을 때 나머지 탭이 따라온다.
         notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_SLOTS_UPDATED);
 
-        boolean matchedAfter = earliestOverlap(exchangeId) != null;
+        Integer overlapAfter = earliestOverlap(exchangeId);
+
+        /*
+          겹치는 가장 빠른 칸이 옮겨갔으면 이미 눌린 "이 시간으로 약속!" 을 전부 되돌린다.
+
+          확정은 전원이 눌러야 되기 때문에, 먼저 누른 사람과 마지막에 누르는 사람 사이에 칸을
+          고칠 시간이 있다. 그 사이에 겹치는 칸이 옮겨간 것을 그냥 두면, 마지막 사람이 누르는
+          순간 먼저 누른 사람은 본 적도 없는 시각으로 약속이 잡힌다.
+        */
+        if (!Objects.equals(overlapBefore, overlapAfter)) {
+            participantRepository.findAllByExchangeId(exchangeId)
+                    .forEach(ExchangeParticipant::cancelTimeConfirm);
+        }
+
+        boolean matchedBefore = overlapBefore != null;
+        boolean matchedAfter = overlapAfter != null;
 
         /*
           시안(204:5230)의 조건이 "상대 사용자가 시간을 입력 완료 & 일치하는 시간이 존재하는
@@ -361,19 +377,39 @@ public class ExchangeService {
     }
 
     /**
-     * 겹치는 가장 빠른 칸으로 약속을 확정한다.
+     * 겹치는 가장 빠른 칸에 "이 시간으로 약속!" 을 누른다.
      *
-     * <p>참가자 중 아무나 한 명이 누르면 확정된다. 전원이 눌러야 한다고 두면 마지막 사람이 화면을
-     * 닫고 있을 때 약속이 영영 안 잡힌다. 나머지 참가자는 실시간 알림으로 확정된 시각을 받는다.
+     * <p><b>참가자 전원이 눌러야 시각이 정해진다.</b> 예전에는 아무나 한 명이 누르면 확정됐는데,
+     * 그러면 아직 화면을 보고 있지도 않은 사람의 약속 시간이 남의 손에 정해진다. 마지막 사람이
+     * 누르는 순간 {@code exchangeTime} 이 박히고 그때 전원이 약속 화면으로 넘어간다.
+     *
+     * <p>대신 한 명이 끝까지 안 누르면 약속이 잡히지 않는다. 기다리는 쪽에는 앱이 닫혀 있어도
+     * 닿게 {@code EXCHANGE_TIME_AGREED} 가 푸시로 나가고, 그래도 안 되면 "다른 시간 물어보기"
+     * 와 약속 취소가 그대로 열려 있다.
      */
     @Transactional
     public ExchangeResponseDto confirmTime(Long exchangeId, UUID userId) {
         Exchange exchange = getExchange(exchangeId);
-        getParticipant(exchangeId, userId);
+        ExchangeParticipant participant = getParticipant(exchangeId, userId);
 
         Integer overlap = earliestOverlap(exchangeId);
         if (overlap == null) {
             throw new ApplicationException(ErrorCode.NO_OVERLAPPING_TIME);
+        }
+
+        // 이미 누른 사람이 한 번 더 눌렀다. 상대에게 같은 알림을 두 번 보내지 않는다.
+        if (participant.isTimeConfirmed()) {
+            return toResponse(exchange);
+        }
+
+        participant.confirmTime();
+
+        boolean allConfirmed = participantRepository.findAllByExchangeId(exchangeId).stream()
+                .allMatch(ExchangeParticipant::isTimeConfirmed);
+
+        if (!allConfirmed) {
+            notifyOthers(exchangeId, userId, SseEventType.EXCHANGE_TIME_AGREED);
+            return toResponse(exchange);
         }
 
         exchange.confirmTime(overlap);
@@ -672,6 +708,7 @@ public class ExchangeService {
                                     user.getUsername(),
                                     slots,
                                     !slots.isEmpty(),
+                                    participant.isTimeConfirmed(),
                                     participant.hasArrived());
                         })
                         .toList();

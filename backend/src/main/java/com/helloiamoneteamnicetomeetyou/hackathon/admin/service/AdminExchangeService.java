@@ -200,12 +200,17 @@ public class AdminExchangeService {
     /**
      * 겹치는 가장 빠른 칸으로 약속을 확정한다.
      *
-     * <p>사용자 화면에서는 참가자 중 아무나 누르면 확정되므로, 어드민도 참가자 한 명의 이름으로
-     * 같은 서비스를 부른다. 겹치는 칸이 없으면 {@code NO_OVERLAPPING_TIME} 으로 거절된다.
+     * <p><b>참가자 전원의 이름으로 부른다.</b> 사용자 화면의 확정은 전원이 눌러야 되는데, 더미는
+     * 화면을 들고 있는 사람이 없어서 스스로 누를 수가 없다. 한 명 이름으로만 부르면 약속이
+     * 확정되지 않고 "상대의 확정을 기다리는 중" 에서 멈춘다. 이미 누른 사람은 그쪽에서 걸러진다.
+     *
+     * <p>겹치는 칸이 없으면 {@code NO_OVERLAPPING_TIME} 으로 거절된다.
      */
     @Transactional
     public void confirmTime(Long exchangeId) {
-        exchangeService.confirmTime(exchangeId, anyParticipantId(exchangeId));
+        for (UUID userId : participantIds(exchangeId)) {
+            exchangeService.confirmTime(exchangeId, userId);
+        }
     }
 
     /**
@@ -295,12 +300,16 @@ public class AdminExchangeService {
      * <p>서비스가 참가자인지 확인하는 문을 지나가야 하는데, 어드민은 참가자가 아니라서 대신
      * 세울 이름이 필요하다. 누구를 세우든 결과가 같은 동작에만 쓴다.
      */
-    private java.util.UUID anyParticipantId(Long exchangeId) {
-        return exchangeParticipantRepository.findAllByExchangeId(exchangeId).stream()
-                .findFirst()
-                .orElseThrow(() -> new ApplicationException(ErrorCode.EXCHANGE_NOT_FOUND))
-                .getUser()
-                .getId();
+    private List<UUID> participantIds(Long exchangeId) {
+        List<UUID> userIds = exchangeParticipantRepository.findAllByExchangeId(exchangeId).stream()
+                .map(participant -> participant.getUser().getId())
+                .toList();
+
+        if (userIds.isEmpty()) {
+            throw new ApplicationException(ErrorCode.EXCHANGE_NOT_FOUND);
+        }
+
+        return userIds;
     }
 
     private Exchange findExchange(Long exchangeId) {

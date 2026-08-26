@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { BreakupDialog } from '@/components/domain/ConfirmDialogs'
@@ -8,7 +8,7 @@ import { MoveStatusBadge, OneToOneView, ThreeWayView } from '@/components/domain
 import { Button, TextButton } from '@/components/ui/Button'
 import { ClockIcon, PinIcon } from '@/components/ui/icons'
 import { TopBar } from '@/components/ui/TopBar'
-import { arriveAtExchange } from '@/lib/exchange'
+import { arriveAtExchange, fetchExchange } from '@/lib/exchange'
 import { springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
 import { identityMarkAt, usePrefetchMark } from '@/store/identity-mark'
@@ -32,6 +32,25 @@ export function Appointment() {
   // hook 은 early return 위에 있어야 한다. 아래 빈 화면으로 빠질 때 호출 수가 달라지면 터진다.
   usePrefetchMark(appt?.identityMark ?? null)
 
+  const arrived = appt?.myArrived ?? false
+  const partnersArrived = appt?.partners.every((p) => p.arrived) ?? false
+  const allArrived = arrived && partnersArrived
+  const waiting = appt?.stage === 'confirmed' || appt?.stage === 'arrived'
+
+  /*
+    전원이 도착하면 서로를 찾는 화면으로 넘어간다. "만났어요!" 가 거기 있다.
+
+    마지막으로 누른 사람은 자기가 누른 결과로, 먼저 도착해 기다리던 사람은 EXCHANGE_ARRIVED 가
+    들어오는 순간 같이 넘어간다. 누른 사람만 넘어가면 먼저 와서 기다리던 쪽은 도착 배지만 보면서
+    계속 서 있게 된다.
+
+    이미 끝난 약속은 넘기지 않는다. 교환을 마친 뒤 이 주소로 돌아오면 식별 화면으로 튕겼다가
+    거기서 다시 완료 화면으로 넘어가는 길이 생긴다.
+  */
+  useEffect(() => {
+    if (allArrived && waiting) navigate('/identify')
+  }, [allArrived, waiting, navigate])
+
   if (!appt || (appt.stage !== 'confirmed' && appt.stage !== 'arrived')) {
     return (
       <EmptyState
@@ -44,25 +63,29 @@ export function Appointment() {
   }
 
   const { zone, match } = appt
-  const arrived = appt.myArrived
-  const partnersArrived = appt.partners.every((p) => p.arrived)
   const myUserId = getDeviceId()
 
   /**
    * "도착했어요". 서버에 남기면 상대 화면의 배지가 이동중에서 도착으로 바뀐다.
    *
-   * 실패해도 식별 화면으로는 보낸다. 상대를 찾는 것을 서버 응답 때문에 막을 이유가 없다.
+   * **여기서 곧바로 식별 화면으로 넘어가지 않는다.** 식별 화면은 같은 표시를 든 사람끼리 서로를
+   * 알아보는 자리라, 아직 오는 중인 사람이 있으면 화면을 들고 있어도 맞은편에 아무도 없다.
+   * 넘어가는 것은 전원이 도착한 순간이고, 그 판단은 위의 effect 가 한다.
+   *
+   * 실패하면 서버에서 현재 상태를 다시 읽는다. 화면만 도착으로 바뀌면 상대에게는 여전히 오는
+   * 중으로 보여서, 서로 다른 화면을 든 채 기다리게 된다.
    */
-  const goIdentify = async () => {
+  const markArrived = async () => {
     setBusy(true)
     try {
       const exchange = await arriveAtExchange(appt.exchangeId, myUserId)
       dispatch({ type: 'exchange-synced', exchange, myUserId })
     } catch {
+      const latest = await fetchExchange(appt.exchangeId).catch(() => null)
+      if (latest) dispatch({ type: 'exchange-synced', exchange: latest, myUserId })
       dispatch({ type: 'toast', message: '도착을 알리지 못했어요' })
     } finally {
       setBusy(false)
-      navigate('/identify')
     }
   }
 
@@ -135,9 +158,20 @@ export function Appointment() {
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
-        <Button disabled={busy} onClick={() => void goIdentify()}>
-          ‘{identityMarkAt(appt.identityMark).name}’ 찾기 {identityMarkAt(appt.identityMark).emoji}
-        </Button>
+        {/*
+          CTA 는 두 갈래다. 아직 도착을 안 알렸으면 알리고, 알렸으면 남은 사람을 기다린다.
+          전원이 도착하는 순간 위의 effect 가 식별 화면으로 넘기기 때문에 세 번째 갈래가 없다.
+
+          상대의 도착은 EXCHANGE_ARRIVED 로 들어와 화면이 알아서 바뀐다. 기다리는 사람이
+          새로고침할 일은 없다.
+        */}
+        {arrived ? (
+          <Button disabled>상대의 도착을 기다리는 중이에요</Button>
+        ) : (
+          <Button disabled={busy} onClick={() => void markArrived()}>
+            도착했어요
+          </Button>
+        )}
         <TextButton onClick={() => setCancelOpen(true)}>약속 취소</TextButton>
       </div>
 

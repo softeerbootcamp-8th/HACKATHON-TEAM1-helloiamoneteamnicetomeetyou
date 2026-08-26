@@ -281,16 +281,70 @@ class ExchangeServiceTest {
     }
 
     @Test
-    @DisplayName("시간을 확정하면 상대에게만 알린다")
-    void 시간을_확정하면_상대에게만_알린다() {
+    @DisplayName("한 명만 확정하면 아직 시각이 정해지지 않고 상대에게만 알린다")
+    void 한_명만_확정하면_아직_정해지지_않는다() {
+        given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of(
+                ExchangeTimeSlot.of(exchange, me, 1),
+                ExchangeTimeSlot.of(exchange, partner, 1)));
+
+        ExchangeResponseDto response = exchangeService.confirmTime(EXCHANGE_ID, ME);
+
+        assertThat(response.confirmedTime()).isNull();
+        assertThat(exchange.getExchangeTime()).isNull();
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_AGREED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+    }
+
+    @Test
+    @DisplayName("전원이 확정해야 시각이 정해지고 마지막 사람은 상대에게만 알린다")
+    void 전원이_확정해야_시각이_정해진다() {
         given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of(
                 ExchangeTimeSlot.of(exchange, me, 1),
                 ExchangeTimeSlot.of(exchange, partner, 1)));
 
         exchangeService.confirmTime(EXCHANGE_ID, ME);
+        ExchangeResponseDto response = exchangeService.confirmTime(EXCHANGE_ID, PARTNER);
 
-        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_UPDATED), any());
-        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+        assertThat(response.confirmedTime()).isEqualTo(BASE_TIME.plusMinutes(TimeSlotGrid.SLOT_MINUTES));
+        verify(sseEventPublisher).toUser(eq(ME), eq(SseEventType.EXCHANGE_TIME_UPDATED), any());
+    }
+
+    @Test
+    @DisplayName("같은 사람이 두 번 확정해도 상대에게 알림이 한 번만 간다")
+    void 같은_사람이_두_번_확정해도_알림은_한_번이다() {
+        given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of(
+                ExchangeTimeSlot.of(exchange, me, 1),
+                ExchangeTimeSlot.of(exchange, partner, 1)));
+
+        exchangeService.confirmTime(EXCHANGE_ID, ME);
+        exchangeService.confirmTime(EXCHANGE_ID, ME);
+
+        assertThat(exchange.getExchangeTime()).isNull();
+        verify(sseEventPublisher, times(1))
+                .toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_AGREED), any());
+    }
+
+    @Test
+    @DisplayName("겹치는 가장 빠른 칸이 옮겨가면 눌러 둔 확정을 되돌린다")
+    void 겹치는_칸이_옮겨가면_확정을_되돌린다() {
+        List<ExchangeParticipant> participants = participantRepository.findAllByExchangeId(EXCHANGE_ID);
+        participants.forEach(ExchangeParticipant::confirmTime);
+
+        // 저장 전후로 격자를 갈아끼운다. 상대의 1번 칸이 그대로여도 내가 1번을 빼면 겹치는
+        // 가장 빠른 칸이 1에서 3으로 옮겨간다.
+        given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(
+                List.of(
+                        ExchangeTimeSlot.of(exchange, me, 1),
+                        ExchangeTimeSlot.of(exchange, partner, 1),
+                        ExchangeTimeSlot.of(exchange, partner, 3)),
+                List.of(
+                        ExchangeTimeSlot.of(exchange, me, 3),
+                        ExchangeTimeSlot.of(exchange, partner, 1),
+                        ExchangeTimeSlot.of(exchange, partner, 3)));
+
+        exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(3));
+
+        assertThat(participants).noneMatch(ExchangeParticipant::isTimeConfirmed);
     }
 
     @Test
@@ -384,7 +438,8 @@ class ExchangeServiceTest {
                 ExchangeTimeSlot.of(exchange, partner, 3),
                 ExchangeTimeSlot.of(exchange, partner, 1)));
 
-        ExchangeResponseDto response = exchangeService.confirmTime(EXCHANGE_ID, ME);
+        exchangeService.confirmTime(EXCHANGE_ID, ME);
+        ExchangeResponseDto response = exchangeService.confirmTime(EXCHANGE_ID, PARTNER);
 
         assertThat(response.confirmedTime()).isEqualTo(BASE_TIME.plusMinutes(TimeSlotGrid.SLOT_MINUTES));
         assertThat(response.overlapSlot()).isEqualTo(1);

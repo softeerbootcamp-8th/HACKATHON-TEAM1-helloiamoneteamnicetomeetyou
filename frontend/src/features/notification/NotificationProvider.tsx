@@ -65,6 +65,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     EXCHANGE_TIME_REQUESTED: onBoothEvent,
     EXCHANGE_TIME_MATCHED: onBoothEvent,
     EXCHANGE_TIME_MISMATCHED: onBoothEvent,
+    EXCHANGE_TIME_AGREED: onBoothEvent,
     EXCHANGE_TIME_UPDATED: onBoothEvent,
     EXCHANGE_PLACE_UPDATED: onBoothEvent,
     EXCHANGE_CANCELLED: onBoothEvent,

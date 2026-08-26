@@ -35,6 +35,10 @@ export const SSE_EVENT_TYPES = [
   'EXCHANGE_TIME_MISMATCHED',
   'EXCHANGE_TIME_UPDATED',
 
+  // 참가자 한 명이 "이 시간으로 약속!" 을 눌렀다. 확정은 전원이 눌러야 되고, 그때는
+  // EXCHANGE_TIME_UPDATED 가 온다.
+  'EXCHANGE_TIME_AGREED',
+
   // 참가자가 고른 칸이 바뀌었다. 화면을 맞추기 위한 것이라 알림함에는 쌓이지 않는다.
   'EXCHANGE_SLOTS_UPDATED',
 

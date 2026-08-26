@@ -1329,7 +1329,8 @@ dialog.sheet .sheet-actions {
   됐다. 양쪽 다 붙이되 색을 갈라서, 건드리면 안 되는 실제 사용자가 여전히 먼저 눈에 띄게 한다.
 */
 .tag-real,
-.tag-dummy {
+.tag-dummy,
+.tag-live {
   flex: 0 0 auto;
   padding: 1px 6px;
   border-radius: 5px;
@@ -1346,6 +1347,13 @@ dialog.sheet .sheet-actions {
 .tag-dummy {
   background: var(--tile);
   color: var(--muted);
+}
+
+/* 지금 부스에 있는 사람. 목록에서 제일 먼저 보여야 하는 값이라 브랜드 색을 쓴다. */
+.tag-live {
+  margin-left: auto;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
 }
 
 .pick .live-dot {
