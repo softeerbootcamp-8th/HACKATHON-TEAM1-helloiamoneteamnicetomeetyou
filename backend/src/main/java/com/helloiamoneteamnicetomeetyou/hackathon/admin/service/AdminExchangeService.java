@@ -90,6 +90,7 @@ public class AdminExchangeService {
         ExchangeParticipant participant = findDummyParticipant(participantId);
         participant.accept();
         publishToBooth(participant.getExchange(), SseEventType.MATCH_ACCEPTED);
+        publishToParticipants(participant.getExchange(), SseEventType.MATCH_ACCEPTED);
     }
 
     @Transactional
@@ -97,6 +98,7 @@ public class AdminExchangeService {
         ExchangeParticipant participant = findDummyParticipant(participantId);
         participant.reject();
         publishToBooth(participant.getExchange(), SseEventType.MATCH_REJECTED);
+        publishToParticipants(participant.getExchange(), SseEventType.MATCH_REJECTED);
     }
 
     @Transactional
@@ -104,12 +106,15 @@ public class AdminExchangeService {
         Exchange exchange = findExchange(exchangeId);
         exchange.cancelByAdmin();
         publishToBooth(exchange, SseEventType.EXCHANGE_CANCELLED);
+        publishToParticipants(exchange, SseEventType.EXCHANGE_CANCELLED);
     }
 
     @Transactional
     public void complete(Long exchangeId) {
         Exchange exchange = findExchange(exchangeId);
         exchange.completeByAdmin();
+        // 참가자에게는 개인 알림·푸시를 보내지 않는다. PushMessage 에 EXCHANGE_COMPLETED 항목이
+        // 없는 것과 같은 이유로, 본인이 현장에서 방금 한 행동이라 알림이 오면 어색하다.
         publishToBooth(exchange, SseEventType.EXCHANGE_COMPLETED);
     }
 
@@ -139,5 +144,24 @@ public class AdminExchangeService {
             return;
         }
         sseEventPublisher.toBooth(exchange.getZone().getBooth().getId(), type, Map.of("exchangeId", exchange.getId()));
+    }
+
+    /**
+     * 참가자 개인에게도 보낸다. 알림함과 잠금 화면 푸시는 부스 방송을 받지 않는다.
+     *
+     * <p>{@code toBooth} 는 화면을 새로고침하라는 신호일 뿐이라 부스 전체로 뿌려도 되지만,
+     * {@code NotificationEventDispatcher} 와 {@code PushEventDispatcher} 는 {@code userId} 가
+     * 없는 이벤트를 개인 것으로 볼 수 없어 건너뛴다. 그래서 문구가 있는 이벤트는 여기서
+     * 실제 참가자에게 따로 한 번 더 보낸다. 부스와 달리 구역이 없어도 보낼 수 있다.
+     *
+     * <p>더미(어드민이 세운 참가자)는 뺀다. 로그인도, 앱도, 구독한 푸시도 없어서 보내도
+     * 갈 곳이 없다.
+     */
+    private void publishToParticipants(Exchange exchange, SseEventType type) {
+        exchangeParticipantRepository.findAllByExchangeId(exchange.getId()).stream()
+                .map(ExchangeParticipant::getUser)
+                .filter(user -> !user.isAdminManaged())
+                .forEach(user -> sseEventPublisher.toUser(
+                        user.getId(), type, Map.of("exchangeId", exchange.getId())));
     }
 }
