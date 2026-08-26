@@ -1,5 +1,7 @@
 import { createContext } from 'react'
 
+import type { RegisteredItem } from '@/features/catalog/api'
+
 import type { BoothHaveItem, PokeAnswerResult, ReceivedPoke, SentPoke } from './api'
 
 /**
@@ -16,6 +18,16 @@ export type PokeValue = {
   sent: SentPoke[]
   /** 부스 안 다른 사람들이 내놓은 카드 */
   waiting: BoothHaveItem[]
+  /**
+   * 상대가 내 묶음에서 고르게 될 카드들. 찔러보기 확인 화면의 "내 카드" 가 이걸 그린다.
+   *
+   * <b>화면이 들고 있는 선택(`state.have`)이 아니라 서버가 기준이다.</b> 수락하는 쪽에 보여줄
+   * 묶음은 서버가 `PokeService.offerableItems` 로 그때그때 계산하는데, 그 규칙이 화면의 선택과
+   * 두 군데서 다르다. 편집만 하고 등록을 안 마치면 화면에만 반영돼 있고, 부스를 옮기면 화면은
+   * 지금 부스 카드만 남기지만 서버는 부스를 가리지 않는다. 그래서 보내기 직전 화면이 "내가 내주는
+   * 카드" 라고 보여주는 것과 상대가 실제로 고르는 것이 갈렸다.
+   */
+  myOfferable: RegisteredItem[]
   /** 부스를 정하고 목록을 읽을 수 있는 상태인지 */
   ready: boolean
   /**

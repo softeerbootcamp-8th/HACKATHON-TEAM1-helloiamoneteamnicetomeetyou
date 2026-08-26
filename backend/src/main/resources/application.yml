@@ -11,6 +11,12 @@
 spring:
   application:
     name: helloiamoneteamnicetomeetyou
+  # 스케줄러 스레드다. SSE heartbeat 와 매칭 트리거 예약이 이 풀을 같이 쓴다. 기본값 1 로 두면
+  # heartbeat 가 연결을 도는 동안 매칭 예약이 뒤에서 기다린다.
+  task:
+    scheduling:
+      pool:
+        size: 2
   # 어드민 화면이 쓰는 css 와 js 주소에 내용 해시를 붙인다 (`admin-<md5>.css`).
   #
   # 스프링은 이 경로에 Cache-Control 을 안 붙이는데, 그러면 브라우저가 Last-Modified 를 보고
@@ -71,6 +77,15 @@ admin:
 sse:
   emitter-timeout-ms: 1800000
   heartbeat-interval-ms: 15000
+
+# 매칭 설정이다.
+#
+# trigger-debounce-ms: 같은 사람의 매칭 트리거가 몰려 올 때, 마지막 것으로부터 이만큼 조용하면
+#   그때 한 번 돌린다. 등록 화면이 고른 카드를 한 장에 한 번씩 동시에 보내기 때문에, 이게 없으면
+#   찾는 카드가 다 들어가기 전에 첫 장만 보고 매칭이 성사된다. 요청들이 거의 같이 도착하므로
+#   짧아도 되고, 사람이 기다린다고 느낄 만큼 길면 안 된다. `0` 이면 예약 없이 곧바로 돌린다.
+matching:
+  trigger-debounce-ms: 400
 
 # 웹푸시(VAPID) 키다. `npx web-push generate-vapid-keys --json` 으로 만든 값을 그대로 쓴다.
 # 값은 팀에서 따로 공유하고 저장소에 넣지 않는다. 배포는 GitHub Secrets 로 들어온다.

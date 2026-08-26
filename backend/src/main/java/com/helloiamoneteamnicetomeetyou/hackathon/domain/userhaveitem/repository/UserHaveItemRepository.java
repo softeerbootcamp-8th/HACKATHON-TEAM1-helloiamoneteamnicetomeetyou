@@ -36,8 +36,14 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
 
     Optional<UserHaveItem> findByUserIdAndItemId(UUID userId, Long itemId);
 
-    /** 찾는 카드 등록이 이 카드를 이미 내놓기로 했는지 확인할 때 쓴다. */
-    boolean existsByUserIdAndItemId(UUID userId, Long itemId);
+    /**
+     * 찾는 카드 등록이 이 카드를 이미 내놓기로 했는지 확인할 때 쓴다.
+     *
+     * <p>다 넘겨서 {@code quantityLeft} 가 0 이 된 줄은 지금 내놓을 몫이 없으므로 뺀다. row 는
+     * 지워지지 않고 남기 때문에, 이 조건이 없으면 예전에 다 줘버린 카드도 계속 "가지고 있다" 로
+     * 잡혀 찾는 것으로 등록할 수 없다.
+     */
+    boolean existsByUserIdAndItemIdAndQuantityLeftGreaterThan(UUID userId, Long itemId, int quantityLeft);
 
     /**
      * 부스 안에서 <b>나를 뺀</b> 다른 사용자들의 보유 카드다.

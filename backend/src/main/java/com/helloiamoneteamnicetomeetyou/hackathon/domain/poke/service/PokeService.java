@@ -2,6 +2,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.poke.service;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service.ExchangeLock;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service.ExchangeService;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -53,6 +55,7 @@ public class PokeService {
     private final UserHaveItemRepository userHaveItemRepository;
     private final ExchangeItemRepository exchangeItemRepository;
     private final ExchangeService exchangeService;
+    private final ExchangeLock exchangeLock;
     private final SseEventPublisher sseEventPublisher;
 
     /**
@@ -139,8 +142,15 @@ public class PokeService {
         return PageRequestValues.slice(sent, page, size);
     }
 
-    /** 받은 찔러보기에 답한다. 수락과 거절이 한 자리다. */
-    @Transactional
+    /**
+     * 받은 찔러보기에 답한다. 수락과 거절이 한 자리다.
+     *
+     * <p><b>{@code READ_COMMITTED} 인 이유.</b> 수락이 {@link ExchangeLock} 으로 두 사람을 잠그고
+     * 이미 묶여 있는지 다시 보는데, MySQL 기본값인 REPEATABLE READ 에서는 그 재확인이 이
+     * 트랜잭션의 첫 읽기 때 뜬 스냅샷을 본다. 잠금을 걸고 기다린 뒤에도 그 사이 자동 매칭이
+     * 만든 참가자 줄이 보이지 않아 그대로 통과한다.
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PokeAnswerResponseDto answer(
             Long pokeId, UUID userId, PokeStatus status, Long chosenItemId) {
 
@@ -182,6 +192,15 @@ public class PokeService {
      *
      * <p>잔여 수량을 미리 잡아 두지 않기 때문에 여기서 다시 확인한다. 제안을 보낸 뒤 그 카드가
      * 다른 교환으로 나갔을 수 있다.
+     *
+     * <p><b>두 사람이 이미 다른 교환에 묶여 있으면 만들지 않는다.</b> 대기장은 상대가 자동
+     * 매칭으로 짝이 잡힌 뒤에도 카드를 계속 보여 주기 때문에, 이미 매칭된 두 사람이 서로를
+     * 찔러보고 수락하는 일이 실제로 일어난다. 그대로 두면 같은 두 사람에게 교환이 두 건 잡혀서
+     * 약속 화면과 식별 화면이 어느 쪽을 가리키는지 알 수 없게 된다.
+     *
+     * <p>찔러보기는 {@code PENDING} 으로 남겨 둔다. 여기서 거절로 바꾸면 세 후보 쿼리의 거절
+     * 이력 필터가 그 카드 조합을 영구히 제외해서, 지금 교환이 끝난 뒤에도 두 사람이 그 카드로는
+     * 다시 매칭되지 않는다.
      */
     private void accept(Poke poke, Long chosenItemId) {
         if (chosenItemId == null) {
@@ -203,6 +222,10 @@ public class PokeService {
                 .orElseThrow(() -> new ApplicationException(ErrorCode.POKE_ITEM_SOLD_OUT));
         if (receiverHave.getQuantityLeft() == null || receiverHave.getQuantityLeft() < 1) {
             throw new ApplicationException(ErrorCode.POKE_ITEM_SOLD_OUT);
+        }
+
+        if (!exchangeLock.acquire(List.of(sender.getId(), receiver.getId()))) {
+            throw new ApplicationException(ErrorCode.POKE_ALREADY_MATCHED);
         }
 
         /*

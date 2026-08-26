@@ -49,6 +49,7 @@ public enum ErrorCode implements ErrorType {
     POKE_CHOSEN_ITEM_NOT_OFFERED(HttpStatus.BAD_REQUEST, 4016, "상대가 내놓은 카드가 아닙니다."),
     POKE_NO_OFFERABLE_ITEM(HttpStatus.BAD_REQUEST, 4017, "내놓을 카드가 없어 찔러볼 수 없습니다."),
     POKE_ITEM_SOLD_OUT(HttpStatus.CONFLICT, 4018, "상대의 카드가 모두 교환되었습니다."),
+    POKE_ALREADY_MATCHED(HttpStatus.CONFLICT, 4019, "이미 진행 중인 교환이 있어 수락할 수 없습니다."),
 
     // Item / UserHaveItem / UserWantItem
     ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, 5000, "카드를 찾을 수 없습니다."),

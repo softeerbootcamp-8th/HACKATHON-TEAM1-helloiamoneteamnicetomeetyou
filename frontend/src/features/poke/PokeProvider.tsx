@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
+import { fetchMyHaveItems, type RegisteredItem } from '@/features/catalog/api'
 import { useCatalog } from '@/features/catalog/useCatalog'
 import { messageOf } from '@/lib/api'
 import { useBoothEvents } from '@/lib/use-booth-events'
@@ -29,6 +30,7 @@ export function PokeProvider({ children }: { children: ReactNode }) {
   const [received, setReceived] = useState<ReceivedPoke[]>([])
   const [sent, setSent] = useState<SentPoke[]>([])
   const [waiting, setWaiting] = useState<BoothHaveItem[]>([])
+  const [myOfferable, setMyOfferable] = useState<RegisteredItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -47,17 +49,23 @@ export function PokeProvider({ children }: { children: ReactNode }) {
 
     void (async () => {
       try {
-        // 셋을 나란히 읽는다. 서로 기다릴 이유가 없고, 화면은 세 개를 같이 쓴다.
-        const [receivedPage, sentPage, waitingPage] = await Promise.all([
+        // 넷을 나란히 읽는다. 서로 기다릴 이유가 없고, 화면은 넷을 같이 쓴다.
+        const [receivedPage, sentPage, waitingPage, myHave] = await Promise.all([
           fetchReceivedPokes(userId, signal),
           fetchSentPokes(userId, signal),
           fetchBoothHaveItems(boothId, userId, signal),
+          fetchMyHaveItems(userId, signal),
         ])
         if (signal.aborted) return
 
         setReceived(receivedPage.content)
         setSent(sentPage.content)
         setWaiting(waitingPage.content)
+        // 서버가 상대에게 묶음을 보여줄 때 쓰는 것과 같은 규칙으로 거른다
+        // (`PokeService.offerableItems`). 응답의 quantity 는 지금 새로 내줄 수 있는 개수라
+        // 다른 교환에 예약된 만큼은 이미 빠져 있고, 0 이면 상대가 고를 수 없는 카드다.
+        // 부스로 거르지 않는 것도 서버와 맞추기 위해서다.
+        setMyOfferable(myHave.filter((row) => row.quantity > 0))
         setLoaded(true)
       } catch (err) {
         if (signal.aborted) return
@@ -83,6 +91,13 @@ export function PokeProvider({ children }: { children: ReactNode }) {
     // 값이라 이벤트에 담아 뿌릴 수 없다. 그래서 신호만 받고 목록을 다시 읽는다.
     USER_JOINED: onBoothEvent,
     USER_LEFT: onBoothEvent,
+    // 교환이 잡히면 내 카드가 그만큼 예약되고, 끝나거나 취소되면 돌아온다. 즉 상대가 내 묶음에서
+    // 고를 수 있는 카드가 이 순간들에 바뀐다. 찔러보기 확인 화면을 열어 둔 채로 자동 매칭이
+    // 성사되면, 다시 읽지 않는 한 이미 나간 카드를 계속 내주겠다고 보여주게 된다.
+    MATCH_ACCEPTED: onBoothEvent,
+    EXCHANGE_CREATED: onBoothEvent,
+    EXCHANGE_COMPLETED: onBoothEvent,
+    EXCHANGE_CANCELLED: onBoothEvent,
   })
 
   // 요청이 겹치는 것을 막는다. 버튼을 두 번 누르면 서버가 4011 로 막지만, 그 전에
@@ -102,6 +117,9 @@ export function PokeProvider({ children }: { children: ReactNode }) {
         return result
       } catch (err) {
         setError(messageOf(err))
+        // 실패는 대개 그 사이 서버가 달라졌다는 뜻이다 — 조르려던 카드가 다 나갔거나, 내가
+        // 내줄 카드가 없어졌거나, 이미 보낸 뒤거나. 다시 읽어야 화면이 사실과 맞는다.
+        refresh()
         throw err
       } finally {
         busy.current = false
@@ -137,6 +155,7 @@ export function PokeProvider({ children }: { children: ReactNode }) {
       received,
       sent,
       waiting,
+      myOfferable,
       ready,
       loaded,
       refresh,
@@ -146,7 +165,20 @@ export function PokeProvider({ children }: { children: ReactNode }) {
       error,
       clearError,
     }),
-    [received, sent, waiting, ready, loaded, refresh, send, accept, reject, error, clearError],
+    [
+      received,
+      sent,
+      waiting,
+      myOfferable,
+      ready,
+      loaded,
+      refresh,
+      send,
+      accept,
+      reject,
+      error,
+      clearError,
+    ],
   )
 
   return <PokeContext.Provider value={value}>{children}</PokeContext.Provider>

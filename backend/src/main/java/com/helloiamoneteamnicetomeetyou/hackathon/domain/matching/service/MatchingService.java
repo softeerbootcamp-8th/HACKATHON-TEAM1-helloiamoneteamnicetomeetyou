@@ -4,6 +4,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchang
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeStatus;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service.ExchangeLock;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
@@ -27,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -42,6 +44,7 @@ public class MatchingService {
     private final ExchangeParticipantRepository exchangeParticipantRepository;
     private final ExchangeItemRepository exchangeItemRepository;
     private final SseEventPublisher sseEventPublisher;
+    private final ExchangeLock exchangeLock;
 
     /**
      * 교환 매칭 진행. 1대1 매칭을 먼저 시도하고, 실패하면 3인 교환으로 폴백한다.
@@ -50,9 +53,20 @@ public class MatchingService {
      *   toThem      : 후보ID → { 내가 줄 아이템ID → 교환가능수량 }  (내 보유 아이템을 원하는 상대)
      *   toMe        : 후보ID → { 내가 받을 아이템ID → 교환가능수량 }  (내가 원하는 아이템을 보유한 상대)
      *   earliestReg : 후보ID → 최소 want_id  (동점 tiebreaker — 작을수록 먼저 등록)
+     *
+     * <p><b>READ_COMMITTED 로 낮춘 이유.</b> MySQL 기본값인 REPEATABLE READ 에서는 잠금 없는
+     * {@code SELECT} 이 트랜잭션의 첫 읽기 때 뜬 스냅샷을 계속 본다. 그래서
+     * {@link ExchangeLock} 이 {@code SELECT ... FOR UPDATE} 로 상대 스레드를 제대로
+     * 기다린 다음에도, 뒤이은 {@code existsActiveExchange} 가 그 사이 커밋된 참가자 줄을 못 보고
+     * "아직 비어 있다" 고 답한다. 잠금은 걸리는데 잠근 뒤에 보는 값이 과거라서, 두 사람이 서로를
+     * 후보로 잡으면 교환이 두 건 만들어진다.
+     *
+     * <p>격리 수준을 낮추면 그 재확인이 매번 최신 커밋을 읽어 제 역할을 한다. 후보 조회 쿼리들도
+     * 최신을 보게 되는데, 이쪽은 오래된 스냅샷으로 이미 짝이 생긴 사람을 후보로 올리던 것이라
+     * 같이 나아진다.
      */
     @Async("matchingExecutor")
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void runMatching(UUID userId) {
         // 한 사람은 동시에 하나의 매칭만 가진다. 이미 진행 중인 교환이 있으면 새로 찾지 않는다.
         if (exchangeParticipantRepository.existsActiveExchange(userId)) return;
@@ -132,7 +146,7 @@ public class MatchingService {
             Map<Long, Integer> give,
             Map<Long, Integer> receive
     ) {
-        if (!lockParticipants(List.of(myUser.getId(), bestId))) return Optional.empty();
+        if (!exchangeLock.acquire(List.of(myUser.getId(), bestId))) return Optional.empty();
 
         User bestUser = userRepository.findById(bestId).orElseThrow();
 
@@ -279,7 +293,7 @@ public class MatchingService {
             Long bToCItemId,
             Long cToAItemId
     ) {
-        if (!lockParticipants(List.of(myUser.getId(), bId, cId))) return Optional.empty();
+        if (!exchangeLock.acquire(List.of(myUser.getId(), bId, cId))) return Optional.empty();
 
         User userB = userRepository.findById(bId).orElseThrow();
         User userC = userRepository.findById(cId).orElseThrow();
@@ -369,27 +383,6 @@ public class MatchingService {
     // ──────────────────────────────────────────
     // 공통 유틸
     // ──────────────────────────────────────────
-
-    /**
-     * 교환을 만들기 직전에 참가자 전원을 잠그고, 그 사이 누가 다른 매칭에 묶이지 않았는지 다시 본다.
-     *
-     * <p>{@code runMatching} 첫 줄의 {@code existsActiveExchange} 검사와 실제 저장 사이에는 락이
-     * 없다. 매칭은 스레드 4개로 동시에 돌기 때문에, 두 사람의 매칭이 서로를 후보로 잡으면 양쪽 다
-     * 검사를 통과하고 교환을 두 건 만든다. 그 사이를 막는 자리가 여기다.
-     *
-     * <p>UUID 오름차순으로 잠근다. 순서를 고정하지 않으면 두 스레드가 서로가 쥔 행을 기다려
-     * 교착에 빠진다.
-     *
-     * @return 전원이 아직 비어 있어 이 교환을 만들어도 되면 true
-     */
-    private boolean lockParticipants(List<UUID> userIds) {
-        List<UUID> ordered = userIds.stream().sorted().toList();
-
-        for (UUID userId : ordered) {
-            userRepository.findByIdForUpdate(userId).orElseThrow();
-        }
-        return ordered.stream().noneMatch(exchangeParticipantRepository::existsActiveExchange);
-    }
 
     /**
      * 같은 카드를 주면서 동시에 받는 조합을 후보에서 걷어낸다.

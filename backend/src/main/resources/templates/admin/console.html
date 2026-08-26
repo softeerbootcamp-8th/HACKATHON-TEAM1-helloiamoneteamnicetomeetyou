@@ -512,9 +512,12 @@
             <div class="box-head">
               구역
               <!--/*
+                맨 위 구역이 이 부스의 지정 교환장소다. 사용자 화면은 그 자리를 고르는 것이
+                아니라 확인만 하고, 새로 만들어지는 교환은 전부 그 자리로 잡힌다. 자리를
+                바꾸려면 맨 위 구역을 고치면 된다.
+
                 약도 자리(X, Y)는 약도 너비·높이에 대한 백분율이다. 비워 두면 50/50 으로
-                들어가는데, 그러면 두 번째 구역부터 첫 핀에 그대로 포개져서 사용자 화면에서
-                고를 수가 없다. 급할 때는 이름만 넣고 넘어가되, 겹쳐 보이면 여기서 고친다.
+                들어가고, 그러면 핀이 약도 한가운데에 뜬다.
               */-->
               <form method="post" th:action="@{'/admin/booths/' + ${booth.id} + '/zones'}" class="inline-form">
                 <input class="input sm" name="name" placeholder="A 구역" required />
@@ -542,7 +545,8 @@
             </div>
 
             <div class="rows">
-              <div class="row" th:each="z : ${zones}">
+              <div class="row" th:each="z, stat : ${zones}">
+                <span class="badge brand" th:if="${stat.first}" title="새 교환은 전부 이 자리로 잡힙니다">지정</span>
                 <form
                   method="post"
                   th:action="@{'/admin/booths/' + ${booth.id} + '/zones/' + ${z.id}}"
@@ -580,11 +584,12 @@
               </div>
             </div>
             <div class="empty sm" th:if="${#lists.isEmpty(zones)}">
-              구역이 없으면 만날 자리를 고르는 화면이 비어 버립니다.
+              구역이 없으면 이 부스에서는 교환이 만들어지지 않습니다. 지정 교환장소를 하나 넣으세요.
             </div>
             <p class="zone-hint" th:if="${!#lists.isEmpty(zones)}">
-              X, Y 는 약도 위 자리입니다. 왼쪽 위가 0, 오른쪽 아래가 100 입니다. 구역을 지우면 여기서 만나기로 한
-              약속은 장소 미정으로 돌아갑니다.
+              맨 위 구역이 지정 교환장소입니다. 새 교환은 전부 그 자리로 잡히고, 사용자는 장소 보기 화면에서 확인만
+              합니다. X, Y 는 약도 위 자리입니다. 왼쪽 위가 0, 오른쪽 아래가 100 입니다. 구역을 지우면 여기서
+              만나기로 한 약속은 장소 미정으로 돌아갑니다.
             </p>
           </div>
 
