@@ -3,10 +3,11 @@ import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 
 import { BoothPicker } from '@/components/domain/BoothPicker'
-import { CardStack } from '@/components/domain/CardStack'
+import { CARD_SHELL } from '@/components/domain/GoodsCard'
 import { RadarRings } from '@/components/domain/Radar'
 import { Button } from '@/components/ui/Button'
 import { useCatalog } from '@/features/catalog/useCatalog'
+import { cn } from '@/lib/cn'
 import { springPage, springSnap } from '@/lib/motion'
 import { useStore } from '@/store/useStore'
 
@@ -26,12 +27,7 @@ export function Onboarding() {
 
   const boothName = booth?.name ?? FALLBACK_BOOTH_NAME
 
-  /*
-    첫 화면의 장식용 카드다. 부스에 실제로 있는 카드 중 첫 장을 세운다. 목록을 아직 못 받았으면
-    빈 묶음이 뜨는데, 아무 카드나 세워 두면 그 부스에 없는 카드를 보여주게 된다.
-  */
   const cardCount = catalog.status === 'ready' ? catalog.items.length : 0
-  const topItemId = catalog.status === 'ready' ? (catalog.items[0]?.id ?? null) : null
 
   /**
    * 이 기기가 전에 홈까지 가 본 적이 있으면 온보딩을 다시 보여주지 않는다.
@@ -133,7 +129,7 @@ export function Onboarding() {
             transition={{ ...springSnap, delay: 0.24 }}
           >
             <div className="anim-float">
-              <CardStack topItemId={topItemId} count={3} className="w-[168px]" />
+              <BrandCard />
             </div>
           </motion.div>
         </div>
@@ -161,6 +157,61 @@ export function Onboarding() {
         onSelect={pickBooth}
         onDismiss={() => setPickerOpen(false)}
       />
+    </div>
+  )
+}
+
+/**
+ * 첫 화면 한가운데 뜨는 NearLy 카드 (시안 159:2024~159:2032).
+ *
+ * <b>부스의 실제 굿즈를 세우지 않는다.</b> 전에는 목록의 첫 카드를 세웠는데, 아직 아무것도
+ * 고르지 않은 사람에게 특정 굿즈를 들이미는 그림이었고 부스마다 첫 화면이 달라 보였다.
+ * 시안은 이 자리를 서비스 카드 한 장으로 두고 있다.
+ *
+ * 뒤에 흰 카드 한 장이 어긋나게 겹치고, 앞 카드 안에 그라데이션 썸네일이 살짝 기울어 앉는다.
+ * 카드 겉모양은 다른 화면과 같은 `CARD_SHELL` 을 쓴다.
+ */
+function BrandCard() {
+  return (
+    <div className="relative w-[150px]">
+      <div
+        aria-hidden
+        className={cn(CARD_SHELL, 'absolute inset-0 rotate-5 shadow-[0_8px_20px_rgba(0,0,0,0.08)]')}
+      />
+
+      <div
+        className={cn(
+          CARD_SHELL,
+          'relative px-5 pt-[22px] pb-3 shadow-[0_8px_20px_rgba(0,0,0,0.08)]',
+        )}
+      >
+        {/* 썸네일이 기울어 앉는 자리. 밑에 깔린 회색 타일이 모서리로 비어져 나온다. */}
+        <div className="relative flex h-[135px] items-center justify-center rounded-[14px] bg-tile">
+          <span
+            aria-hidden
+            className="absolute size-[64%] rounded-full blur-[11px]"
+            style={{ background: 'radial-gradient(circle, #2cb3edd9 0%, #2cb3ed00 74%)' }}
+          />
+          <div className="card-face relative flex size-full -rotate-5 items-center justify-center rounded-[14px]">
+            {/*
+              심볼은 시안에서 크게 기울어 있다. 원본 svg 가 preserveAspectRatio="none" 이라
+              폭과 높이를 둘 다 못 박아야 모양이 눌리지 않는다.
+            */}
+            <img
+              src="/nearly-mark.svg"
+              alt=""
+              aria-hidden
+              draggable={false}
+              className="h-[38px] w-[46px] rotate-[80deg] select-none"
+            />
+          </div>
+        </div>
+
+        {/* 시안에서 이름이 카드 한가운데가 아니라 오른쪽으로 조금 밀려 있다 (159:2032). */}
+        <p className="mt-2.5 translate-x-[7px] -rotate-5 text-center text-[16px] font-bold text-[#4e5146]">
+          NearLy
+        </p>
+      </div>
     </div>
   )
 }

@@ -45,3 +45,14 @@ export type MatchResult = OneToOneMatch | ThreeWayMatch
 
 /** 전체리스트 한 줄의 오른쪽에 붙는 상태. 시안이 세 가지로 나눠 둔다. */
 export type WaitingStatus = '매칭됨' | '교환 가능' | '그래도 찔러보기'
+
+/**
+ * 이 교환에서 실제로 주고받는 카드 쌍 전부. 삼자 교환은 언제나 한 쌍이다.
+ *
+ * `giveItemId`/`receiveItemId` 는 한 줄로 줄여 보여주는 자리에 쓰는 첫 쌍이라,
+ * 무엇을 주고받았는지를 빠짐없이 세야 하는 곳은 이쪽을 쓴다.
+ */
+export function pairsOf(match: MatchResult): ExchangePair[] {
+  if (match.kind === 'ONE_TO_ONE') return match.pairs
+  return [{ giveItemId: match.giveItemId, receiveItemId: match.receiveItemId }]
+}

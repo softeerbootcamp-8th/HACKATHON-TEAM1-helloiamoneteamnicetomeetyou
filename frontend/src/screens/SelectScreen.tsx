@@ -77,7 +77,19 @@ export function SelectScreen({
   }
 
   return (
-    <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
+    <div className="relative isolate flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
+      {/*
+        카드 격자 뒤에 깔리는 빛무리다 (시안 187:4308 의 Vector). 화면에 고정이라 격자가
+        스크롤해도 따라 움직이지 않는다. 시안에서 위 35.8%, 아래 18.8% 를 비운 자리다.
+
+        스크롤 영역 안에 넣지 않는 것은 같이 굴러가면 빛무리가 화면 밖으로 사라져서다.
+        `isolate` 로 쌓임 맥락을 여기서 끊어야 `-z-10` 이 화면 밖으로 빠지지 않는다.
+      */}
+      <span
+        aria-hidden
+        className="screen-glow pointer-events-none absolute inset-x-0 top-[35.8%] -z-10 h-[45.4%]"
+      />
+
       <TopBar title={title} onBack={onBack} />
 
       <div className="flex-1 overflow-y-auto px-5 no-scrollbar">

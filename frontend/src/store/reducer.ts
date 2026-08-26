@@ -1,7 +1,8 @@
 import type { Exchange } from '@/lib/exchange'
 
 import { toAppointment } from './appointment'
-import type { ExchangePair, MatchPartner, MatchResult } from './matching'
+import { pairsOf } from './matching'
+import type { ExchangePair, MatchPartner } from './matching'
 import { getPersistedSetupDone } from './setup-status'
 import type { ActiveMatch, Appointment, Selection, State } from './types'
 
@@ -112,12 +113,6 @@ function setQty(list: State['have'], itemId: number, qty: number): State['have']
 /** 서버에서 온 상대. 이름을 안 보낸 사용자는 "상대" 로 들어간다. */
 function partnerOf(userId: string, name: string | undefined): MatchPartner {
   return { id: userId, nickname: name ?? '상대' }
-}
-
-/** 이 교환에서 실제로 주고받는 카드 쌍. 삼자 교환은 언제나 한 쌍이다. */
-function pairsOf(match: MatchResult): ExchangePair[] {
-  if (match.kind === 'ONE_TO_ONE') return match.pairs
-  return [{ giveItemId: match.giveItemId, receiveItemId: match.receiveItemId }]
 }
 
 /** 교환이 끝난 카드는 다음 매칭에서 빠진다. 여러 장을 한 번에 바꿨으면 전부 덜어낸다. */

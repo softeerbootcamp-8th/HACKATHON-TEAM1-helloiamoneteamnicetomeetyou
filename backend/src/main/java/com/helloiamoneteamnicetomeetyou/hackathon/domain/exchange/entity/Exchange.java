@@ -153,18 +153,6 @@ public class Exchange {
     }
 
     /**
-     * 시간을 처음부터 다시 고른다. 겹치는 칸이 없어서 조율을 요청할 때 부른다.
-     *
-     * <p>격자 시작점도 지금 기준으로 다시 잡는다. 그러지 않으면 한참 지난 뒤에 조율을 요청했을 때
-     * 이미 지나간 시각이 선택지로 남는다.
-     */
-    public void resetTime() {
-        this.exchangeTime = null;
-        this.status = ExchangeStatus.PENDING;
-        this.slotBaseTime = TimeSlotGrid.baseTimeFrom(LocalDateTime.now());
-    }
-
-    /**
      * 만나서 교환을 끝냈다.
      *
      * <p><b>카드 주인은 아직 여기서 바꾸지 않는다.</b> 수량 조정은 이슈 #45 에서 한다.

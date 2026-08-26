@@ -103,8 +103,16 @@ export function updateTimeSlots(
   })
 }
 
-/** "시간 조율 요청하기". 참가자 전원의 선택을 비운다. */
-export function resetTimeSlots(exchangeId: number, userId: string): Promise<Exchange> {
+/**
+ * "시간 조율 요청하기". <b>상대에게 알림만 보낸다.</b>
+ *
+ * 고른 칸은 양쪽 모두 그대로 남는다. 안 맞은 것은 겹치는 칸이지 각자의 선택이 아니라서,
+ * 비우면 돌아온 사람이 자기가 고른 것부터 다시 찍어야 한다.
+ *
+ * 경로의 `reset` 은 전원의 선택을 비우던 예전 동작에서 온 이름이다. 백엔드와 함께 쓰는
+ * 약속이라 동작만 바꾸고 경로는 그대로 뒀다.
+ */
+export function requestTimeCoordination(exchangeId: number, userId: string): Promise<Exchange> {
   return apiData<Exchange>(`/api/exchanges/${exchangeId}/time-slots/reset`, {
     method: 'POST',
     body: JSON.stringify({ userId }),
