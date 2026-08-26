@@ -43,14 +43,14 @@
 
 ### 주요 기능
 
-- **알아서 찾아주는 교환 상대** — 내놓을 굿즈(Have)와 찾는 굿즈(Wanted)를 등록하면 조건이 맞는
+- **알아서 찾아주는 교환 상대.** 내놓을 굿즈(Have)와 찾는 굿즈(Wanted)를 등록하면 조건이 맞는
   상대를 시스템이 자동으로 찾습니다.
-- **둘이 아니어도 셋이서 교환** — 서로 정확히 맞는 상대가 없어도 A 에서 B, B 에서 C, C 에서 A 로
+- **둘이 아니어도 셋이서 교환.** 서로 정확히 맞는 상대가 없어도 A 에서 B, B 에서 C, C 에서 A 로
   도는 삼자 교환으로 성사 기회를 넓힙니다.
-- **현장에서 바로 교환** — 약속이 확정되면 과일 아이콘 식별 화면을 발급해서, 같은 화면을 든 사람을
+- **현장에서 바로 교환.** 약속이 확정되면 과일 아이콘 식별 화면을 발급해서, 같은 화면을 든 사람을
   찾아 대면 교환합니다.
-- **찔러보기** — 자동 매칭을 기다리지 않고 원하는 상대의 카드에 직접 교환을 신청할 수 있습니다.
-- **시간 조율** — 15분 단위로 가능한 시간을 고르면 모두가 되는 가장 빠른 시간으로 확정됩니다.
+- **찔러보기.** 자동 매칭을 기다리지 않고 원하는 상대의 카드에 직접 교환을 신청할 수 있습니다.
+- **시간 조율.** 15분 단위로 가능한 시간을 고르면 모두가 되는 가장 빠른 시간으로 확정됩니다.
 
 <br>
 
@@ -85,19 +85,32 @@
 
 ## 기술 스택
 
-| 구분 | 사용한 것 |
-| --- | --- |
-| **프론트엔드** | React 19, TypeScript, Vite 8, Tailwind CSS 4, React Router 8, Motion |
-| **PWA** | vite-plugin-pwa, Workbox, Web Push (VAPID) |
-| **백엔드** | Java 21, Spring Boot 4, Spring Data JPA, Thymeleaf |
-| **데이터베이스** | MySQL 8.4 (로컬은 Docker Compose, 배포는 RDS) |
-| **실시간** | SSE (Server-Sent Events), 가상 스레드 |
-| **인프라** | AWS EC2 t4g.micro, AWS RDS, Caddy, Docker, GHCR, Vercel |
-| **CI/CD** | GitHub Actions, Dozzle, Slack Webhook |
+**Frontend**
 
-프론트엔드와 백엔드를 한 저장소에서 관리하고, 두 디렉터리는 서로 의존하지 않습니다. 브랜치와 커밋
-규칙, 영역별 코딩 컨벤션은 [`CLAUDE.md`](./CLAUDE.md), [`backend/CLAUDE.md`](./backend/CLAUDE.md),
-[`frontend/CLAUDE.md`](./frontend/CLAUDE.md) 에 있습니다.
+![React](https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite_8-646CFF?style=flat-square&logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![React Router](https://img.shields.io/badge/React_Router_8-CA4245?style=flat-square&logo=reactrouter&logoColor=white)
+![PWA](https://img.shields.io/badge/PWA_Workbox-5A0FC8?style=flat-square&logo=pwa&logoColor=white)
+
+**Backend**
+
+![Java](https://img.shields.io/badge/Java_21-ED8B00?style=flat-square&logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot_4-6DB33F?style=flat-square&logo=springboot&logoColor=white)
+![JPA](https://img.shields.io/badge/Spring_Data_JPA-6DB33F?style=flat-square&logo=spring&logoColor=white)
+![Thymeleaf](https://img.shields.io/badge/Thymeleaf-005F0F?style=flat-square&logo=thymeleaf&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL_8.4-4479A1?style=flat-square&logo=mysql&logoColor=white)
+![SSE](https://img.shields.io/badge/SSE-FF6F00?style=flat-square&logo=serverfault&logoColor=white)
+
+**Infra**
+
+![Amazon EC2](https://img.shields.io/badge/Amazon_EC2-FF9900?style=flat-square&logo=amazonec2&logoColor=white)
+![Amazon RDS](https://img.shields.io/badge/Amazon_RDS-527FFF?style=flat-square&logo=amazonrds&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
+![Caddy](https://img.shields.io/badge/Caddy-1F88C0?style=flat-square&logo=caddy&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)
 
 <br>
 
@@ -105,16 +118,10 @@
 
 ![서비스 아키텍처](./docs/architecture.png)
 
-프론트엔드는 Vercel 에, 백엔드는 EC2 한 대에 올라가 있습니다. 두 오리진이 다르기 때문에 CORS 는
-`/api/**` 에만 열어 두었고, 어드민은 서버가 그리는 화면이라 CORS 가 필요하지 않습니다.
-
-화면이 HTTPS 로 서빙되는데 그 안에서 http 주소를 부르면 mixed content 로 막히기 때문에 백엔드에도
-HTTPS 가 필요했습니다. Cloudflare 터널은 재시작할 때마다 주소가 바뀌는 것이 걸려서, EC2 앞에
-Caddy 를 두고 sslip.io 도메인을 쓰는 쪽을 골랐습니다. 인스턴스를 재시작해도 주소가 그대로입니다.
-
-배포 대상이 t4g.micro 라서 이미지를 `linux/arm64` 로 빌드하고, RAM 이 1 GiB 뿐이라 컨테이너를
-640m 으로 묶고 G1GC 를 명시했습니다. main 에 push 하면 테스트와 이미지 빌드를 거쳐 SSH 로 배포한
-뒤 `/health` 가 응답할 때까지 확인하고, 결과를 Slack 으로 보냅니다.
+프론트엔드는 Vercel 에, 백엔드는 EC2 에 올라가 있고 RDS 는 private subnet 에 두어 EC2 를 거쳐서만
+접근합니다. 화면이 HTTPS 라 백엔드에도 HTTPS 가 필요해서, EC2 앞에 Caddy 를 두고 sslip.io 도메인으로
+주소를 고정했습니다. main 에 push 하면 테스트와 이미지 빌드를 거쳐 EC2 로 배포하고 결과를 Slack 으로
+보냅니다.
 
 <br>
 
@@ -131,16 +138,17 @@ Caddy 를 두고 sslip.io 도메인을 쓰는 쪽을 골랐습니다. 인스턴�
 
 ## Known Issues
 
-3일 동안 만든 것이라 알면서 두고 간 부분이 있습니다.
+교환은 두 사람이 동시에 잡힐 수 있는 자리라 동시성이 문제가 됩니다. 지금 이렇게 막아 두었고, 남은
+것은 아래와 같습니다.
 
 | 내용 | 지금 상태 |
 | --- | --- |
-| **로그인이 없습니다** | 브라우저가 만든 UUID 를 `localStorage` 에 저장해 사용자를 구분합니다. 브라우저 데이터를 지우거나 기기를 바꾸면 이전 기록으로 돌아가지 못합니다 |
-| **서버를 여러 대로 늘릴 수 없습니다** | SSE 연결을 인스턴스 메모리에 들고 있어서, 두 대로 늘리면 다른 인스턴스에 붙은 사용자에게 이벤트가 가지 않습니다 |
-| **스키마 마이그레이션 도구가 없습니다** | `ddl-auto=update` 로 맞추고 있어서 컬럼을 지우거나 이름을 바꾸는 변경은 반영되지 않습니다 |
-| **iOS 는 홈 화면에 추가해야 푸시가 옵니다** | 사파리 탭에서는 `PushManager` 자체가 노출되지 않아, 설치하지 않으면 알림을 켤 수 없습니다 |
-| [#99](https://github.com/softeerbootcamp-8th/HACKATHON-TEAM1-helloiamoneteamnicetomeetyou/issues/99) 아무도 수락하지 않은 매칭 제안이 남습니다 | 제안이 만료되지 않아 두 사람이 계속 묶여 있습니다 |
-| [#34](https://github.com/softeerbootcamp-8th/HACKATHON-TEAM1-helloiamoneteamnicetomeetyou/issues/34) 부스 안 다른 사용자 보유 카드 조회 | 목록 조회 API 가 열려 있는 이슈로 남아 있습니다 |
+| **매칭 재실행을 서버 안에서만 모았습니다** | 등록 화면이 카드를 한 장씩 보내서, 내놓을 카드 4장에 찾는 카드 3장이면 매칭이 7번 돌았습니다. 이벤트를 마지막 한 번으로 합쳐 막았고, 등록을 한 번에 받는 API 로 바꾸는 것이 근본 해결로 남아 있습니다 |
+| **매칭과 찔러보기 트랜잭션을 `READ_COMMITTED` 로 낮췄습니다** | MySQL 기본값인 REPEATABLE READ 에서는 `SELECT ... FOR UPDATE` 로 상대를 기다린 뒤 다시 읽어도 트랜잭션 첫 스냅샷을 봐서, 잠금이 걸려도 중복 교환을 막지 못했습니다. 낮춘 대신 같은 트랜잭션에서 같은 행을 두 번 읽으면 값이 달라질 수 있어, 이 경로에 조회를 더할 때 확인이 필요합니다 |
+| **교환을 만드는 경로의 잠금 순서를 `ExchangeLock` 한 곳에 모았습니다** | 자동 매칭과 찔러보기가 사용자 행을 다른 순서로 잠그면 교착에 빠져서 UUID 오름차순으로 통일했습니다. 교환을 만드는 경로를 새로 추가하면 반드시 이 잠금을 거쳐야 합니다 |
+| **거절 이력이 영구 필터로 남습니다** | 후보 조회 쿼리가 `CANCELLED` 교환에 `REJECTED` 참가자가 있는 조합을 계속 제외합니다. 중복으로 막힌 찔러보기를 거절로 바꾸지 않고 409 만 돌려주는 것도 이 때문입니다 |
+| **다른 기기나 탭에서 내 등록을 고치는 경합은 다루지 못했습니다** | 서버가 본인에게는 SSE 이벤트를 보내지 않아서, 화면에 들어올 때 다시 읽는 것으로만 덮입니다 |
+| [**#99**](https://github.com/softeerbootcamp-8th/HACKATHON-TEAM1-helloiamoneteamnicetomeetyou/issues/99) **아무도 수락하지 않은 매칭 제안이 만료되지 않습니다** | 제안이 그대로 남아 두 사람을 계속 묶어 둡니다 |
 
 <br>
 
@@ -148,28 +156,6 @@ Caddy 를 두고 sslip.io 도메인을 쓰는 쪽을 골랐습니다. 인스턴�
 
 | 이름 | GitHub | 맡은 것 |
 | --- | --- | --- |
-| **기승민** | [@KiSeungMin](https://github.com/KiSeungMin) | 어드민 콘솔, 카드 카탈로그와 부스, 프론트엔드 배포 |
-| **유승종** | [@bigbell999](https://github.com/bigbell999) | 교환 대기장과 찔러보기, SSE 실시간 연결, 백엔드 배포 |
+| **기승민** | [@KiSeungMin](https://github.com/KiSeungMin) | 개발 리더, SSE 실시간 연결, 어드민 콘솔 |
+| **유승종** | [@bigbell999](https://github.com/bigbell999) | 교환 대기존과 찔러보기, 지정 교환장소, 배포 파이프라인 |
 | **최서지** | [@choiseoji](https://github.com/choiseoji) | 자동 매칭(1:1, 삼자), 매칭 수락과 거절, 알림 |
-
-<br>
-
-## 로컬에서 실행하기
-
-백엔드는 Java 21 이 필요하고 Gradle 은 wrapper 가 받습니다. DB 컨테이너를 먼저 띄웁니다.
-
-```bash
-cd backend
-docker compose up -d mysql   # localhost:3306 (DB: hackathon)
-./gradlew bootRun            # http://localhost:8080
-```
-
-프론트엔드는 Node 22 이상과 pnpm 이 필요합니다. pnpm 이 없으면 `corepack enable` 로 켭니다.
-
-```bash
-cd frontend
-pnpm install
-pnpm dev                     # http://localhost:5173
-```
-
-`pnpm dev` 는 `/api` 와 `/health` 를 8080 으로 넘겨주기 때문에 백엔드를 같이 띄우면 그대로 붙습니다.
