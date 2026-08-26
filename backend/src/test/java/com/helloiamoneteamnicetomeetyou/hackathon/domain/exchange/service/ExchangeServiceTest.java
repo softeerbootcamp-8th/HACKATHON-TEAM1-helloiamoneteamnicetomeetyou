@@ -170,6 +170,67 @@ class ExchangeServiceTest {
     }
 
     @Test
+    @DisplayName("자리를 옮기면 저장하고 참가자 전원에게 알린다")
+    void 자리를_옮기면_전원에게_알린다() throws Exception {
+        Booth booth = exchange.getZone().getBooth();
+        Zone lounge = withId(Zone.of(booth, "라운지", "2층 라운지"), 2L);
+        given(zoneRepository.findById(2L)).willReturn(Optional.of(lounge));
+
+        exchangeService.updateZone(EXCHANGE_ID, ME, 2L);
+
+        assertThat(exchange.getZone()).isEqualTo(lounge);
+        verify(sseEventPublisher).toUser(eq(ME), eq(SseEventType.EXCHANGE_PLACE_UPDATED), any());
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_PLACE_UPDATED), any());
+    }
+
+    @Test
+    @DisplayName("참가자가 아니면 자리를 옮길 수 없다")
+    void 참가자가_아니면_자리를_못_옮긴다() {
+        assertThatThrownBy(() -> exchangeService.updateZone(EXCHANGE_ID, OUTSIDER, 2L))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(e -> ((ApplicationException) e).getErrorType())
+                .isEqualTo(ErrorCode.NOT_EXCHANGE_PARTICIPANT);
+    }
+
+    @Test
+    @DisplayName("다른 부스의 자리로는 옮길 수 없다")
+    void 다른_부스의_자리로는_못_옮긴다() throws Exception {
+        Booth otherBooth = withId(Booth.of("다른 팝업", null), 99L);
+        Zone otherZone = withId(Zone.of(otherBooth, "남의 부스 자리", "저쪽"), 3L);
+        given(zoneRepository.findById(3L)).willReturn(Optional.of(otherZone));
+
+        assertThatThrownBy(() -> exchangeService.updateZone(EXCHANGE_ID, ME, 3L))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(e -> ((ApplicationException) e).getErrorType())
+                .isEqualTo(ErrorCode.ZONE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("없는 자리로는 옮길 수 없다")
+    void 없는_자리로는_못_옮긴다() {
+        given(zoneRepository.findById(404L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> exchangeService.updateZone(EXCHANGE_ID, ME, 404L))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(e -> ((ApplicationException) e).getErrorType())
+                .isEqualTo(ErrorCode.ZONE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("아직 수락하지 않아 자리가 없는 교환은 옮길 수 없다")
+    void 자리가_없는_교환은_못_옮긴다() throws Exception {
+        Exchange pending = withId(Exchange.create(ExchangeType.ONE_TO_ONE), 77L);
+        given(exchangeRepository.findById(77L)).willReturn(Optional.of(pending));
+        given(participantRepository.findAllByExchangeId(77L))
+                .willReturn(List.of(ExchangeParticipant.accepted(pending, me)));
+
+        assertThatThrownBy(() -> exchangeService.updateZone(77L, ME, 2L))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(e -> ((ApplicationException) e).getErrorType())
+                .isEqualTo(ErrorCode.EXCHANGE_NOT_ACCEPTED);
+    }
+
+    @Test
     @DisplayName("격자 밖의 칸은 저장하지 않는다")
     void 격자_밖의_칸은_저장하지_않는다() {
         assertThatThrownBy(() -> exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(TimeSlotGrid.SLOT_COUNT)))

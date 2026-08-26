@@ -116,7 +116,7 @@ export function Identify() {
             */}
             <motion.button
               type="button"
-              aria-label="레몬 흔들기"
+              aria-label={`${mark.name} 흔들기`}
               onClick={() => {
                 tick(12)
                 setPokes((n) => n + 1)
@@ -140,14 +140,13 @@ export function Identify() {
               </AnimatePresence>
 
               <motion.img
-                key={pokes}
-                src="/lemon.svg"
-                style={{ filter: `hue-rotate(${mark.hueRotate}deg)` }}
+                key={`${mark.src}-${pokes}`}
+                src={mark.src}
                 alt=""
                 aria-hidden
                 animate={pokes > 0 ? { rotate: [0, -9, 7, -4, 0], scale: [1, 1.08, 0.98, 1] } : {}}
                 transition={{ duration: 0.7, ease: 'easeOut' }}
-                className="anim-lemon w-[260px] max-w-[70vw] select-none"
+                className="anim-fruit w-[260px] max-w-[70vw] select-none"
                 draggable={false}
               />
             </motion.button>

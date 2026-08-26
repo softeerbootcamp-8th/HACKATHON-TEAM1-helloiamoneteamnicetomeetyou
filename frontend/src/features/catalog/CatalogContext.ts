@@ -2,6 +2,8 @@ import { createContext } from 'react'
 
 import type { Item } from '@/mocks/data'
 
+import type { ServerBooth } from './api'
+
 /**
  * 서버 연동 준비 상태.
  *
@@ -29,6 +31,18 @@ export type CatalogValue = {
   state: CatalogState
   userId: string
   reload: () => void
+  /** 서버에 열려 있는 부스 전부. 랜딩의 부스 고르기가 쓴다. */
+  booths: ServerBooth[]
+  /**
+   * 지금 붙어 있는 부스. 목록을 받기 전이면 `null` 이다.
+   *
+   * `state.boothId` 와 따로 두는 이유는, 카드 목록을 받는 동안이나 그 부스에 카드가 하나도
+   * 없을 때(`empty`)에도 **부스 이름은 화면에 떠 있어야** 하기 때문이다. `ready` 안에만
+   * 두면 정작 "이 부스엔 카드가 없다" 를 말해야 할 때 어느 부스인지 못 보여준다.
+   */
+  booth: ServerBooth | null
+  /** 부스를 바꾼다. 고른 부스는 다음 방문까지 남는다. */
+  selectBooth: (boothId: number) => void
 }
 
 export const CatalogContext = createContext<CatalogValue | null>(null)

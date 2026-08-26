@@ -223,7 +223,7 @@ body {
   }
 }
 
-@keyframes tradit-lemon {
+@keyframes tradit-fruit {
   0%,
   100% {
     transform: translateY(0) rotate(-3deg);
@@ -263,8 +263,8 @@ body {
 @utility anim-pop {
   animation: tradit-pop 0.5s ease-out;
 }
-@utility anim-lemon {
-  animation: tradit-lemon 5s ease-in-out infinite;
+@utility anim-fruit {
+  animation: tradit-fruit 5s ease-in-out infinite;
 }
 
 /* 모션을 줄이겠다고 한 사용자에게는 전환을 걷어낸다. */

@@ -368,7 +368,18 @@ export function Home() {
             )}
           </AnimatePresence>
 
-          <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+          {/*
+            펼친 동안에는 이 층이 클릭을 받지 않는다. 카드든 카드 사이 빈 곳이든 누르면
+            그대로 뒤에 깔린 '내 카드 접기' 판으로 떨어져서 접힌다. 예전에는 이 층이
+            부채꼴 크기만큼 클릭을 삼켜서, 화면 대부분이 눌러도 아무 일이 없는 자리였다.
+            버튼 둘만 pointer-events 를 되살린다.
+          */}
+          <div
+            className={cn(
+              'absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2',
+              fanOpen && 'pointer-events-none',
+            )}
+          >
             <p className="mb-1 text-center text-[11px] font-bold text-ink md:text-[14px]">
               {fanOpen ? `내 카드 ${state.have.length}종 ${haveCount}장` : '내 카드'}
             </p>
@@ -380,6 +391,7 @@ export function Home() {
                   setFanOpen(false)
                   navigate('/have')
                 }}
+                onClose={() => setFanOpen(false)}
               />
             ) : (
               /*
@@ -420,9 +432,11 @@ export function Home() {
         </div>
 
         <p className="mt-8 shrink-0 text-center text-[12px] text-neutral-400 md:text-[14px]">
-          {dragging
-            ? '놓아주면 찔러보기가 전송돼요'
-            : '내 카드 묶음을 상대 카드 위에 끌어서 놓아보세요'}
+          {fanOpen
+            ? '아무 곳이나 누르면 닫혀요'
+            : dragging
+              ? '놓아주면 찔러보기가 전송돼요'
+              : '내 카드 묶음을 상대 카드 위에 끌어서 놓아보세요'}
         </p>
 
         {/* 레이더에 올라온 카드를 뒷순위로 새로 채운다. 답변을 기다리는 카드는 남는다. */}
@@ -838,9 +852,11 @@ const GRID_KINDS = 9
 function MyCardsFan({
   have,
   onEdit,
+  onClose,
 }: {
   have: { itemId: string; qty: number }[]
   onEdit: () => void
+  onClose: () => void
 }) {
   const sorted = [...have].sort((a, b) => b.qty - a.qty)
 
@@ -848,7 +864,7 @@ function MyCardsFan({
     return (
       <div className="w-[300px]">
         <p className="py-10 text-center text-[12px] text-neutral-400">아직 고른 카드가 없어요</p>
-        <EditCardsButton onClick={onEdit} />
+        <FanActions onEdit={onEdit} onClose={onClose} />
       </div>
     )
   }
@@ -880,7 +896,7 @@ function MyCardsFan({
           })}
         </div>
 
-        <EditCardsButton onClick={onEdit} />
+        <FanActions onEdit={onEdit} onClose={onClose} />
       </div>
     )
   }
@@ -914,7 +930,7 @@ function MyCardsFan({
         </p>
       )}
 
-      <EditCardsButton onClick={onEdit} />
+      <FanActions onEdit={onEdit} onClose={onClose} />
     </div>
   )
 }
@@ -929,19 +945,40 @@ function QtyBadge({ qty }: { qty: number }) {
   )
 }
 
-function EditCardsButton({ onClick }: { onClick: () => void }) {
+/**
+ * 펼친 카드 밑에 서는 버튼 둘.
+ *
+ * 닫기를 굳이 두는 이유는, 빈 곳을 눌러 닫는 길이 있어도 그 길이 화면에 안 보이기
+ * 때문이다. 처음 펼친 사람은 어디를 눌러야 접히는지 모른 채로 화면을 한참 들여다본다.
+ *
+ * 부모가 `pointer-events-none` 이라 여기서 되살려 준다. 되살리지 않으면 두 버튼도
+ * 뒤로 클릭이 넘어가서 편집하기가 안 눌린다.
+ */
+function FanActions({ onEdit, onClose }: { onEdit: () => void; onClose: () => void }) {
   return (
-    <motion.button
-      type="button"
-      onClick={onClick}
+    <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ ...springSnap, delay: 0.1 }}
-      whileTap={{ scale: 0.95 }}
-      className="mx-auto mt-4 block rounded-full bg-ink px-4 py-2 text-[12px] font-bold text-white"
+      className="pointer-events-auto mt-4 flex items-center justify-center gap-2"
     >
-      편집하기
-    </motion.button>
+      <motion.button
+        type="button"
+        onClick={onEdit}
+        whileTap={{ scale: 0.95 }}
+        className="rounded-full bg-ink px-4 py-2 text-[12px] font-bold text-white"
+      >
+        편집하기
+      </motion.button>
+      <motion.button
+        type="button"
+        onClick={onClose}
+        whileTap={{ scale: 0.95 }}
+        className="rounded-full border border-neutral-200 bg-white px-4 py-2 text-[12px] font-bold text-neutral-500"
+      >
+        닫기
+      </motion.button>
+    </motion.div>
   )
 }
 

@@ -103,6 +103,23 @@ export function updateTimeSlots(
   })
 }
 
+/**
+ * 만날 자리를 바꾼다.
+ *
+ * 이름이나 좌표가 아니라 `zoneId` 만 보낸다. 구역은 어드민이 고치는 값이라, 화면이 목록을
+ * 받아 둔 사이에 이름이 바뀌었으면 옛 값을 되돌려 저장하게 된다.
+ */
+export function updateExchangeZone(
+  exchangeId: number,
+  userId: string,
+  zoneId: number,
+): Promise<Exchange> {
+  return apiData<Exchange>(`/api/exchanges/${exchangeId}/zone`, {
+    method: 'PUT',
+    body: JSON.stringify({ userId, zoneId }),
+  })
+}
+
 /** "시간 조율 요청하기". 참가자 전원의 선택을 비운다. */
 export function resetTimeSlots(exchangeId: number, userId: string): Promise<Exchange> {
   return apiData<Exchange>(`/api/exchanges/${exchangeId}/time-slots/reset`, {
