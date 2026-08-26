@@ -37,7 +37,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       try {
         const page = await fetchNotifications(userId, signal)
         if (signal.aborted) return
-        setNotifications(page.content)
+        // 읽은 것은 목록에서 뺀다. 서버는 읽음 표시만 하고 계속 내려주기 때문에, 걸러 두지
+        // 않으면 스와이프로 치운 알림이 다음 새로고침에 다시 나타난다.
+        setNotifications(page.content.filter((n) => !n.read))
       } catch (err) {
         if (signal.aborted) return
         setError(messageOf(err))
@@ -60,6 +62,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     POKE_ACCEPTED: onBoothEvent,
     POKE_REJECTED: onBoothEvent,
     EXCHANGE_CREATED: onBoothEvent,
+    EXCHANGE_TIME_REQUESTED: onBoothEvent,
+    EXCHANGE_TIME_MATCHED: onBoothEvent,
+    EXCHANGE_TIME_MISMATCHED: onBoothEvent,
     EXCHANGE_TIME_UPDATED: onBoothEvent,
     EXCHANGE_PLACE_UPDATED: onBoothEvent,
     EXCHANGE_CANCELLED: onBoothEvent,
@@ -78,7 +83,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     [userId],
   )
 
-  const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications])
+  // 목록에 읽지 않은 것만 남으므로 길이가 곧 개수다.
+  const unreadCount = notifications.length
 
   const value = useMemo(
     () => ({ notifications, unreadCount, ready, refresh, markRead, error, clearError }),

@@ -175,14 +175,64 @@ class ExchangeServiceTest {
                 .isEqualTo(ErrorCode.INVALID_EXCHANGE_PARTICIPANTS);
     }
 
+    /*
+      아래 알림 테스트는 시안(204:5026)의 노출 조건을 지킨다. 조건이 전부 "상대 사용자가 ...한
+      경우" 라서, 누른 사람에게 이벤트가 가면 자기가 방금 한 행동이 자기 알림함에 쌓이고 앱이
+      닫혀 있으면 잠금화면 푸시까지 간다.
+    */
+
     @Test
-    @DisplayName("시간을 저장하면 참가자 전원에게 알린다")
-    void 시간을_저장하면_전원에게_알린다() {
+    @DisplayName("시간을 저장했을 때 겹치는 칸이 없으면 상대에게만 매칭 실패를 알린다")
+    void 시간을_저장하면_겹치지_않으면_상대에게만_실패를_알린다() {
         exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(2, 0, 2));
 
         verify(timeSlotRepository).deleteAllByExchangeIdAndUserId(EXCHANGE_ID, ME);
-        verify(sseEventPublisher).toUser(eq(ME), eq(SseEventType.EXCHANGE_TIME_UPDATED), any());
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_MISMATCHED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+    }
+
+    @Test
+    @DisplayName("시간을 저장했을 때 겹치는 칸이 있으면 상대에게 매칭 성공을 알린다")
+    void 시간을_저장하면_겹치면_상대에게_성공을_알린다() {
+        given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of(
+                ExchangeTimeSlot.of(exchange, me, 1),
+                ExchangeTimeSlot.of(exchange, partner, 1)));
+
+        exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(1));
+
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_MATCHED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+    }
+
+    @Test
+    @DisplayName("시간 조율을 요청하면 상대에게만 알린다")
+    void 시간_조율을_요청하면_상대에게만_알린다() {
+        exchangeService.resetTimeSlots(EXCHANGE_ID, ME);
+
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_REQUESTED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+    }
+
+    @Test
+    @DisplayName("시간을 확정하면 상대에게만 알린다")
+    void 시간을_확정하면_상대에게만_알린다() {
+        given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of(
+                ExchangeTimeSlot.of(exchange, me, 1),
+                ExchangeTimeSlot.of(exchange, partner, 1)));
+
+        exchangeService.confirmTime(EXCHANGE_ID, ME);
+
         verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_UPDATED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+    }
+
+    @Test
+    @DisplayName("약속을 취소하면 취소한 사람에게는 알리지 않는다")
+    void 약속을_취소하면_취소한_사람에게는_알리지_않는다() {
+        exchangeService.cancel(EXCHANGE_ID, ME);
+
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_CANCELLED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
     }
 
     @Test

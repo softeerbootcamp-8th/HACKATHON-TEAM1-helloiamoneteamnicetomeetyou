@@ -274,7 +274,17 @@ public class ExchangeService {
         timeSlotRepository.saveAll(
                 distinctSlots.stream().map(slot -> ExchangeTimeSlot.of(exchange, user, slot)).toList());
 
-        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_TIME_UPDATED);
+        /*
+          시안(204:5230)의 조건이 "상대 사용자가 시간을 입력 완료 & 일치하는 시간이 존재하는
+          경우" 다. 상대가 볼 알림은 내가 무엇을 골랐는지가 아니라 시간이 맞았는지 안 맞았는지다.
+          그래서 저장한 뒤 겹치는 칸을 다시 세어 두 문구로 갈라 보낸다.
+        */
+        notifyOthers(
+                exchangeId,
+                userId,
+                earliestOverlap(exchangeId) != null
+                        ? SseEventType.EXCHANGE_TIME_MATCHED
+                        : SseEventType.EXCHANGE_TIME_MISMATCHED);
 
         return toResponse(exchange);
     }
@@ -334,7 +344,7 @@ public class ExchangeService {
         timeSlotRepository.deleteAllByExchangeId(exchangeId);
         exchange.resetTime();
 
-        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_TIME_UPDATED);
+        notifyOthers(exchangeId, userId, SseEventType.EXCHANGE_TIME_REQUESTED);
 
         return toResponse(exchange);
     }
@@ -357,7 +367,7 @@ public class ExchangeService {
 
         exchange.confirmTime(overlap);
 
-        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_TIME_UPDATED);
+        notifyOthers(exchangeId, userId, SseEventType.EXCHANGE_TIME_UPDATED);
 
         return toResponse(exchange);
     }
@@ -462,7 +472,7 @@ public class ExchangeService {
         releaseReservations(exchangeId);
 
         List<UUID> participantIds = participantIds(exchangeId);
-        notifyParticipants(exchangeId, participantIds, SseEventType.EXCHANGE_CANCELLED);
+        notifyOthers(exchangeId, userId, SseEventType.EXCHANGE_CANCELLED);
         for (UUID participantId : participantIds) {
             eventPublisher.publishEvent(new MatchTriggerEvent(participantId));
         }
@@ -587,13 +597,28 @@ public class ExchangeService {
     /**
      * 참가자 전원에게 알린다. 누른 사람도 포함한다.
      *
-     * <p>누른 사람은 응답으로 최신 상태를 이미 받았으니 한 번 더 읽는 셈이지만, 같은 사람이 탭을
-     * 여러 개 열어 뒀을 때 나머지 탭이 갱신되려면 이 편이 맞다.
+     * <p><b>{@code PushMessage} 에 문구가 없는, 화면 갱신용 이벤트에만 쓴다.</b> 문구가 있는
+     * 이벤트를 이걸로 보내면 누른 사람 알림함에도 자기가 방금 한 행동이 쌓이고, 앱이 닫혀
+     * 있으면 잠금화면 푸시까지 간다. 그런 이벤트는 {@link #notifyOthers} 를 쓴다.
      */
     private void notifyParticipants(Long exchangeId, List<UUID> userIds, SseEventType type) {
         Map<String, Object> data = Map.of("exchangeId", exchangeId);
 
         userIds.forEach(userId -> sseEventPublisher.toUser(userId, type, data));
+    }
+
+    /**
+     * 누른 사람을 뺀 나머지 참가자에게만 알린다.
+     *
+     * <p>시안(204:5026)의 노출 조건이 전부 "상대 사용자가 ...한 경우" 다. 누른 사람은 응답으로
+     * 최신 상태를 이미 받으니 알릴 것이 없다. {@code reject()} 도 같은 방식으로 본인을 뺀다.
+     */
+    private void notifyOthers(Long exchangeId, UUID actorId, SseEventType type) {
+        Map<String, Object> data = Map.of("exchangeId", exchangeId);
+
+        participantIds(exchangeId).stream()
+                .filter(userId -> !userId.equals(actorId))
+                .forEach(userId -> sseEventPublisher.toUser(userId, type, data));
     }
 
     private ExchangeResponseDto toResponse(Exchange exchange) {

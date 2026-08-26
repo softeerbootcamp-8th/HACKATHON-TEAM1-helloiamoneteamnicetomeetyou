@@ -36,7 +36,6 @@ export function Home() {
   const {
     waiting: serverWaiting,
     sent,
-    received,
     error: pokeError,
     clearError,
     refresh: refreshPokes,
@@ -60,8 +59,6 @@ export function Home() {
   const [radarPage, setRadarPage] = useState(0)
   // 내 카드 묶음을 눌러서 펼쳐 본 상태. 펼친 동안에는 끌어놓기를 하지 않는다.
   const [fanOpen, setFanOpen] = useState(false)
-  // 밀어서 치운 배너. 내용이 바뀌면 다시 뜬다.
-  const [dismissedBanner, setDismissedBanner] = useState<string | null>(null)
   const bannerDragRef = useRef(false)
   const radarRef = useRef<HTMLDivElement>(null)
   // 끌었는지 기억해 둔다. 끌고 난 뒤 따라오는 click 을 걸러내는 데 쓴다.
@@ -266,46 +263,42 @@ export function Home() {
   }
 
   /**
-   * 위에 뜨는 알림 카드. 시안의 `알림 수신 예시` 자리다. 밀어서 치울 수 있어서
-   * 무엇을 치웠는지 구분할 id 가 필요하다. 제목으로 구분하면 같은 문구의 새 알림이 와도
-   * 계속 숨어 있어서 버튼이 안 먹는 것처럼 보인다.
+   * 알림을 눌렀을 때 하는 일. 읽음으로 표시하고 해당 화면을 연다.
+   *
+   * 문구와 열리는 화면의 짝은 백엔드 `PushMessage` 와 같은 것을 쓴다. 배너와 알림 패널이
+   * 같은 표를 봐야 해서 한 곳에 둔다. `PushMessage.url` 을 고치면 여기도 같이 고친다.
    */
-  const banner = (() => {
-    if (match) {
-      const who =
-        match.kind === 'ONE_TO_ONE' ? match.partner.id : `${match.giver.id}-${match.receiver.id}`
-      return {
-        id: `match-${match.origin}-${who}`,
-        celebrate: match.origin === 'poke',
-        title:
-          match.origin === 'poke'
-            ? '상대방이 내 신청을 받아들였어요!'
-            : '내가 원하는 굿즈로 교환할 수 있어요!',
-        onClick: () => navigate('/match'),
-      }
-    }
-    // 서버에 실제로 온 것이 목업보다 먼저다. 둘이 같이 있으면 실제 요청을 놓치는 쪽이
-    // 손해가 크다.
-    const serverPoke = received[0]
-    if (serverPoke) {
-      return {
-        id: `server-poke-${serverPoke.pokeId}`,
-        tone: 'white' as const,
-        title: '교환 신청이 왔어요~',
-        body: '탭하여 확인',
-        onClick: () => navigate('/poke/received'),
-      }
-    }
-    if (state.incomingPoke) {
-      return {
-        id: `poke-${state.incomingPoke.fromUserId}-${state.incomingPoke.wantItemId}`,
-        celebrate: false,
-        title: '교환 신청이 왔어요~',
-        onClick: () => navigate('/poke/received'),
-      }
-    }
-    return null
-  })()
+  const openNotification = (id: number, kind: string) => {
+    void markNotificationRead(id)
+
+    if (kind === 'POKE_RECEIVED') navigate('/poke/received')
+    else if (kind === 'MATCH_SUGGESTED' || kind === 'MATCH_ACCEPTED' || kind === 'POKE_ACCEPTED')
+      navigate('/match')
+    else if (
+      kind === 'EXCHANGE_TIME_REQUESTED' ||
+      kind === 'EXCHANGE_TIME_MATCHED' ||
+      kind === 'EXCHANGE_TIME_MISMATCHED'
+    )
+      navigate('/time')
+    else if (
+      kind === 'EXCHANGE_CREATED' ||
+      kind === 'EXCHANGE_TIME_UPDATED' ||
+      kind === 'EXCHANGE_PLACE_UPDATED'
+    )
+      navigate('/appointment')
+    else if (kind === 'MATCH_REJECTED' || kind === 'POKE_REJECTED' || kind === 'EXCHANGE_CANCELLED')
+      navigate('/home')
+  }
+
+  /**
+   * 위에 뜨는 알림 카드. 시안의 `알림 수신 예시`(204:5026) 자리다.
+   *
+   * <b>서버 알림 목록의 맨 앞 한 건을 그대로 쓴다.</b> 예전에는 화면이 들고 있는 상태
+   * (`state.match`, 받은 찔러보기)로 직접 만들었는데, 그러면 시간 조율이나 약속 취소처럼
+   * 화면 상태에 없는 알림은 배너로 뜰 길이 없었고 문구도 백엔드와 두 벌이 됐다.
+   * 목록에는 안 읽은 것만 들어 있고 서버가 최근 순으로 준다.
+   */
+  const banner = serverNotifications[0] ?? null
 
   /**
    * 레이더는 정사각형 무대 안에 그린다. 예전에는 세로로 늘어나는 칸에 백분율로 카드를
@@ -686,7 +679,7 @@ export function Home() {
         </AnimatePresence>
 
         <AnimatePresence>
-          {banner && banner.id !== dismissedBanner && (
+          {banner && (
             <motion.button
               key={banner.id}
               type="button"
@@ -707,7 +700,8 @@ export function Home() {
                   info.velocity.y < -500
                 if (flung) {
                   tick(10)
-                  setDismissedBanner(banner.id)
+                  // 서버에 읽음으로 남긴다. 화면에서만 치우면 새로고침에 다시 올라온다.
+                  void markNotificationRead(banner.id)
                 }
                 window.setTimeout(() => {
                   bannerDragRef.current = false
@@ -715,7 +709,7 @@ export function Home() {
               }}
               onClick={() => {
                 if (bannerDragRef.current) return
-                banner.onClick()
+                openNotification(banner.id, banner.type)
               }}
               initial={{ opacity: 0, y: -12, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -729,7 +723,7 @@ export function Home() {
                 aria-hidden
                 className={cn(
                   'size-9 shrink-0 rounded-xl bg-alarm',
-                  banner.celebrate && 'anim-pop',
+                  banner.type === 'POKE_ACCEPTED' && 'anim-pop',
                 )}
               />
               <span className="min-w-0 flex-1">
@@ -777,33 +771,13 @@ export function Home() {
           id: String(n.id),
           kind: n.type,
           title: n.title,
-          body: n.body,
         }))}
         pushState={pushState}
         onEnablePush={enablePush}
         onDismiss={(id) => void markNotificationRead(Number(id))}
-        onSelect={(kind) => {
+        onSelect={(id, kind) => {
           setNotifOpen(false)
-          // 문구와 열리는 화면의 짝은 백엔드 PushMessage 와 같은 것을 쓴다.
-          if (kind === 'POKE_RECEIVED') navigate('/poke/received')
-          else if (
-            kind === 'MATCH_SUGGESTED' ||
-            kind === 'MATCH_ACCEPTED' ||
-            kind === 'POKE_ACCEPTED'
-          )
-            navigate('/match')
-          else if (
-            kind === 'EXCHANGE_CREATED' ||
-            kind === 'EXCHANGE_TIME_UPDATED' ||
-            kind === 'EXCHANGE_PLACE_UPDATED'
-          )
-            navigate('/appointment')
-          else if (
-            kind === 'MATCH_REJECTED' ||
-            kind === 'POKE_REJECTED' ||
-            kind === 'EXCHANGE_CANCELLED'
-          )
-            navigate('/home')
+          openNotification(Number(id), kind)
         }}
       />
     </div>
@@ -990,8 +964,8 @@ function NotificationRow({
   onSelect,
   onDismiss,
 }: {
-  notification: { id: string; kind: string; title: string; body: string }
-  onSelect: (kind: string) => void
+  notification: { id: string; kind: string; title: string }
+  onSelect: (id: string, kind: string) => void
   onDismiss: (id: string) => void
 }) {
   // 밀어서 지운 뒤에도 click 이 뒤따라 와서 알림이 열려 버린다. 끌었으면 그 click 은 버린다.
@@ -1032,7 +1006,7 @@ function NotificationRow({
         }}
         onClick={() => {
           if (draggedRef.current) return
-          onSelect(notification.kind)
+          onSelect(notification.id, notification.kind)
         }}
         whileTap={{ scale: 0.98 }}
         transition={springSnap}
@@ -1041,7 +1015,12 @@ function NotificationRow({
         <span aria-hidden className="size-9 shrink-0 rounded-xl bg-alarm" />
         <span className="min-w-0 flex-1">
           <span className="block text-[14px] font-bold text-ink">{notification.title}</span>
-          <span className="block text-[12px] text-neutral-400">{notification.body}</span>
+          {/*
+            부제는 종류와 무관하게 고정이다. 시안 정리판에 "알림 variation은 메인 텍스트만
+            변경" 이라고 적혀 있고 패널 시안(225:27684)의 다섯 줄도 전부 같다. 서버가 주는
+            body 는 화면이 없는 잠금화면 푸시용이라 여기서 쓰지 않는다.
+          */}
+          <span className="block text-[12px] text-neutral-400">탭하여 확인</span>
         </span>
         <span className="text-[18px] text-neutral-300">›</span>
       </motion.button>
@@ -1064,8 +1043,8 @@ function NotificationSheet({
 }: {
   open: boolean
   onClose: () => void
-  notifications: { id: string; kind: string; title: string; body: string }[]
-  onSelect: (kind: string) => void
+  notifications: { id: string; kind: string; title: string }[]
+  onSelect: (id: string, kind: string) => void
   onDismiss: (id: string) => void
   pushState: PushState
   onEnablePush: () => void
