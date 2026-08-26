@@ -68,6 +68,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     EXCHANGE_TIME_UPDATED: onBoothEvent,
     EXCHANGE_PLACE_UPDATED: onBoothEvent,
     EXCHANGE_CANCELLED: onBoothEvent,
+    // 끝난 교환의 알림은 서버가 읽음 처리한다. 다시 읽어야 화면에서도 빠진다.
+    EXCHANGE_COMPLETED: onBoothEvent,
   })
 
   // 스와이프로 지운 알림은 서버에 읽음 처리하고 화면에서도 뺀다.

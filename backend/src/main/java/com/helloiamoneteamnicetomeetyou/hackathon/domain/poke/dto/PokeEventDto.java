@@ -2,6 +2,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.poke.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.poke.entity.Poke;
+import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.ExchangeScoped;
 
 /**
  * 실시간 알림에 실어 보내는 내용이다.
@@ -14,7 +15,8 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.poke.entity.Poke;
  * 됐는지" 를 보여 줘야 하는데, 그 값은 서버만 알기 때문이다.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record PokeEventDto(Long pokeId, Long requestedItemId, Long chosenItemId, Long exchangeId) {
+public record PokeEventDto(Long pokeId, Long requestedItemId, Long chosenItemId, Long exchangeId)
+        implements ExchangeScoped {
 
     public static PokeEventDto from(Poke poke) {
         return new PokeEventDto(

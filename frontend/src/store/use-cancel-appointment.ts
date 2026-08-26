@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 
+import { useNotification } from '@/features/notification/useNotification'
 import { cancelExchange, fetchExchange } from '@/lib/exchange'
 
 import { getDeviceId } from './identity'
@@ -15,9 +16,14 @@ import { useStore } from './useStore'
  *
  * 서버에 닿지 못한 경우에는 화면을 접는다. 취소하겠다고 누른 사람을 네트워크 문제로 붙잡아 두는
  * 것보다는 낫다. 그 경우 상대에게는 전해지지 않고, 상대는 시간 조율이나 취소로 풀게 된다.
+ *
+ * <b>알림함을 다시 읽는다.</b> 서버는 교환이 끝나면 그 교환의 알림을 읽음 처리하는데, 취소를
+ * 누른 본인에게는 실시간 알림이 가지 않아서(`notifyOthers`) 다시 읽지 않으면 방금 정리된
+ * 알림이 화면에만 남는다.
  */
 export function useCancelAppointment() {
   const { state, dispatch } = useStore()
+  const { refresh: refreshNotifications } = useNotification()
   const exchangeId = activeAppointment(state)?.exchangeId
 
   return useCallback(async (): Promise<boolean> => {
@@ -31,6 +37,7 @@ export function useCancelAppointment() {
     try {
       await cancelExchange(exchangeId, myUserId)
       dispatch({ type: 'cancel-appointment' })
+      refreshNotifications()
       return true
     } catch {
       const latest = await fetchExchange(exchangeId).catch(() => null)
@@ -51,5 +58,5 @@ export function useCancelAppointment() {
       dispatch({ type: 'cancel-appointment' })
       return true
     }
-  }, [exchangeId, dispatch])
+  }, [exchangeId, dispatch, refreshNotifications])
 }

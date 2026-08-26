@@ -4,6 +4,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchang
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
+import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.ExchangeScoped;
 import java.util.List;
 import java.util.function.Predicate;
 
@@ -40,7 +41,7 @@ public record MatchSuggestedResponseDto(
         List<MatchedItemDto> receiveItems,
         MatchedUserDto receiveFrom,
         List<MatchedItemDto> middleItems
-) {
+) implements ExchangeScoped {
 
     /**
      * 한 사람이 받을 payload 를 만든다.

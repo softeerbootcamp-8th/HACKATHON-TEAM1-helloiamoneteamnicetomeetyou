@@ -8,6 +8,7 @@ import { OneToOneView, ThreeWayView } from '@/components/domain/ExchangeCards'
 import { Button, TextButton } from '@/components/ui/Button'
 import { TopBar } from '@/components/ui/TopBar'
 import { acceptExchange, rejectExchange } from '@/features/matching/api'
+import { useNotification } from '@/features/notification/useNotification'
 import { springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
 import { fetchExchange } from '@/lib/exchange'
@@ -24,6 +25,7 @@ import { useStore } from '@/store/useStore'
 export function MatchResult() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
+  const { refresh: refreshNotifications } = useNotification()
   const [rejectOpen, setRejectOpen] = useState(false)
   const match = useLastDefined(state.match)
   const [accepting, setAccepting] = useState(false)
@@ -130,9 +132,11 @@ export function MatchResult() {
         onKeep={() => setRejectOpen(false)}
         onReject={() => {
           setRejectOpen(false)
-          rejectExchange(match.exchangeId, getDeviceId()).catch((error: unknown) =>
-            console.error('[exchange] 거절 실패', error),
-          )
+          // 거절하면 서버가 이 교환의 알림을 읽음 처리한다. 거절한 본인에게는 실시간 알림이
+          // 가지 않아서, 다시 읽지 않으면 방금 정리된 제안 알림이 화면에만 남는다.
+          rejectExchange(match.exchangeId, getDeviceId())
+            .then(() => refreshNotifications())
+            .catch((error: unknown) => console.error('[exchange] 거절 실패', error))
           dispatch({ type: 'decline-match' })
           navigate('/home')
         }}
