@@ -23,6 +23,14 @@
 
   /* 카드 썸네일 그라데이션. 시안 card-preview-thumbnail 과 같은 값이다. */
   --gradient-card: linear-gradient(160deg, #2cb3ed 0%, #e8eaf1 75%, #cfd3df 100%);
+
+  /*
+    카드 등록 화면에서 카드 격자 뒤에 깔리는 빛무리. 시안 225:24324 의 Vector 자리다.
+    시안은 타원 하나에 반지름 그라데이션을 넣고 요소 전체를 50% 로 눌러 두었는데, 여기서는
+    같은 결과가 나오게 알파를 색에 미리 섞어 뒀다. 요소에 opacity 를 주면 그 위에 올라가는
+    것까지 같이 눌린다.
+  */
+  --gradient-screen-glow: radial-gradient(50% 50% at 50% 50%, #57d1fe80 0%, #2ced9000 100%);
 }
 
 html,
@@ -57,6 +65,11 @@ body {
 /* 카드 앞면. 굿즈 이미지가 아직 없어서 시안의 그라데이션을 그대로 쓴다. */
 @utility card-face {
   background: var(--gradient-card);
+}
+
+/* 화면 뒤에 깔리는 빛무리. 장식이라 클릭을 받지 않는다. */
+@utility screen-glow {
+  background: var(--gradient-screen-glow);
 }
 
 /*
