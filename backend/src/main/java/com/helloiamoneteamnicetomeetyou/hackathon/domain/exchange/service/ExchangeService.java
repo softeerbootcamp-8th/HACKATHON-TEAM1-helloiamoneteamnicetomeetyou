@@ -14,6 +14,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.ent
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.repository.ExchangeParticipantRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangetimeslot.entity.ExchangeTimeSlot;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangetimeslot.repository.ExchangeTimeSlotRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.event.MatchTriggerEvent;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
@@ -390,6 +391,8 @@ public class ExchangeService {
      *
      * <p>여기서 카드가 실제로 오간 것으로 친다. 주는 쪽은 보유 수량이 그만큼 줄고, 받는 쪽은
      * 찾는 수량이 그만큼 준다. 둘 다 하지 않으면 교환이 끝나자마자 같은 카드로 다시 매칭된다.
+     * <p>이 시점에 카드 수량을 실제로 옮긴다. 무엇을 주고받는지는 매칭이 정한 {@link ExchangeItem}
+     * 을 그대로 따른다.
      */
     @Transactional
     public ExchangeResponseDto complete(Long exchangeId, UUID userId) {
@@ -399,9 +402,45 @@ public class ExchangeService {
         exchange.complete();
         consumeItems(exchangeId);
 
+        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
+            giveAway(item);
+            receive(item);
+        }
+
         notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_COMPLETED);
 
         return toResponse(exchange);
+    }
+
+    /** 준 사람 쪽 재고를 줄인다. */
+    private void giveAway(ExchangeItem item) {
+        userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
+                .ifPresent(hi -> hi.completeExchange(item.getQuantity()));
+    }
+
+    /**
+     * 받은 사람 쪽에 반영한다. 보유 카드는 늘리고, 그 카드를 찾고 있었으면 찾는 수량에서 뺀다.
+     *
+     * <p>보유 카드에 더하는 것과 재교환 가능하게 만드는 것은 다른 문제다. {@link UserHaveItem#acquired}
+     * 와 {@link UserHaveItem#receiveMore} 둘 다 받은 몫을 곧바로 매칭 후보로 올리지 않는다.
+     */
+    private void receive(ExchangeItem item) {
+        User toUser = item.getToUser();
+        Item receivedItem = item.getItem();
+        int quantity = item.getQuantity();
+
+        userHaveItemRepository.findByUserIdAndItemId(toUser.getId(), receivedItem.getId())
+                .ifPresentOrElse(
+                        existing -> existing.receiveMore(quantity),
+                        () -> userHaveItemRepository.save(UserHaveItem.acquired(toUser, receivedItem, quantity)));
+
+        userWantItemRepository.findByUserIdAndItemId(toUser.getId(), receivedItem.getId())
+                .ifPresent(want -> {
+                    want.reduceQuantity(quantity);
+                    if (want.getQuantity() <= 0) {
+                        userWantItemRepository.delete(want);
+                    }
+                });
     }
 
     /**

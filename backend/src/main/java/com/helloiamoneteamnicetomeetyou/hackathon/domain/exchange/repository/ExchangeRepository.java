@@ -10,6 +10,15 @@ import org.springframework.data.jpa.repository.Query;
 public interface ExchangeRepository extends JpaRepository<Exchange, Long> {
 
     /**
+     * 이 구역에서 만나기로 한 약속이 있는지.
+     *
+     * <p>어드민이 구역을 지우기 전에 본다. 그냥 지우면 FK 제약에 걸려서 운영자가 500 을 받는데,
+     * 부스에서 그 화면을 만나면 무엇이 잘못됐는지 알 방법이 없다.
+     */
+    boolean existsByZoneId(Long zoneId);
+
+
+    /**
      * 어드민 교환 목록이다. 구역과 부스를 같이 읽는다.
      *
      * <p>{@code zone} 이 {@code LAZY} 라 fetch join 없이 목록을 그리면 행마다 구역 조회가 따로

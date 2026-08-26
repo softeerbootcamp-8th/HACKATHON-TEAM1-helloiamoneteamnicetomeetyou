@@ -77,6 +77,35 @@ public class UserHaveItem {
         return userHaveItem;
     }
 
+    /**
+     * 교환으로 이 카드를 받았는데, 이 카드로는 처음 등록하는 행이다.
+     *
+     * <p>{@code quantityLeft} 를 0 으로 두고 바로 {@link ItemStatus#OUT} 으로 만든다. 받자마자
+     * 재교환 후보에 올리지 않기 위해서다 — 이걸 다시 내놓고 싶으면 카드 등록 화면에서 직접
+     * 등록해야 한다.
+     */
+    public static UserHaveItem acquired(User user, Item item, int quantity) {
+        UserHaveItem userHaveItem = new UserHaveItem();
+        userHaveItem.user = user;
+        userHaveItem.item = item;
+        userHaveItem.quantity = quantity;
+        userHaveItem.quantityLeft = 0;
+        userHaveItem.status = ItemStatus.OUT;
+        userHaveItem.createdAt = LocalDateTime.now();
+        return userHaveItem;
+    }
+
+    /**
+     * 이미 이 카드 행이 있는데 교환으로 더 받았다.
+     *
+     * <p>{@code quantity} 만 올리고 {@code quantityLeft} 와 상태는 그대로 둔다. 이미 내놓고
+     * 있던 수량이 있으면 그 거래를 건드리면 안 되고, 이미 {@link ItemStatus#OUT} 이었으면 방금
+     * 받은 것도 곧바로 재교환 후보가 될 이유가 없다.
+     */
+    public void receiveMore(int amount) {
+        this.quantity += amount;
+    }
+
     public void reserve() {
         this.status = ItemStatus.RESERVED;
     }

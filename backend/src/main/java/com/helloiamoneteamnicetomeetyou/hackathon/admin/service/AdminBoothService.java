@@ -6,6 +6,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ZoneView;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.entity.Booth;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.repository.BoothRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.repository.ItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.entity.Zone;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.repository.ZoneRepository;
@@ -23,9 +24,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AdminBoothService {
 
+    /** 약도 한가운데. 자리를 안 정해 주면 여기 뜨고, 겹쳐 있는 것이 눈에 보인다. */
+    private static final int DEFAULT_MAP_POSITION = 50;
+
     private final BoothRepository boothRepository;
     private final ZoneRepository zoneRepository;
     private final ItemRepository itemRepository;
+    private final ExchangeRepository exchangeRepository;
     private final SseConnectionManager sseConnectionManager;
 
     public List<BoothView> findBooths() {
@@ -47,6 +52,11 @@ public class AdminBoothService {
         return zoneRepository.findByBoothIdOrderByIdAsc(boothId).stream().map(ZoneView::of).toList();
     }
 
+    /** 부스를 가리지 않은 구역 전부. 교환의 만날 자리를 옮기는 드롭다운이 쓴다. */
+    public List<ZoneView> findAllZones() {
+        return zoneRepository.findAll().stream().map(ZoneView::of).toList();
+    }
+
     public List<ItemView> findItems(Long boothId) {
         return itemRepository.findByBoothIdOrderByIdAsc(boothId).stream().map(ItemView::of).toList();
     }
@@ -66,20 +76,49 @@ public class AdminBoothService {
         findBooth(boothId).update(name, description);
     }
 
+    /**
+     * 구역을 만든다. 약도 위 자리까지 여기서 받는다.
+     *
+     * <p><b>자리를 안 받으면 만든 구역이 전부 약도 한가운데에 겹쳐 뜬다.</b> 기본값이 50/50
+     * 이라 두 번째 구역부터는 첫 번째 핀에 그대로 포개진다. 그러면 화면에서 고를 수가 없어서,
+     * 어드민으로 구역을 늘려도 실제로는 못 쓰는 구역이 된다.
+     */
     @Transactional
-    public void createZone(Long boothId, String name, String location) {
-        zoneRepository.save(Zone.of(findBooth(boothId), name, location));
+    public void createZone(Long boothId, String name, String location, Integer mapX, Integer mapY) {
+        Zone zone = Zone.of(findBooth(boothId), name, location);
+        zone.moveOnMap(mapX == null ? DEFAULT_MAP_POSITION : mapX, mapY == null ? DEFAULT_MAP_POSITION : mapY);
+
+        zoneRepository.save(zone);
     }
 
     @Transactional
-    public void updateZone(Long zoneId, String name, String location) {
-        zoneRepository.findById(zoneId)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.ZONE_NOT_FOUND))
-                .update(name, location);
+    public void updateZone(Long zoneId, String name, String location, Integer mapX, Integer mapY) {
+        Zone zone = zoneRepository.findById(zoneId)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.ZONE_NOT_FOUND));
+
+        zone.update(name, location);
+        if (mapX != null && mapY != null) {
+            zone.moveOnMap(mapX, mapY);
+        }
     }
 
+    /**
+     * 구역을 지운다.
+     *
+     * <p><b>약속이 걸려 있으면 먼저 막는다.</b> 그냥 지우면 FK 제약에 걸려 500 이 나가는데,
+     * 운영자가 받는 것은 이유가 안 적힌 오류 화면이라 무엇을 정리해야 하는지 알 수 없다.
+     * 끝난 약속도 그 자리를 기록으로 들고 있어서 여기에 걸린다. 교환을 먼저 정리하고 지운다.
+     */
     @Transactional
     public void deleteZone(Long zoneId) {
+        if (!zoneRepository.existsById(zoneId)) {
+            throw new ApplicationException(ErrorCode.ZONE_NOT_FOUND);
+        }
+
+        if (exchangeRepository.existsByZoneId(zoneId)) {
+            throw new ApplicationException(ErrorCode.ZONE_IN_USE);
+        }
+
         zoneRepository.deleteById(zoneId);
     }
 

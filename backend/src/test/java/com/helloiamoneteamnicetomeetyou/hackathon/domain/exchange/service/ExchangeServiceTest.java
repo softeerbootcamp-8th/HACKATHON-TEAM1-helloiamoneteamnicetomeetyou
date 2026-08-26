@@ -17,12 +17,20 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeRe
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.repository.ExchangeParticipantRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangetimeslot.entity.ExchangeTimeSlot;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangetimeslot.repository.ExchangeTimeSlotRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.ItemStatus;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.entity.UserWantItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.entity.Zone;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.repository.ZoneRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
@@ -60,6 +68,7 @@ class ExchangeServiceTest {
 
     private static final Long EXCHANGE_ID = 1L;
     private static final Long BOOTH_ID = 1L;
+    private static final Long ITEM_ID = 10L;
     private static final UUID ME = UUID.fromString("11111111-1111-4111-8111-111111111111");
     private static final UUID PARTNER = UUID.fromString("22222222-2222-4222-8222-222222222222");
     private static final UUID OUTSIDER = UUID.fromString("33333333-3333-4333-8333-333333333333");
@@ -353,6 +362,80 @@ class ExchangeServiceTest {
         exchangeService.complete(EXCHANGE_ID, ME);
 
         verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_COMPLETED), any());
+    }
+
+    @Test
+    @DisplayName("교환을 마치면 준 사람의 보유 수량이 준다")
+    void 교환을_마치면_준_사람의_보유_수량이_준다() throws Exception {
+        Item item = withId(Item.of(null, "카드", null), ITEM_ID);
+        UserHaveItem meHave = UserHaveItem.of(me, item, 3);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(userHaveItemRepository.findByUserIdAndItemId(ME, ITEM_ID)).willReturn(Optional.of(meHave));
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        assertThat(meHave.getQuantityLeft()).isEqualTo(2);
+        assertThat(meHave.getStatus()).isEqualTo(ItemStatus.LEFT);
+    }
+
+    @Test
+    @DisplayName("받는 사람에게 같은 카드 행이 없으면 OUT 상태로 새로 만든다")
+    void 받는_사람에게_같은_카드_행이_없으면_OUT_상태로_새로_만든다() throws Exception {
+        Item item = withId(Item.of(null, "카드", null), ITEM_ID);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 2)));
+        given(userHaveItemRepository.findByUserIdAndItemId(PARTNER, ITEM_ID)).willReturn(Optional.empty());
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        verify(userHaveItemRepository).save(any(UserHaveItem.class));
+    }
+
+    @Test
+    @DisplayName("받는 사람에게 이미 행이 있으면 수량만 더하고 상태는 그대로 둔다")
+    void 받는_사람에게_이미_행이_있으면_수량만_더한다() throws Exception {
+        Item item = withId(Item.of(null, "카드", null), ITEM_ID);
+        UserHaveItem partnerHave = UserHaveItem.of(partner, item, 2);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(userHaveItemRepository.findByUserIdAndItemId(PARTNER, ITEM_ID)).willReturn(Optional.of(partnerHave));
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        assertThat(partnerHave.getQuantity()).isEqualTo(3);
+        assertThat(partnerHave.getQuantityLeft()).isEqualTo(2);
+        assertThat(partnerHave.getStatus()).isEqualTo(ItemStatus.LEFT);
+        verify(userHaveItemRepository, never()).save(any(UserHaveItem.class));
+    }
+
+    @Test
+    @DisplayName("찾던 카드였으면 찾는 수량이 준다")
+    void 찾던_카드였으면_찾는_수량이_준다() throws Exception {
+        Item item = withId(Item.of(null, "카드", null), ITEM_ID);
+        UserWantItem partnerWant = UserWantItem.of(partner, item, 3);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(userWantItemRepository.findByUserIdAndItemId(PARTNER, ITEM_ID)).willReturn(Optional.of(partnerWant));
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        assertThat(partnerWant.getQuantity()).isEqualTo(2);
+        verify(userWantItemRepository, never()).delete(any(UserWantItem.class));
+    }
+
+    @Test
+    @DisplayName("찾던 카드가 다 채워지면 행을 지운다")
+    void 찾던_카드가_다_채워지면_행을_지운다() throws Exception {
+        Item item = withId(Item.of(null, "카드", null), ITEM_ID);
+        UserWantItem partnerWant = UserWantItem.of(partner, item, 1);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(userWantItemRepository.findByUserIdAndItemId(PARTNER, ITEM_ID)).willReturn(Optional.of(partnerWant));
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        verify(userWantItemRepository).delete(partnerWant);
     }
 
     @Test
