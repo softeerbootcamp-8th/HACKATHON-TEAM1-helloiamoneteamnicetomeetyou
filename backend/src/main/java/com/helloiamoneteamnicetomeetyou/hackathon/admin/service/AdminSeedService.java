@@ -47,7 +47,15 @@ public class AdminSeedService {
 
     /** 카드가 하나도 없는 부스에 케이스를 만들 때 같이 만들어 주는 기본 카드다. */
     private static final List<String> DEFAULT_ITEMS = List.of(
-            "N Vision 74", "IONIQ 5 N", "PONY", "AVANTE N", "GRANDEUR", "SANTA FE", "CASPER");
+            "IONIQ 5 N",
+            "AVANTE N",
+            "VELOSTER N",
+            "KONA N",
+            "i30 N",
+            "i30 Fastback",
+            "i20 N",
+            "AVANTE N Facelift",
+            "i20 N Rally1");
 
     private final BoothRepository boothRepository;
     private final ZoneRepository zoneRepository;

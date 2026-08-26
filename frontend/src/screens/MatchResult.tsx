@@ -10,6 +10,7 @@ import { TopBar } from '@/components/ui/TopBar'
 import { acceptExchange, rejectExchange } from '@/features/matching/api'
 import { springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
+import { fetchExchange } from '@/lib/exchange'
 import { getDeviceId } from '@/store/identity'
 import { useStore } from '@/store/useStore'
 
@@ -26,6 +27,41 @@ export function MatchResult() {
   const { state, dispatch } = useStore()
   const [rejectOpen, setRejectOpen] = useState(false)
   const match = useLastDefined(state.match)
+  const [accepting, setAccepting] = useState(false)
+
+  /**
+   * 매칭 결과를 받아들이고 장소 화면으로 넘어간다.
+   *
+   * 서버가 이때 만날 자리와 시간 격자, 약속 식별자를 붙인다. 매칭이 교환을 만드는 시점에는
+   * 아직 제안일 뿐이라 그것들이 비어 있다.
+   *
+   * 상대의 수락을 기다리지 않는다. 각자 장소와 시간 화면으로 들어가 맞춰 보는 흐름이다.
+   */
+  const goToPlace = async () => {
+    if (!match) return
+
+    // 목업으로 심어 준 매칭은 서버에 교환이 없다. 화면만 넘긴다.
+    if (match.exchangeId === null) {
+      navigate('/place')
+      return
+    }
+
+    const myUserId = getDeviceId()
+    setAccepting(true)
+    try {
+      await acceptExchange(match.exchangeId, myUserId)
+
+      // 수락한 직후의 약속을 바로 읽어 둔다. 알림을 기다리면 장소 화면이 잠깐 비어 보인다.
+      const exchange = await fetchExchange(match.exchangeId)
+      dispatch({ type: 'exchange-synced', exchange, myUserId, match, activate: true })
+      navigate('/place')
+    } catch {
+      dispatch({ type: 'toast', message: '교환 장소를 열지 못했어요. 잠시 후 다시 시도해주세요' })
+    } finally {
+      setAccepting(false)
+    }
+  }
+
   const demo = params.get('demo')
 
   // 주소로 바로 열었을 때 화면을 볼 수 있게 상태를 심어 준다.
@@ -94,19 +130,8 @@ export function MatchResult() {
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
-        <Button
-          onClick={() => {
-            // 목업 매칭은 exchangeId 가 없다 — 서버에 되돌릴 것이 없다.
-            if (match.exchangeId !== null) {
-              acceptExchange(match.exchangeId, getDeviceId()).catch((error: unknown) =>
-                console.error('[exchange] 수락 실패', error),
-              )
-            }
-            dispatch({ type: 'start-appointment' })
-            navigate('/place')
-          }}
-        >
-          교환 장소 확인하기
+        <Button disabled={accepting} onClick={() => void goToPlace()}>
+          {accepting ? '교환 장소를 여는 중' : '교환 장소 확인하기'}
         </Button>
         {!fromPoke && <TextButton onClick={() => setRejectOpen(true)}>거절하기</TextButton>}
       </div>

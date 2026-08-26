@@ -6,7 +6,10 @@ import {
   precacheAndRoute,
   type PrecacheEntry,
 } from 'workbox-precaching'
+import { CacheableResponsePlugin } from 'workbox-cacheable-response'
+import { ExpirationPlugin } from 'workbox-expiration'
 import { NavigationRoute, registerRoute } from 'workbox-routing'
+import { CacheFirst } from 'workbox-strategies'
 
 /**
  * 손으로 관리하는 서비스 워커다. `vite.config.ts` 의 `injectManifest` 가 아래
@@ -32,6 +35,30 @@ precacheAndRoute(self.__WB_MANIFEST)
 registerRoute(
   new NavigationRoute(createHandlerBoundToURL('index.html'), {
     denylist: [/^\/api\//, /^\/health$/],
+  }),
+)
+
+/**
+ * 굿즈 카드와 식별 표시 그림은 Supabase 스토리지에서 온다. 한 번 받은 것은 캐시에서 준다.
+ *
+ * **스토리지가 `cache-control: no-cache` 로 준다.** 그래서 브라우저 캐시만 믿으면 쓸 때마다
+ * 서버에 "안 바뀌었지" 를 다시 물어본다. 바뀐 게 없어도 왕복은 왕복이라, 네트워크가 막히면
+ * 그림이 안 뜬다. 하필 식별 화면은 사람이 몰린 곳에서 쓰고 그림이 화면 내용의 전부다.
+ * CacheFirst 는 그 왕복을 건너뛴다.
+ *
+ * 파일 이름이 곧 내용이라(`lemon.webp` 는 항상 같은 그림) 안전하다. 그림을 갈아 끼우면
+ * 이름을 바꾸거나 30일을 기다려야 한다.
+ */
+registerRoute(
+  ({ url }) => url.origin === 'https://sdumqvkniemiowanvsef.supabase.co',
+  new CacheFirst({
+    cacheName: 'supabase-images',
+    plugins: [
+      // `new Image()` 로 받는 요청은 no-cors 라 opaque(status 0) 로 온다. 0 을 안 넣으면
+      // 캐시에 들어가지 않아서 미리 받아 두는 것이 통째로 무용지물이 된다.
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+      new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 }),
+    ],
   }),
 )
 

@@ -32,6 +32,13 @@ export type Goods = {
 
 export type WaitingUser = {
   id: string
+  /**
+   * 서버 `users` 테이블의 UUID 다. 백엔드 `DemoUser` 의 값과 같아야 한다.
+   *
+   * 목업으로 고른 상대를 서버가 알아보고, 그 사람이 고른 시간이 실제로 DB 에서 읽힌다.
+   * 매칭이 서버로 옮겨가면 이 목업 목록 자체가 사라진다.
+   */
+  userId: string
   nickname: string
   /** 이 사람이 내놓은 카드. 레이더와 전체리스트에는 이 카드가 대표로 뜬다. */
   itemId: string
@@ -41,16 +48,6 @@ export type WaitingUser = {
   needsItemIds: string[]
   /** 지금 앱을 켜 두고 있는지. 목록에 "접속 중" 으로 나온다. */
   online: boolean
-}
-
-export type Zone = {
-  id: string
-  name: string
-  location: string
-  /** 약도 위 위치. 행사장 안 상대 좌표라 거리 계산에는 쓰지 않는다. */
-  x: number
-  y: number
-  selectable: boolean
 }
 
 export const PHOTOCARD_ITEMS: Item[] = [
@@ -143,23 +140,46 @@ export function itemById(id: string): Item {
 export const WAITING_USERS: WaitingUser[] = [
   {
     id: 'u1',
+    userId: '00000000-0000-4000-8000-000000000001',
     nickname: '코나러버',
     itemId: 'kona',
     alsoHasItemIds: ['vel'],
     needsItemIds: ['avn', 'i5n'],
     online: true,
   },
-  { id: 'u2', nickname: '블루N', itemId: 'vel', needsItemIds: ['i30n', 'i20n'], online: true },
+  {
+    id: 'u2',
+    userId: '00000000-0000-4000-8000-000000000002',
+    nickname: '블루N',
+    itemId: 'vel',
+    needsItemIds: ['i30n', 'i20n'],
+    online: true,
+  },
   {
     id: 'u3',
+    userId: '00000000-0000-4000-8000-000000000003',
     nickname: '아이오닉러버',
     itemId: 'i5n',
     alsoHasItemIds: ['i30f'],
     needsItemIds: ['i20n', 'avn'],
     online: true,
   },
-  { id: 'u4', nickname: 'N드라이버', itemId: 'avn', needsItemIds: ['i30n'], online: false },
-  { id: 'u5', nickname: '랠리팬', itemId: 'i20r', needsItemIds: ['i20n', 'kona'], online: true },
+  {
+    id: 'u4',
+    userId: '00000000-0000-4000-8000-000000000004',
+    nickname: 'N드라이버',
+    itemId: 'avn',
+    needsItemIds: ['i30n'],
+    online: false,
+  },
+  {
+    id: 'u5',
+    userId: '00000000-0000-4000-8000-000000000005',
+    nickname: '랠리팬',
+    itemId: 'i20r',
+    needsItemIds: ['i20n', 'kona'],
+    online: true,
+  },
 ]
 
 /** 바텀시트 전체 리스트용. 레이더에 안 뜨는 사람까지 포함한다. */
@@ -167,39 +187,58 @@ export const ALL_WAITING: WaitingUser[] = [
   ...WAITING_USERS,
   {
     id: 'u6',
+    userId: '00000000-0000-4000-8000-000000000006',
     nickname: '패스트백덕후',
     itemId: 'i30f',
     needsItemIds: ['avn', 'vel'],
     online: true,
   },
-  { id: 'u7', nickname: '레몬 16', itemId: 'i5n', needsItemIds: ['i20n', 'i30n'], online: false },
-  { id: 'u8', nickname: '레몬 07', itemId: 'i20n', needsItemIds: ['avn', 'i20r'], online: true },
-  { id: 'u9', nickname: '아반떼러버', itemId: 'avnf', needsItemIds: ['kona', 'i5n'], online: true },
-  { id: 'u10', nickname: '삼공러버', itemId: 'i30n', needsItemIds: ['i30f'], online: false },
-]
-
-export const ZONES: Zone[] = [
   {
-    id: 'z1',
-    name: '중앙 포토존 앞',
-    location: '행사 중앙 포토존',
-    x: 52,
-    y: 44,
-    selectable: true,
+    id: 'u7',
+    userId: '00000000-0000-4000-8000-000000000007',
+    nickname: '레몬 16',
+    itemId: 'i5n',
+    needsItemIds: ['i20n', 'i30n'],
+    online: false,
   },
   {
-    id: 'z2',
-    name: '에스컬레이터',
-    location: '1층 에스컬레이터 앞',
-    x: 25,
-    y: 68,
-    selectable: false,
+    id: 'u8',
+    userId: '00000000-0000-4000-8000-000000000008',
+    nickname: '레몬 07',
+    itemId: 'i20n',
+    needsItemIds: ['avn', 'i20r'],
+    online: true,
   },
-  { id: 'z3', name: '라운지', location: '휴게 라운지', x: 82, y: 60, selectable: false },
+  {
+    id: 'u9',
+    userId: '00000000-0000-4000-8000-000000000009',
+    nickname: '아반떼러버',
+    itemId: 'avnf',
+    needsItemIds: ['kona', 'i5n'],
+    online: true,
+  },
+  {
+    id: 'u10',
+    userId: '00000000-0000-4000-8000-000000000010',
+    nickname: '삼공러버',
+    itemId: 'i30n',
+    needsItemIds: ['i30f'],
+    online: false,
+  },
 ]
-
-/** 지정 교환장소는 1개로 한정한다. */
-export const FIXED_ZONE = ZONES[0]
 
 /** 내 식별 이름. 3인 매칭 화면의 "나 (레몬 28)" 과 같은 자리다. */
-export const MY_IDENTITY = { fruit: '레몬', number: 28 }
+
+/**
+ * 서버에 등록할 내 이름. 상대 화면에서 내 줄의 라벨이 된다.
+ *
+ * **기기마다 달라야 한다.** 고정값으로 두면 두 기기를 붙였을 때 상대 줄에도 내 이름과 같은
+ * 글자가 뜨는데, 그러면 누가 누구인지 화면에서 가릴 수가 없다.
+ *
+ * 식별 화면의 "레몬 28" 과는 다른 값이다. 그쪽은 교환마다 서버가 정해 준다.
+ */
+export function myUsername(deviceId: string): string {
+  let hash = 0
+  for (const ch of deviceId) hash = (hash * 31 + ch.charCodeAt(0)) | 0
+  return `손님 ${String((Math.abs(hash) % 90) + 10)}`
+}

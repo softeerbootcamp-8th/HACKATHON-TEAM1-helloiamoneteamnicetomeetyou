@@ -12,6 +12,7 @@ import { RadarUser } from '@/components/domain/RadarUser'
 import { BellIcon } from '@/components/ui/icons'
 import { useCatalog } from '@/features/catalog/useCatalog'
 import { useNotification } from '@/features/notification/useNotification'
+import type { BoothHaveItem } from '@/features/poke/api'
 import { usePoke } from '@/features/poke/usePoke'
 import { cn } from '@/lib/cn'
 import { tick } from '@/lib/haptics'
@@ -20,7 +21,13 @@ import { usePush, type PushState } from '@/lib/use-push'
 import { itemById, type Item } from '@/mocks/data'
 import { appointmentStatus, sortedAppointments } from '@/store/appointment-status'
 import { getDeviceId } from '@/store/identity'
-import { radarUsers, sortedWaitingList, waitingStatus, wantedFromMe } from '@/store/matching'
+import {
+  radarUsers,
+  sortedWaitingList,
+  waitingStatus,
+  wantedFromMe,
+  type WaitingStatus,
+} from '@/store/matching'
 import { useStore } from '@/store/useStore'
 
 export function Home() {
@@ -119,7 +126,8 @@ export function Home() {
    * 레이더에 세울 상대를 서버 목록에서 뽑는다.
    *
    * 시안 규칙이다 (desc 165:3500 2번) — 먼저 등록된 순으로 최대 5개, 카드 종류마다 한 명씩.
-   * 목록 자체가 이미 내 희망 카드만 담고 있어서 여기서 다시 걸러내지 않는다.
+   * 무엇을 담을지는 서버가 이미 정해서 준다(희망 카드가 있으면 그와 맞는 것만, 없으면 내가
+   * 가진 카드를 뺀 전부). 여기서 다시 걸러내지 않는다.
    *
    * <b>목업에 짝이 없는 카드는 세우지 않는다.</b> 카드 그림과 약칭이 목업에만 있어서 그릴
    * 수가 없다. 어드민 시드를 목업 이름과 맞추면 이 일이 생기지 않는다.
@@ -360,7 +368,18 @@ export function Home() {
             )}
           </AnimatePresence>
 
-          <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+          {/*
+            펼친 동안에는 이 층이 클릭을 받지 않는다. 카드든 카드 사이 빈 곳이든 누르면
+            그대로 뒤에 깔린 '내 카드 접기' 판으로 떨어져서 접힌다. 예전에는 이 층이
+            부채꼴 크기만큼 클릭을 삼켜서, 화면 대부분이 눌러도 아무 일이 없는 자리였다.
+            버튼 둘만 pointer-events 를 되살린다.
+          */}
+          <div
+            className={cn(
+              'absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2',
+              fanOpen && 'pointer-events-none',
+            )}
+          >
             <p className="mb-1 text-center text-[11px] font-bold text-ink md:text-[14px]">
               {fanOpen ? `내 카드 ${state.have.length}종 ${haveCount}장` : '내 카드'}
             </p>
@@ -372,6 +391,7 @@ export function Home() {
                   setFanOpen(false)
                   navigate('/have')
                 }}
+                onClose={() => setFanOpen(false)}
               />
             ) : (
               /*
@@ -412,9 +432,11 @@ export function Home() {
         </div>
 
         <p className="mt-8 shrink-0 text-center text-[12px] text-neutral-400 md:text-[14px]">
-          {dragging
-            ? '놓아주면 찔러보기가 전송돼요'
-            : '내 카드 묶음을 상대 카드 위에 끌어서 놓아보세요'}
+          {fanOpen
+            ? '아무 곳이나 누르면 닫혀요'
+            : dragging
+              ? '놓아주면 찔러보기가 전송돼요'
+              : '내 카드 묶음을 상대 카드 위에 끌어서 놓아보세요'}
         </p>
 
         {/* 레이더에 올라온 카드를 뒷순위로 새로 채운다. 답변을 기다리는 카드는 남는다. */}
@@ -443,14 +465,14 @@ export function Home() {
   /**
    * 서버에 등록한 사람들의 카드. 배지는 시안 desc 204:4948 기준으로 가른다.
    *
-   * "매칭됨" 은 서버가 내려주지 않는다. 나와 그 사람 사이에 이미 성사된 교환이 있는지의
-   * 이야기라, 화면이 들고 있는 현재 매칭 상태에서 판단해야 한다.
+   * "매칭됨" 은 서버가 `matched` 로 내려준다. 화면이 들고 있는 매칭 상태로 판단하면
+   * 알림을 놓치거나 새로고침한 순간 이미 매칭된 상대가 "교환 가능" 으로 되돌아간다.
    */
   const serverListPanel =
     serverWaiting.length === 0 ? (
       <p className="py-10 text-center text-[13px] leading-[1.7] text-neutral-400">
         {needIds.length === 0
-          ? '찾는 카드를 등록하면 그 카드를 가진 사람이 여기 나타나요.'
+          ? '아직 이 부스에 카드를 내놓은 사람이 없어요.'
           : '아직 이 부스에 찾는 카드를 내놓은 사람이 없어요.'}
       </p>
     ) : (
@@ -463,7 +485,7 @@ export function Home() {
         {serverWaiting.map((row) => {
           const item = mockItemOf?.(row.item.id)
           const waitingReply = pendingOwnerIds.has(row.ownerId)
-          const status = row.givableItemNames.length > 0 ? '교환 가능' : '그래도 찔러보기'
+          const status = waitingStatusOf(row)
 
           return (
             <motion.li key={row.haveItemId} variants={staggerChild}>
@@ -788,8 +810,19 @@ export function Home() {
   )
 }
 
+/**
+ * 서버 목록 한 줄의 상태. 세 가지를 위에서부터 본다 (시안 desc 204:4948).
+ *
+ * 매칭된 상대에게 줄 카드가 있어도 "매칭됨" 이 먼저다. 이미 만나기로 한 사람을
+ * "교환 가능" 으로 두면 아직 아무것도 정해지지 않은 것처럼 읽힌다.
+ */
+function waitingStatusOf(row: BoothHaveItem): WaitingStatus {
+  if (row.matched) return '매칭됨'
+  return row.givableItemNames.length > 0 ? '교환 가능' : '그래도 찔러보기'
+}
+
 /** 전체리스트 오른쪽 상태. 매칭됐거나 교환이 되는 상대만 브랜드색으로 눈에 띈다. */
-function WaitingStatusTag({ status }: { status: string }) {
+function WaitingStatusTag({ status }: { status: WaitingStatus }) {
   const dim = status === '그래도 찔러보기'
   return (
     <span
@@ -819,9 +852,11 @@ const GRID_KINDS = 9
 function MyCardsFan({
   have,
   onEdit,
+  onClose,
 }: {
   have: { itemId: string; qty: number }[]
   onEdit: () => void
+  onClose: () => void
 }) {
   const sorted = [...have].sort((a, b) => b.qty - a.qty)
 
@@ -829,7 +864,7 @@ function MyCardsFan({
     return (
       <div className="w-[300px]">
         <p className="py-10 text-center text-[12px] text-neutral-400">아직 고른 카드가 없어요</p>
-        <EditCardsButton onClick={onEdit} />
+        <FanActions onEdit={onEdit} onClose={onClose} />
       </div>
     )
   }
@@ -861,7 +896,7 @@ function MyCardsFan({
           })}
         </div>
 
-        <EditCardsButton onClick={onEdit} />
+        <FanActions onEdit={onEdit} onClose={onClose} />
       </div>
     )
   }
@@ -895,7 +930,7 @@ function MyCardsFan({
         </p>
       )}
 
-      <EditCardsButton onClick={onEdit} />
+      <FanActions onEdit={onEdit} onClose={onClose} />
     </div>
   )
 }
@@ -910,19 +945,40 @@ function QtyBadge({ qty }: { qty: number }) {
   )
 }
 
-function EditCardsButton({ onClick }: { onClick: () => void }) {
+/**
+ * 펼친 카드 밑에 서는 버튼 둘.
+ *
+ * 닫기를 굳이 두는 이유는, 빈 곳을 눌러 닫는 길이 있어도 그 길이 화면에 안 보이기
+ * 때문이다. 처음 펼친 사람은 어디를 눌러야 접히는지 모른 채로 화면을 한참 들여다본다.
+ *
+ * 부모가 `pointer-events-none` 이라 여기서 되살려 준다. 되살리지 않으면 두 버튼도
+ * 뒤로 클릭이 넘어가서 편집하기가 안 눌린다.
+ */
+function FanActions({ onEdit, onClose }: { onEdit: () => void; onClose: () => void }) {
   return (
-    <motion.button
-      type="button"
-      onClick={onClick}
+    <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ ...springSnap, delay: 0.1 }}
-      whileTap={{ scale: 0.95 }}
-      className="mx-auto mt-4 block rounded-full bg-ink px-4 py-2 text-[12px] font-bold text-white"
+      className="pointer-events-auto mt-4 flex items-center justify-center gap-2"
     >
-      편집하기
-    </motion.button>
+      <motion.button
+        type="button"
+        onClick={onEdit}
+        whileTap={{ scale: 0.95 }}
+        className="rounded-full bg-ink px-4 py-2 text-[12px] font-bold text-white"
+      >
+        편집하기
+      </motion.button>
+      <motion.button
+        type="button"
+        onClick={onClose}
+        whileTap={{ scale: 0.95 }}
+        className="rounded-full border border-neutral-200 bg-white px-4 py-2 text-[12px] font-bold text-neutral-500"
+      >
+        닫기
+      </motion.button>
+    </motion.div>
   )
 }
 

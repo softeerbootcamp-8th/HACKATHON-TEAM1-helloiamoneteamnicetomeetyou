@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.repository.BoothRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.repository.ExchangeParticipantRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
@@ -59,6 +60,9 @@ class BoothHaveItemServiceTest {
     private UserWantItemRepository userWantItemRepository;
 
     @Mock
+    private ExchangeParticipantRepository exchangeParticipantRepository;
+
+    @Mock
     private UserRepository userRepository;
 
     @Mock
@@ -91,17 +95,44 @@ class BoothHaveItemServiceTest {
     }
 
     @Test
-    @DisplayName("희망 카드를 등록하지 않았으면 빈 목록이다")
-    void 희망_카드가_없으면_비어_있다() {
-        List<UserHaveItem> rows = List.of(row(1L, OTHER_A, 10L, "i20 N", 1));
+    @DisplayName("희망 카드를 등록하지 않았으면 내가 가진 카드만 빼고 전부 내려준다")
+    void 희망_카드가_없으면_내_보유와_겹치는_것만_뺀다() {
+        // 10L 은 내가 이미 가진 카드라 빠지고, 20L 만 남는다 (시안 desc 204:4928).
+        List<UserHaveItem> rows =
+                List.of(row(1L, OTHER_A, 10L, "i20 N", 1), row(2L, OTHER_B, 20L, "IONIQ 5 N", 1));
+        List<UserHaveItem> myHaves = List.of(row(9L, ME, 10L, "i20 N", 2));
 
-        stub(rows, List.of(), List.of(), List.of());
+        stub(rows, List.of(), myHaves, List.of());
 
         PageResponse<BoothHaveItemResponseDto> result = findFirstPage();
 
-        assertThat(result.content()).isEmpty();
-        assertThat(result.size()).isZero();
-        assertThat(result.hasNext()).isFalse();
+        assertThat(result.content()).hasSize(1);
+        assertThat(result.content().get(0).haveItemId()).isEqualTo(2L);
+        // 걸러내는 기준이 희망 카드가 아니므로 wanted 는 false 다.
+        assertThat(result.content().get(0).wanted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("진행 중인 교환에 함께 묶인 상대는 matched 로 내려간다")
+    void 매칭된_상대는_matched_다() {
+        List<UserHaveItem> rows =
+                List.of(row(1L, OTHER_A, 10L, "i20 N", 1), row(2L, OTHER_B, 20L, "IONIQ 5 N", 1));
+        List<UserWantItem> myWants = List.of(want(ME, 10L, "i20 N"), want(ME, 20L, "IONIQ 5 N"));
+
+        stub(rows, myWants, List.of(), List.of());
+        given(exchangeParticipantRepository.findActivePartnerIds(ME)).willReturn(List.of(OTHER_B));
+
+        List<BoothHaveItemResponseDto> content = findFirstPage().content();
+
+        assertThat(content).hasSize(2);
+        assertThat(content).filteredOn(row -> row.ownerId().equals(OTHER_B))
+                .singleElement()
+                .extracting(BoothHaveItemResponseDto::matched)
+                .isEqualTo(true);
+        assertThat(content).filteredOn(row -> row.ownerId().equals(OTHER_A))
+                .singleElement()
+                .extracting(BoothHaveItemResponseDto::matched)
+                .isEqualTo(false);
     }
 
     @Test
@@ -242,6 +273,7 @@ class BoothHaveItemServiceTest {
         given(userWantItemRepository.findAllByUserId(ME)).willReturn(myWants);
         given(userHaveItemRepository.findAllByUserId(ME)).willReturn(myHaves);
         given(userWantItemRepository.findAllByUserIdIn(anyCollection())).willReturn(ownerWants);
+        given(exchangeParticipantRepository.findActivePartnerIds(ME)).willReturn(List.of());
     }
 
     private PageResponse<BoothHaveItemResponseDto> findFirstPage() {

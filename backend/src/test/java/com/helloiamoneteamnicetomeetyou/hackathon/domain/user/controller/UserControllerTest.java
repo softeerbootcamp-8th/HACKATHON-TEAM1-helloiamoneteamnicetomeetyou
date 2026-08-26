@@ -36,7 +36,7 @@ class UserControllerTest {
     @Test
     @DisplayName("새로 등록하면 201 을 내려준다")
     void 새로_등록하면_201_이다() throws Exception {
-        given(userService.register(any(UUID.class))).willReturn(true);
+        given(userService.register(any(UUID.class), any())).willReturn(true);
 
         mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isCreated())
@@ -48,7 +48,7 @@ class UserControllerTest {
     @Test
     @DisplayName("이미 등록된 UUID 면 200 을 내려준다")
     void 이미_등록됐으면_200_이다() throws Exception {
-        given(userService.register(any(UUID.class))).willReturn(false);
+        given(userService.register(any(UUID.class), any())).willReturn(false);
 
         mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk())

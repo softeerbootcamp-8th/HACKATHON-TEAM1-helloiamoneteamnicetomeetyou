@@ -4,12 +4,12 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
-@Getter
-@RequiredArgsConstructor
 /**
  * 도메인별로 코드 앞자리를 나눠 쓴다. 1000 공통, 2000 사용자, 3000 부스와 구역, 4000 교환,
  * 5000 카드와 보유·희망 등록, 6000 알림이다.
  */
+@Getter
+@RequiredArgsConstructor
 public enum ErrorCode implements ErrorType {
 
     // Common
@@ -29,7 +29,14 @@ public enum ErrorCode implements ErrorType {
     // Exchange
     EXCHANGE_NOT_FOUND(HttpStatus.NOT_FOUND, 4000, "교환을 찾을 수 없습니다."),
     NOT_EXCHANGE_PARTICIPANT(HttpStatus.FORBIDDEN, 4001, "이 교환의 참가자가 아닙니다."),
+    INVALID_TIME_SLOT(HttpStatus.BAD_REQUEST, 4002, "고를 수 없는 시간입니다."),
+    NO_OVERLAPPING_TIME(HttpStatus.CONFLICT, 4003, "모두가 되는 시간이 아직 없습니다."),
+    EXCHANGE_TIME_ALREADY_CONFIRMED(HttpStatus.CONFLICT, 4004, "이미 시간이 정해진 약속입니다."),
+    INVALID_EXCHANGE_PARTICIPANTS(HttpStatus.BAD_REQUEST, 4005, "교환 참가자 구성이 올바르지 않습니다."),
     UNSUPPORTED_MATCHING_SIZE(HttpStatus.BAD_REQUEST, 4006, "2인과 3인 매칭만 지원합니다."),
+    EXCHANGE_TIME_NOT_CONFIRMED(HttpStatus.CONFLICT, 4007, "아직 만날 시간이 정해지지 않았습니다."),
+    EXCHANGE_ALREADY_FINISHED(HttpStatus.CONFLICT, 4008, "이미 끝난 약속입니다."),
+    EXCHANGE_NOT_ACCEPTED(HttpStatus.CONFLICT, 4009, "아직 수락하지 않은 교환입니다."),
 
     // Poke (찔러보기). 교환 제안이라 교환 대역을 이어 쓴다.
     POKE_NOT_FOUND(HttpStatus.NOT_FOUND, 4010, "찔러보기를 찾을 수 없습니다."),

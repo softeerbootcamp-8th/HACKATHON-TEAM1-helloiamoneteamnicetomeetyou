@@ -85,8 +85,17 @@ public class User {
         return new User(id, username, true);
     }
 
-    /** 어드민 화면에서 표시 이름을 고친다. */
+    /**
+     * 표시 이름을 고친다. 빈 값이면 무시한다.
+     *
+     * <p>어드민 화면에서도 쓰고, 사용자 등록에서도 쓴다. 등록이 멱등이라 앱을 열 때마다 불리는데,
+     * 그때 이름을 안 보낸 요청이 이미 있던 이름을 지워 버리면 상대 화면에서 이름이 사라진다.
+     */
     public void rename(String username) {
+        if (username == null || username.isBlank()) {
+            return;
+        }
+
         this.username = username;
     }
 }
