@@ -17,7 +17,7 @@ export function Complete() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
   // 정리 전에 무엇을 받았는지 붙잡아 둔다. dispatch 뒤에는 match 가 비기 때문이다.
-  const [received] = useState(() => activeAppointment(state)?.match.receiveItemId ?? null)
+  const [received] = useState(() => activeAppointment(state)?.match?.receiveItemId ?? null)
 
   useEffect(() => {
     dispatch({ type: 'complete' })

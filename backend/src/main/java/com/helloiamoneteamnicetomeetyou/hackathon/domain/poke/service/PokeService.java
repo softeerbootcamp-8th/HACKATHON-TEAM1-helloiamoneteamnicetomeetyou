@@ -1,6 +1,8 @@
 package com.helloiamoneteamnicetomeetyou.hackathon.domain.poke.service;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service.ExchangeService;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
@@ -49,9 +51,8 @@ public class PokeService {
     private final PokeRepository pokeRepository;
     private final UserRepository userRepository;
     private final UserHaveItemRepository userHaveItemRepository;
-    private final ExchangeRepository exchangeRepository;
-    private final ExchangeParticipantRepository exchangeParticipantRepository;
     private final ExchangeItemRepository exchangeItemRepository;
+    private final ExchangeService exchangeService;
     private final SseEventPublisher sseEventPublisher;
 
     /**
@@ -203,11 +204,17 @@ public class PokeService {
             throw new ApplicationException(ErrorCode.POKE_ITEM_SOLD_OUT);
         }
 
-        Exchange exchange = exchangeRepository.save(Exchange.oneToOne());
+        /*
+          교환을 만드는 길은 ExchangeService 하나다. 만나는 자리와 시간 격자 시작점, 약속별
+          식별자가 거기서 함께 붙는다. 여기서 Exchange 를 직접 만들면 그것들이 비어서 약속
+          화면이 장소도 시간표도 못 그린다.
 
-        exchangeParticipantRepository.saveAll(List.of(
-                ExchangeParticipant.accepted(exchange, sender),
-                ExchangeParticipant.accepted(exchange, receiver)));
+          참가자도 그쪽이 넣는다. 찔러보기로 온 교환은 두 사람의 뜻이 이미 확인된 상태라
+          수락 상태로 들어간다.
+        */
+        Long boothId = poke.getRequestedItem().getBooth().getId();
+        Exchange exchange = exchangeService.createExchange(
+                boothId, ExchangeType.ONE_TO_ONE, List.of(sender.getId(), receiver.getId()));
 
         exchangeItemRepository.saveAll(List.of(
                 ExchangeItem.of(exchange, sender, chosenItem, receiver),

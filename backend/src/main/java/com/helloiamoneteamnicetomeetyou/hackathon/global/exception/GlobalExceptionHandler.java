@@ -15,6 +15,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -136,6 +138,41 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(ErrorCode.RESOURCE_NOT_FOUND.getHttpStatus())
                 .body(CommonResponse.error(ErrorCode.RESOURCE_NOT_FOUND));
+    }
+
+    /**
+     * SSE(구독) 처럼 끝나지 않는 요청에서 클라이언트가 이미 나간 뒤 서버가 쓰기를 시도하면 난다.
+     *
+     * <p>이 시점엔 연결이 끊긴 뒤라 응답 바디를 쓸 곳이 없다. 몸체를 채워 돌려주면(=아래
+     * {@code handleException} 처럼) {@code text/event-stream} 으로 이미 커밋된 응답에 JSON 을
+     * 쓰려다 {@code HttpMessageNotWritableException} 이 한 번 더 나면서 정상적인 연결 종료가
+     * 오류처럼 로그에 두 번 찍힌다. 여기서는 반환값 없이 조용히 흘려보낸다.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsableException(
+            AsyncRequestNotUsableException e, HttpServletRequest request) {
+
+        log.debug("비동기 연결이 이미 끊어짐 - [{}] {}", request.getMethod(), request.getRequestURI());
+    }
+
+    /**
+     * SSE 연결이 {@code sse.emitter-timeout-ms} 에 도달하면 톰캣이 올린다. 장애가 아니라 정해 둔
+     * 수명이 다한 것이다.
+     *
+     * <p>{@code emitter.onTimeout} 이 이미 연결을 색인에서 걷어냈고 브라우저의
+     * {@code EventSource} 는 알아서 다시 붙는다. 그래서 여기서 할 일은 없는데, 전용 핸들러가
+     * 없으면 아래 {@code handleException} 이 이걸 "예상치 못한 예외" 로 잡아 ERROR 와
+     * 스택트레이스를 남긴다. 실제 장애를 찾을 때 방해가 된다.
+     *
+     * <p>{@link AsyncRequestNotUsableException} 과 같은 이유로 반환값이 없다. 이미
+     * {@code text/event-stream} 으로 커밋된 응답에 JSON 바디를 쓰려 하면
+     * {@code HttpMessageNotWritableException} 이 한 번 더 난다.
+     */
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    public void handleAsyncRequestTimeoutException(
+            AsyncRequestTimeoutException e, HttpServletRequest request) {
+
+        log.debug("비동기 요청 타임아웃 - [{}] {}", request.getMethod(), request.getRequestURI());
     }
 
     @ExceptionHandler(Exception.class)

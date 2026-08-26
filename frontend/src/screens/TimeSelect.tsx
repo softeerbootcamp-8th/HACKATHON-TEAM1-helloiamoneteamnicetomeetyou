@@ -8,17 +8,20 @@ import { Button, TextButton } from '@/components/ui/Button'
 import { ClockIcon } from '@/components/ui/icons'
 import { TopBar } from '@/components/ui/TopBar'
 import { cn } from '@/lib/cn'
+import {
+  confirmExchangeTime,
+  fetchExchange,
+  resetTimeSlots,
+  updateTimeSlots,
+  type Exchange,
+} from '@/lib/exchange'
 import { tick } from '@/lib/haptics'
 import { springSheet, springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
+import { getDeviceId } from '@/store/identity'
 import { activeAppointment } from '@/store/reducer'
-import {
-  buildSlots,
-  earliestOverlap,
-  overlappingSlots,
-  slotTimeLabel,
-  SLOT_COUNT,
-} from '@/store/time'
+import { useCancelAppointment } from '@/store/use-cancel-appointment'
+import { buildSlots, parseSlotBaseTime, slotTimeLabel, SLOT_COUNT } from '@/store/time'
 import { useStore } from '@/store/useStore'
 
 /**
@@ -36,11 +39,19 @@ export function TimeSelect() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
   const [rejectOpen, setRejectOpen] = useState(false)
-  // 시각은 화면에 들어온 순간으로 고정한다. 매 렌더마다 다시 계산하면 칸이 밀린다.
-  const [now] = useState(() => new Date())
-  const slots = useMemo(() => buildSlots(now), [now])
+  const [busy, setBusy] = useState(false)
+  const cancelAppointment = useCancelAppointment()
+  const myUserId = useMemo(() => getDeviceId(), [])
 
   const appt = useLastDefined(activeAppointment(state))
+
+  /*
+    격자의 시작점은 서버가 정한다. 화면이 각자 자기 시계로 만들면 14:03 에 연 사람의 0번 칸은
+    14:15 이고 14:20 에 연 사람의 0번 칸은 14:30 이라, 같은 칸 번호가 사람마다 다른 시각을 뜻하게
+    된다. 참가자 전원이 같은 값을 받아 같은 격자를 본다.
+  */
+  const baseTime = useMemo(() => (appt ? parseSlotBaseTime(appt.slotBaseTime) : new Date()), [appt])
+  const slots = useMemo(() => buildSlots(baseTime), [baseTime])
 
   if (!appt) {
     return (
@@ -53,29 +64,87 @@ export function TimeSelect() {
     )
   }
 
-  const { match } = appt
-  const partners = match.kind === 'ONE_TO_ONE' ? [match.partner] : [match.giver, match.receiver]
-
   /**
    * 이미 확정한 다른 약속이 차지한 칸. 같은 시간에 두 군데를 갈 수 없으니 못 고르게 막는다.
    * 시안의 `11_v2` 자리다.
+   *
+   * 다른 약속은 격자 시작점이 다를 수 있어서 칸 번호를 그대로 비교하면 안 된다. 확정된 시각을
+   * 이 약속의 격자에 다시 얹어 몇 번째 칸인지 구한다.
    */
   const blocked = state.appointments
-    .filter((other) => other.id !== appt.id && other.confirmedSlot !== null)
-    .map((other) => other.confirmedSlot as number)
+    .filter((other) => other.exchangeId !== appt.exchangeId && other.confirmedTime !== null)
+    .map((other) => slotIndexOf(baseTime, other.confirmedTime as string, appt.slotCount))
+    .filter((index): index is number => index !== null)
 
-  const answered = Object.keys(appt.partnerSlots).length > 0
-  const rows = [appt.mySlots, ...partners.map((p) => appt.partnerSlots[p.id] ?? [])]
-  const overlap = answered ? earliestOverlap(rows) : -1
-  const overlaps = answered ? overlappingSlots(rows) : []
-  const matched = overlap !== -1
+  /*
+    CTA 를 여는 기준은 **상대가 시간을 넣었는가** 다. 내가 아직 안 골랐어도 상대가 골랐으면
+    "시간 조율 요청하기" 는 보낼 수 있어야 한다. 전원이 답했는지로 보면 그 경우가 막힌다.
+
+    셋이 교환할 때는 상대 둘이 다 넣어야 연다. 한 명만 넣은 상태에서는 여전히 기다리는 중이다.
+  */
+  const answered = appt.partners.length > 0 && appt.partners.every((p) => p.slots.length > 0)
+  const overlap = appt.overlapSlot
+  const matched = overlap !== null
+  const confirmed = appt.confirmedLabel !== null
+  // 겹치는 칸은 서버가 가장 빠른 하나만 알려준다. 밑줄은 그 자리에만 긋는다.
+  const overlaps = matched ? [overlap] : []
+
+  /**
+   * 서버에 저장하고 결과로 화면을 맞춘다.
+   *
+   * 실패하면 서버에서 현재 상태를 다시 읽는다. 화면만 바뀐 채로 남으면 상대에게는 안 보이는 칸이
+   * 나에게만 칠해져 있게 되고, 실패의 원인이 "상대가 먼저 했다" 인 경우에는 다시 읽는 것만으로
+   * 화면이 맞는 상태가 된다.
+   */
+  const run = async (action: () => Promise<Exchange>) => {
+    setBusy(true)
+    try {
+      const exchange = await action()
+      dispatch({ type: 'exchange-synced', exchange, myUserId })
+      return true
+    } catch {
+      const latest = await fetchExchange(appt.exchangeId).catch(() => null)
+      if (latest) dispatch({ type: 'exchange-synced', exchange: latest, myUserId })
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const toggle = (index: number) => {
-    if (blocked.includes(index)) return
+    if (blocked.includes(index) || confirmed) return
+
     const next = appt.mySlots.includes(index)
       ? appt.mySlots.filter((i) => i !== index)
       : [...appt.mySlots, index].sort((a, b) => a - b)
-    dispatch({ type: 'set-my-slots', slots: next })
+
+    // 누른 즉시 칠한다. 서버 응답을 기다리면 손가락을 뗀 뒤에야 칸이 차서 눌린 느낌이 사라진다.
+    dispatch({ type: 'my-slots-picked', slots: next })
+    void run(() => updateTimeSlots(appt.exchangeId, myUserId, next)).then((ok) => {
+      if (!ok) dispatch({ type: 'toast', message: '시간을 저장하지 못했어요' })
+    })
+  }
+
+  /**
+   * 약속을 확정한다.
+   *
+   * **상대가 먼저 눌렀으면 실패가 아니다.** 서버는 이미 정해진 약속을 다시 확정하지 못하게
+   * 막는데, 누른 사람 입장에서는 원하던 일이 이미 일어난 것이라 그대로 약속 화면으로 넘어간다.
+   */
+  const confirmTime = async () => {
+    if (confirmed) {
+      navigate('/appointment')
+      return
+    }
+
+    const ok = await run(() => confirmExchangeTime(appt.exchangeId, myUserId))
+
+    if (ok || activeAppointment(state)?.confirmedLabel) {
+      navigate('/appointment')
+      return
+    }
+
+    dispatch({ type: 'toast', message: '잠시 후 다시 시도해주세요' })
   }
 
   return (
@@ -116,11 +185,11 @@ export function TimeSelect() {
               interactive
               onToggle={toggle}
             />
-            {partners.map((p) => (
+            {appt.partners.map((partner) => (
               <TimeRow
-                key={p.id}
-                label={p.nickname}
-                slots={appt.partnerSlots[p.id] ?? []}
+                key={partner.userId}
+                label={partner.name}
+                slots={partner.slots}
                 color={PARTNER_COLOR}
                 overlaps={overlaps}
               />
@@ -158,7 +227,7 @@ export function TimeSelect() {
                 </span>
                 <div>
                   <p className="text-[16px] font-bold text-ink">
-                    {slotTimeLabel(slots, overlap, now)}에 만나요
+                    {appt.confirmedLabel ?? slotTimeLabel(baseTime, overlap ?? 0)}에 만나요
                   </p>
                   <p className="text-[12px] text-neutral-500">모두가 만날 수 있는 가장 빠른 시간</p>
                 </div>
@@ -177,26 +246,23 @@ export function TimeSelect() {
         {!answered && <Button disabled>아직 상대방을 기다려야 해요</Button>}
 
         {answered && matched && (
-          <Button
-            variant="brand"
-            onClick={() => {
-              dispatch({
-                type: 'confirm-time',
-                slot: overlap,
-                label: slotTimeLabel(slots, overlap, now),
-              })
-              navigate('/appointment')
-            }}
-          >
-            약속 확정하기
+          <Button variant="brand" disabled={busy} onClick={() => void confirmTime()}>
+            {confirmed ? '약속 보러 가기' : '약속 확정하기'}
           </Button>
         )}
 
         {answered && !matched && (
           <Button
+            disabled={busy}
             onClick={() => {
-              dispatch({ type: 'request-time-again' })
-              navigate('/home')
+              void run(() => resetTimeSlots(appt.exchangeId, myUserId)).then((ok) => {
+                if (!ok) {
+                  dispatch({ type: 'toast', message: '잠시 후 다시 시도해주세요' })
+                  return
+                }
+                dispatch({ type: 'request-time-again' })
+                navigate('/home')
+              })
             }}
           >
             시간 조율 요청하기
@@ -211,8 +277,9 @@ export function TimeSelect() {
         onKeep={() => setRejectOpen(false)}
         onReject={() => {
           setRejectOpen(false)
-          dispatch({ type: 'cancel-appointment' })
-          navigate('/home')
+          void cancelAppointment().then((cancelled) => {
+            if (cancelled) navigate('/home')
+          })
         }}
       />
     </div>
@@ -293,4 +360,16 @@ function TimeRow({
       })}
     </div>
   )
+}
+
+/**
+ * 다른 약속의 확정 시각이 이 격자의 몇 번째 칸인지. 격자 밖이면 null 이다.
+ *
+ * 약속마다 격자 시작점이 다르기 때문에 칸 번호를 그대로 견줄 수 없다. 시각으로 되돌려 비교한다.
+ */
+function slotIndexOf(baseTime: Date, confirmedTime: string, slotCount: number): number | null {
+  const minutes = (new Date(confirmedTime).getTime() - baseTime.getTime()) / 60_000
+  const index = Math.round(minutes / 15)
+
+  return index >= 0 && index < slotCount ? index : null
 }

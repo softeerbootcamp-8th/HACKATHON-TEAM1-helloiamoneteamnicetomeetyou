@@ -7,6 +7,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.repository.ItemRep
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.event.MatchTriggerEvent;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.entity.UserWantItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
@@ -18,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +49,15 @@ public class AdminSeedService {
 
     /** 카드가 하나도 없는 부스에 케이스를 만들 때 같이 만들어 주는 기본 카드다. */
     private static final List<String> DEFAULT_ITEMS = List.of(
-            "N Vision 74", "IONIQ 5 N", "PONY", "AVANTE N", "GRANDEUR", "SANTA FE", "CASPER");
+            "IONIQ 5 N",
+            "AVANTE N",
+            "VELOSTER N",
+            "KONA N",
+            "i30 N",
+            "i30 Fastback",
+            "i20 N",
+            "AVANTE N Facelift",
+            "i20 N Rally1");
 
     private final BoothRepository boothRepository;
     private final ZoneRepository zoneRepository;
@@ -55,6 +65,7 @@ public class AdminSeedService {
     private final UserRepository userRepository;
     private final UserHaveItemRepository userHaveItemRepository;
     private final UserWantItemRepository userWantItemRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 매칭 케이스를 만든다.
@@ -105,6 +116,13 @@ public class AdminSeedService {
             User seeker = members.get((i + caseSize - 1) % caseSize);
             userWantItemRepository.save(UserWantItem.of(seeker, owned, 1));
         }
+
+        // 고리를 다 엮은 뒤에 한 번씩 돌린다. 카드를 붙이는 중간에 돌리면 아직 상대가 찾는
+        // 카드를 등록하기 전이라 후보가 없다고 판단하고 그냥 지나간다.
+        //
+        // 이걸 안 하면 케이스를 만들어 놓고도 매칭이 붙지 않아서, 부스에서 "더미는 만들어졌는데
+        // 매칭이 안 뜬다" 가 된다. 리스너가 AFTER_COMMIT 이라 실제로는 이 트랜잭션이 끝난 뒤에 돈다.
+        members.forEach(member -> eventPublisher.publishEvent(new MatchTriggerEvent(member.getId())));
 
         return caseSize;
     }

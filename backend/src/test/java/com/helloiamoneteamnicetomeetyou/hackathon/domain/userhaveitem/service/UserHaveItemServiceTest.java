@@ -15,6 +15,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventPublisher;
@@ -29,6 +30,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("내놓을 카드 등록")
@@ -42,10 +44,16 @@ class UserHaveItemServiceTest {
     private UserHaveItemRepository userHaveItemRepository;
 
     @Mock
+    private UserWantItemRepository userWantItemRepository;
+
+    @Mock
     private UserRepository userRepository;
 
     @Mock
     private ItemRepository itemRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @Mock
     private SseEventPublisher sseEventPublisher;
@@ -169,5 +177,61 @@ class UserHaveItemServiceTest {
         Item item = Mockito.mock(Item.class);
         given(item.getBooth()).willReturn(booth);
         return item;
+    }
+
+    @Test
+    @DisplayName("찾기로 한 카드는 내놓을 카드로 등록할 수 없다")
+    void 찾는_카드는_내놓을_수_없다() {
+        given(userWantItemRepository.existsByUserIdAndItemId(USER_ID, ITEM_ID)).willReturn(true);
+
+        assertThatThrownBy(() -> userHaveItemService.register(USER_ID, ITEM_ID, 1))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(e -> ((ApplicationException) e).getErrorType())
+                .isEqualTo(ErrorCode.ITEM_ALREADY_IN_WANT);
+
+        verify(userHaveItemRepository, never()).save(any(UserHaveItem.class));
+    }
+
+    @Test
+    @DisplayName("등록을 해제하면 그 줄을 지운다")
+    void 해제하면_지운다() {
+        UserHaveItem existing = UserHaveItem.of(User.of(USER_ID), Mockito.mock(Item.class), 1);
+        given(userHaveItemRepository.findByUserIdAndItemId(USER_ID, ITEM_ID))
+                .willReturn(Optional.of(existing));
+
+        userHaveItemService.remove(USER_ID, ITEM_ID);
+
+        verify(userHaveItemRepository).delete(existing);
+    }
+
+    /**
+     * 예약된 카드를 지우면 진행 중인 교환에서 상대가 받기로 한 카드가 사라진다.
+     * 빼고 싶으면 약속을 먼저 취소해야 한다.
+     */
+    @Test
+    @DisplayName("교환에 예약된 카드는 해제할 수 없다")
+    void 예약된_카드는_해제할_수_없다() {
+        UserHaveItem reserved = UserHaveItem.of(User.of(USER_ID), Mockito.mock(Item.class), 1);
+        reserved.reserve();
+        given(userHaveItemRepository.findByUserIdAndItemId(USER_ID, ITEM_ID))
+                .willReturn(Optional.of(reserved));
+
+        assertThatThrownBy(() -> userHaveItemService.remove(USER_ID, ITEM_ID))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(e -> ((ApplicationException) e).getErrorType())
+                .isEqualTo(ErrorCode.HAVE_ITEM_RESERVED);
+
+        verify(userHaveItemRepository, never()).delete(any(UserHaveItem.class));
+    }
+
+    @Test
+    @DisplayName("없는 카드를 해제해도 조용히 넘어간다")
+    void 없는_카드를_해제해도_괜찮다() {
+        given(userHaveItemRepository.findByUserIdAndItemId(USER_ID, ITEM_ID))
+                .willReturn(Optional.empty());
+
+        userHaveItemService.remove(USER_ID, ITEM_ID);
+
+        verify(userHaveItemRepository, never()).delete(any(UserHaveItem.class));
     }
 }

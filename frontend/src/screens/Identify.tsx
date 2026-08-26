@@ -1,11 +1,16 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { BreakupDialog } from '@/components/domain/ConfirmDialogs'
+import { completeExchange } from '@/lib/exchange'
 import { tick } from '@/lib/haptics'
 import { springSnap } from '@/lib/motion'
-import { MY_IDENTITY } from '@/mocks/data'
+import { useLastDefined } from '@/lib/useLastDefined'
+import { getDeviceId } from '@/store/identity'
+import { identityLabel, identityMarkAt } from '@/store/identity-mark'
+import { activeAppointment } from '@/store/reducer'
+import { useCancelAppointment } from '@/store/use-cancel-appointment'
 import { useStore } from '@/store/useStore'
 
 /**
@@ -14,10 +19,61 @@ import { useStore } from '@/store/useStore'
  */
 export function Identify() {
   const navigate = useNavigate()
-  const { dispatch } = useStore()
+  const { state, dispatch } = useStore()
+  const cancelAppointment = useCancelAppointment()
   const [noShowOpen, setNoShowOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
   // 레몬을 누른 횟수. 누를 때마다 키가 바뀌어서 흔들림이 처음부터 다시 돈다.
   const [pokes, setPokes] = useState(0)
+
+  const myUserId = useMemo(() => getDeviceId(), [])
+  const appt = useLastDefined(activeAppointment(state))
+  const active = activeAppointment(state)
+
+  /*
+    식별자는 교환 하나에 하나이고 참가자 전원이 같은 값을 든다. 그래서 같은 화면을 든 사람이
+    곧 내 교환 상대다. 진행 중인 다른 교환과 겹치지 않게 서버가 골라 준다.
+
+    약속 없이 주소로 바로 들어온 경우에는 첫 표시로 보여준다. 화면이 비면 무엇을 보는 자리인지
+    알 수 없기 때문이다.
+  */
+  const mark = identityMarkAt(appt?.identityMark ?? 0)
+  const label = appt ? identityLabel(appt.identityMark, appt.identityNumber) : mark.name
+
+  /*
+    상대가 먼저 "만났어요" 를 눌렀을 때 내 화면도 따라간다. 서버가 EXCHANGE_COMPLETED 를 보내면
+    약속 단계가 완료로 바뀌고, 그걸 보고 넘어간다.
+
+    두 사람이 서로 다른 버튼을 누를 수 있어서 필요하다. 한 명이 만났다고 하고 다른 한 명이
+    "상대가 오지 않아요" 를 누르면, 먼저 도착한 쪽만 반영되고 늦은 쪽은 그 결과를 따라야 한다.
+  */
+  useEffect(() => {
+    if (active?.stage === 'completed') navigate('/complete')
+  }, [active?.stage, navigate])
+
+  /**
+   * "만났어요". 서버에 끝났다고 남긴 다음 완료 화면으로 간다.
+   *
+   * 상대가 먼저 취소했으면 실패한다. 그때는 서버가 알려 준 결과를 그대로 받아들인다.
+   */
+  const goComplete = async () => {
+    if (!appt) {
+      navigate('/complete')
+      return
+    }
+
+    setBusy(true)
+    try {
+      const exchange = await completeExchange(appt.exchangeId, myUserId)
+      dispatch({ type: 'exchange-synced', exchange, myUserId })
+      navigate('/complete')
+    } catch {
+      dispatch({ type: 'toast', message: '상대가 먼저 거래를 취소했어요' })
+      navigate('/home')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="relative flex h-full flex-col text-white">
@@ -60,7 +116,7 @@ export function Identify() {
             */}
             <motion.button
               type="button"
-              aria-label="레몬 흔들기"
+              aria-label={`${mark.name} 흔들기`}
               onClick={() => {
                 tick(12)
                 setPokes((n) => n + 1)
@@ -84,13 +140,13 @@ export function Identify() {
               </AnimatePresence>
 
               <motion.img
-                key={pokes}
-                src="/lemon.svg"
+                key={`${mark.src}-${pokes}`}
+                src={mark.src}
                 alt=""
                 aria-hidden
                 animate={pokes > 0 ? { rotate: [0, -9, 7, -4, 0], scale: [1, 1.08, 0.98, 1] } : {}}
                 transition={{ duration: 0.7, ease: 'easeOut' }}
-                className="anim-lemon w-[260px] max-w-[70vw] select-none"
+                className="anim-fruit w-[260px] max-w-[70vw] select-none"
                 draggable={false}
               />
             </motion.button>
@@ -102,7 +158,7 @@ export function Identify() {
             transition={{ ...springSnap, delay: 0.15 }}
             className="mt-12 text-[28px] font-extrabold"
           >
-            {MY_IDENTITY.fruit} {MY_IDENTITY.number}
+            {label}
           </motion.h1>
           <p className="mt-3 text-center text-[14px] leading-[1.55] text-white/70">
             같은 화면을 든 사람이
@@ -115,8 +171,9 @@ export function Identify() {
           <motion.button
             type="button"
             whileTap={{ scale: 0.97 }}
-            onClick={() => navigate('/complete')}
-            className="h-[54px] w-full rounded-full bg-white text-[16px] font-bold text-ink"
+            disabled={busy}
+            onClick={() => void goComplete()}
+            className="h-[54px] w-full rounded-full bg-white text-[16px] font-bold text-ink disabled:opacity-60"
           >
             만났어요
           </motion.button>
@@ -136,8 +193,9 @@ export function Identify() {
         onKeep={() => setNoShowOpen(false)}
         onFindNew={() => {
           setNoShowOpen(false)
-          dispatch({ type: 'cancel-appointment' })
-          navigate('/home')
+          void cancelAppointment().then((cancelled) => {
+            if (cancelled) navigate('/home')
+          })
         }}
       />
     </div>

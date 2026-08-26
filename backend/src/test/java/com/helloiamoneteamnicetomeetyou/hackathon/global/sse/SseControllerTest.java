@@ -119,14 +119,19 @@ class SseControllerTest {
 
     /**
      * 전송이 SSE 전용 스레드에서 일어나기 때문에 발행 직후에는 아직 응답에 안 실려 있다.
-     * 찾는 문자열이 나올 때까지 잠깐 기다렸다가 그때의 응답 전체를 돌려준다.
+     * 찾는 이벤트가 끝까지 실릴 때까지 기다렸다가 그때의 응답 전체를 돌려준다.
+     *
+     * <p><b>이름 줄만 보고 끝내면 안 된다.</b> {@code event:} 와 {@code data:} 가 따로 실려서,
+     * 이름이 보이는 순간에는 아직 내용이 비어 있을 수 있다. 부르는 쪽이 전부 내용을 보기 때문에
+     * 이벤트를 닫는 빈 줄까지 온 것을 확인하고 돌려준다.
      */
     private String waitForContent(MvcResult result, String expected) throws Exception {
         long deadline = System.currentTimeMillis() + WAIT_TIMEOUT_MS;
 
         while (System.currentTimeMillis() < deadline) {
             String body = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-            if (body.contains(expected)) {
+            int at = body.indexOf(expected);
+            if (at >= 0 && body.indexOf("\n\n", at) >= 0) {
                 return body;
             }
             Thread.sleep(20);

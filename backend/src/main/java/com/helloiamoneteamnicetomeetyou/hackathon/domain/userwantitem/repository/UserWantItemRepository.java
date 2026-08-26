@@ -7,9 +7,52 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface UserWantItemRepository extends JpaRepository<UserWantItem, Long> {
 
+    // 내 희망 아이템 전체 (have-item 등록 후 매칭 트리거용)
+    @Query("SELECT uwi FROM UserWantItem uwi JOIN FETCH uwi.item WHERE uwi.user.id = :userId")
+    List<UserWantItem> findByUserId(@Param("userId") UUID userId);
+
+    /**
+     * 쿼리 A: 내 보유 아이템을 원하는 후보와 교환 가능 수량 (LEAST로 cap)
+     *
+     * <p>userId 를 UUID 가 아니라 String 으로 받는다. user_id 컬럼은 varchar(36) 인데,
+     * 네이티브 쿼리에는 매핑 정보가 없어서 UUID 를 넘기면 Hibernate 가 binary(16) 으로
+     * 바인딩한다. 그러면 비교가 전부 어긋나 결과가 0건이 된다.
+     */
+    @Query(value = """
+        SELECT uwi.user_id, uwi.item_id,
+               LEAST(my_uhi.quantity_left, uwi.quantity) AS qty,
+               uwi.id AS want_id
+        FROM user_want_items uwi
+        JOIN user_have_items my_uhi
+            ON my_uhi.item_id = uwi.item_id
+           AND my_uhi.user_id = :myUserId
+           AND my_uhi.status = 'LEFT'
+           AND my_uhi.quantity_left > 0
+        WHERE uwi.user_id != :myUserId
+          AND uwi.user_id NOT IN (
+              SELECT ep.user_id FROM exchange_participants ep
+              JOIN exchanges e ON e.id = ep.exchange_id
+              WHERE e.status IN ('PENDING', 'IN_PROGRESS')
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM exchange_items ei
+              JOIN exchanges e2 ON e2.id = ei.exchange_id
+              WHERE e2.status = 'CANCELLED'
+                AND ei.from_user_id = :myUserId
+                AND ei.to_user_id = uwi.user_id
+                AND ei.item_id = my_uhi.item_id
+                AND EXISTS (
+                    SELECT 1 FROM exchange_participants ep2
+                    WHERE ep2.exchange_id = e2.id AND ep2.status = 'REJECTED'
+                )
+          )
+        ORDER BY my_uhi.created_at ASC
+        """, nativeQuery = true)
+    List<Object[]> findToThemData(@Param("myUserId") String myUserId);
     @Query("""
             select w from UserWantItem w
             join fetch w.item

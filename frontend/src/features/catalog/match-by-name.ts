@@ -21,6 +21,8 @@ function normalize(name: string): string {
 export type NameMatch = {
   /** 목업 카드 id → 서버 카드 id */
   serverIdOf: (mockItemId: string) => number | undefined
+  /** 서버 카드 id → 목업 카드 id. 매칭 알림처럼 서버 id 로 오는 걸 화면에 그릴 때 쓴다. */
+  mockIdOf: (serverItemId: number) => string | undefined
   /**
    * 서버 카드 id → 목업 카드. 서버에서 받은 것을 화면에 그릴 때 쓴다.
    *
@@ -60,8 +62,12 @@ export function matchByName(mockItems: Item[], serverItems: ServerItem[]): NameM
     reversed.set(found, mock)
   }
 
+  const byServerId = new Map<number, string>()
+  for (const [mockId, serverId] of resolved) byServerId.set(serverId, mockId)
+
   return {
     serverIdOf: (mockItemId) => resolved.get(mockItemId),
+    mockIdOf: (serverItemId) => byServerId.get(serverItemId),
     mockItemOf: (serverItemId) => reversed.get(serverItemId),
     unmatched,
   }

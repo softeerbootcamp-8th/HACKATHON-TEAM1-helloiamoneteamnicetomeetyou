@@ -2,6 +2,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.admin.controller;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.service.AdminBoothService;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.service.AdminExchangeService;
+import com.helloiamoneteamnicetomeetyou.hackathon.admin.service.AdminPokeService;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.service.AdminUserService;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ExchangeView;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeStatus;
@@ -32,6 +33,7 @@ public class AdminConsoleController {
     private final AdminUserService adminUserService;
     private final AdminBoothService adminBoothService;
     private final AdminExchangeService adminExchangeService;
+    private final AdminPokeService adminPokeService;
 
     @GetMapping({"/admin", "/admin/"})
     public String console(
@@ -49,6 +51,7 @@ public class AdminConsoleController {
             case "items" -> items(itemId, model);
             case "zones" -> zones(boothId, model);
             case "exchanges" -> exchanges(status, model);
+            case "pokes" -> model.addAttribute("pokes", adminPokeService.findPokes());
             // 사용자를 만드는 일은 목록 옆에 끼워 넣기에는 고를 것이 많다. 화면을 따로 준다.
             case "new-user" -> model.addAttribute("allItems", adminBoothService.findAllItems());
             default -> users(userId, model);
@@ -80,6 +83,11 @@ public class AdminConsoleController {
         model.addAttribute("haveItems", adminUserService.findHaveItems(selected));
         model.addAttribute("wantItems", adminUserService.findWantItems(selected));
         model.addAttribute("userExchanges", adminExchangeService.findExchangesOf(selected));
+
+        // 이 사람을 찔러볼 더미를 고르는 자리다. 자기 자신은 뺀다.
+        model.addAttribute("dummies", users.stream()
+                .filter(u -> u.dummy() && !u.id().equals(selected))
+                .toList());
     }
 
     /**
@@ -103,6 +111,9 @@ public class AdminConsoleController {
             counts.put(value, all.stream().filter(view -> view.status() == value).count());
         }
         model.addAttribute("statusCounts", counts);
+
+        // 만날 자리를 옮기는 드롭다운이 쓴다. 부스가 하나라 전부 담아도 몇 개 안 된다.
+        model.addAttribute("allZones", adminBoothService.findAllZones());
     }
 
     private void items(Long itemId, Model model) {

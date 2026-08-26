@@ -3,30 +3,38 @@ import { useCallback, useState } from 'react'
 import { messageOf } from '@/lib/api'
 import type { Selection } from '@/store/types'
 
-import { registerHaveItem, registerWantItem } from './api'
+import {
+  fetchMyHaveItems,
+  fetchMyWantItems,
+  registerHaveItem,
+  registerWantItem,
+  removeHaveItem,
+  removeWantItem,
+} from './api'
 import { useCatalog } from './useCatalog'
 
-type Kind = 'have' | 'want'
-
-const REGISTER: Record<Kind, typeof registerHaveItem> = {
-  have: registerHaveItem,
-  want: registerWantItem,
-}
+/** 서버에 보낼 수 있는 카드만 남긴 것. 목업 id 를 서버 id 로 바꾼 결과다. */
+type Row = { itemId: number; qty: number }
 
 /**
  * 고른 카드를 서버에 등록하고, 끝나면 다음 화면으로 넘긴다.
  *
- * 서버가 아직 준비되지 않았으면(부스나 카드가 없거나 연결이 안 되면) **등록을 건너뛰고 그냥
- * 넘어간다.** 매칭과 레이더가 아직 목업으로 돌기 때문에, 여기서 막으면 등록 말고는 아무것도
- * 못 보게 된다. 대신 무엇이 안 됐는지는 화면에 남긴다.
+ * **내놓을 카드와 찾는 카드를 한 번에 보낸다.** 예전에는 Have 화면의 "다음" 이 곧바로
+ * `/api/have-items` 를 불러서, 찾는 굿즈를 고르다 그만두거나 뒤로 가서 고쳐도 서버에는 이미
+ * 등록이 남았다. 두 화면을 다 지나 "교환하러 가기" 를 눌렀을 때만 보낸다.
+ *
+ * **화면에서 뺀 카드는 서버에서도 지운다.** 고른 것만 보내면 서버는 "이번에 안 온 카드" 를 알
+ * 방법이 없어서, 한 번 등록한 카드가 영원히 남아 매칭에 계속 잡힌다. 그래서 보내기 전에 서버가
+ * 들고 있는 목록을 먼저 읽고 차집합을 지운다. 화면 상태는 새로고침에 사라지므로 이전 선택을
+ * 화면 기억에서 꺼낼 수는 없다 — 서버가 유일한 기준이다.
  */
-export function useRegisterSelections(kind: Kind) {
+export function useRegisterSelections() {
   const { state, userId } = useCatalog()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
 
   const submit = useCallback(
-    async (selections: Selection[], done: () => void) => {
+    async (have: Selection[], needs: Selection[], done: () => void) => {
       if (state.status !== 'ready') {
         done()
         return
@@ -35,13 +43,39 @@ export function useRegisterSelections(kind: Kind) {
       setSubmitting(true)
       setError(undefined)
 
-      try {
-        // 서버에 없는 카드는 보내지 않는다. 보내 봐야 404 다.
-        const rows = selections
+      // 서버에 없는 카드는 보내지 않는다. 보내 봐야 404 다.
+      const rowsOf = (selections: Selection[]): Row[] =>
+        selections
           .map((s) => ({ itemId: state.serverIdOf(s.itemId), qty: s.qty }))
-          .filter((row): row is { itemId: number; qty: number } => row.itemId !== undefined)
+          .filter((row): row is Row => row.itemId !== undefined)
 
-        await Promise.all(rows.map((row) => REGISTER[kind](userId, row.itemId, row.qty)))
+      try {
+        const haveRows = rowsOf(have)
+        const wantRows = rowsOf(needs)
+
+        const [serverHave, serverWant] = await Promise.all([
+          fetchMyHaveItems(userId),
+          fetchMyWantItems(userId),
+        ])
+
+        const goneFrom = (registered: { itemId: number }[], rows: Row[]) => {
+          const keep = new Set(rows.map((row) => row.itemId))
+          return registered.map((r) => r.itemId).filter((itemId) => !keep.has(itemId))
+        }
+
+        // 지우는 것이 먼저다. 같은 카드를 have 에서 want 로 옮기는 경우, 예전 등록이 남은 채로
+        // 새 등록을 보내면 서버의 상호 배제 검증에 막힌다.
+        await Promise.all(
+          goneFrom(serverWant, wantRows).map((itemId) => removeWantItem(userId, itemId)),
+        )
+        await Promise.all(
+          goneFrom(serverHave, haveRows).map((itemId) => removeHaveItem(userId, itemId)),
+        )
+
+        // have 를 먼저 보낸다. 서버가 등록마다 매칭을 다시 돌리는데, 내놓을 카드가 아직 다 안
+        // 들어간 상태에서 찾는 카드가 먼저 들어가면 덜 채워진 상태로 매칭이 성사될 수 있다.
+        await Promise.all(haveRows.map((row) => registerHaveItem(userId, row.itemId, row.qty)))
+        await Promise.all(wantRows.map((row) => registerWantItem(userId, row.itemId, row.qty)))
         done()
       } catch (e) {
         setError(messageOf(e))
@@ -49,7 +83,7 @@ export function useRegisterSelections(kind: Kind) {
         setSubmitting(false)
       }
     },
-    [kind, state, userId],
+    [state, userId],
   )
 
   return { submit, submitting, error }

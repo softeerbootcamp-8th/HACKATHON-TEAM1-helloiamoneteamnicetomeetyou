@@ -25,6 +25,7 @@
         <a href="/admin?tab=users" th:classappend="${tab == 'users' or tab == 'new-user'} ? 'on'">사용자</a>
         <a href="/admin?tab=items" th:classappend="${tab == 'items'} ? 'on'">카드</a>
         <a href="/admin?tab=zones" th:classappend="${tab == 'zones'} ? 'on'">부스와 구역</a>
+        <a href="/admin?tab=pokes" th:classappend="${tab == 'pokes'} ? 'on'">찔러보기</a>
         <a href="/admin?tab=exchanges" th:classappend="${tab == 'exchanges'} ? 'on'">교환</a>
       </nav>
 
@@ -34,7 +35,7 @@
       <a class="btn ghost sm" href="/admin/logout">로그아웃</a>
     </header>
 
-    <main class="split" th:if="${tab != 'exchanges' and tab != 'new-user'}">
+    <main class="split" th:if="${tab != 'exchanges' and tab != 'new-user' and tab != 'pokes'}">
       <!--/* ===================== 사용자 ===================== */-->
       <th:block th:if="${tab == 'users'}">
         <aside class="pane-list">
@@ -69,7 +70,7 @@
                 <span class="trade-side">
                   <span class="chip-card xs" th:each="i : ${u.haveItems}" th:title="${i.name}">
                     <img th:if="${i.imageUrl}" th:src="${i.imageUrl}" th:alt="${i.name}" />
-                    <span th:unless="${i.imageUrl}" th:text="${i.code}">N74</span>
+                    <span th:text="${i.code}">N74</span>
                   </span>
                   <span class="trade-none" th:if="${#lists.isEmpty(u.haveItems)}">없음</span>
                 </span>
@@ -79,7 +80,7 @@
                 <span class="trade-side">
                   <span class="chip-card xs ghost" th:each="i : ${u.wantItems}" th:title="${i.name}">
                     <img th:if="${i.imageUrl}" th:src="${i.imageUrl}" th:alt="${i.name}" />
-                    <span th:unless="${i.imageUrl}" th:text="${i.code}">N74</span>
+                    <span th:text="${i.code}">N74</span>
                   </span>
                   <span class="trade-none" th:if="${#lists.isEmpty(u.wantItems)}">없음</span>
                 </span>
@@ -130,9 +131,28 @@
                 <div class="row" th:each="h : ${haveItems}">
                   <div class="chip-card">
                     <img th:if="${h.item.imageUrl}" th:src="${h.item.imageUrl}" th:alt="${h.item.name}" />
-                    <span th:unless="${h.item.imageUrl}" th:text="${h.item.code}">N74</span>
+                    <span th:text="${h.item.code}">N74</span>
                   </div>
-                  <div class="grow"><div class="title" th:text="${h.item.name}">카드</div></div>
+                  <!--/*
+                    등록한 개수와 남은 개수가 갈린다. 매칭이 잡은 카드는 예약만 걸리고 실제
+                    개수는 교환이 끝날 때 줄기 때문이다. 둘이 다를 때만 함께 보여 준다 —
+                    늘 "1 / 1" 을 적으면 다른 줄이 눈에 안 띈다.
+                  */-->
+                  <div class="grow">
+                    <div class="title" th:text="${h.item.name}">카드</div>
+                    <div class="meta hold-state">
+                      <span
+                        class="hold-badge"
+                        th:if="${h.status != null}"
+                        th:classappend="${h.statusTone()}"
+                        th:text="${h.statusLabel()}"
+                        >교환 가능</span
+                      >
+                      <span th:if="${h.partlyGone()}">
+                        남은 <b th:text="${h.quantityLeft}">0</b> / 등록 <b th:text="${h.quantity}">0</b>
+                      </span>
+                    </div>
+                  </div>
 
                   <form
                     method="post"
@@ -169,7 +189,7 @@
                 <div class="row" th:each="w : ${wantItems}">
                   <div class="chip-card">
                     <img th:if="${w.item.imageUrl}" th:src="${w.item.imageUrl}" th:alt="${w.item.name}" />
-                    <span th:unless="${w.item.imageUrl}" th:text="${w.item.code}">N74</span>
+                    <span th:text="${w.item.code}">N74</span>
                   </div>
                   <div class="grow"><div class="title" th:text="${w.item.name}">카드</div></div>
                   <form method="post" th:action="@{'/admin/users/' + ${user.id} + '/want/' + ${w.id} + '/delete'}">
@@ -183,8 +203,44 @@
             </div>
           </div>
 
+          <!--/*
+            이 사람을 더미가 찔러본다.
+
+            요청할 카드는 이 사람이 내놓고 있는 것 중에서 고른다. 카드 전체를 늘어놓으면
+            상대가 안 가진 카드를 골라서 거절당하는 일이 생긴다.
+          */-->
+          <div class="box" th:if="${!#lists.isEmpty(haveItems) and !#lists.isEmpty(dummies)}">
+            <div class="box-head">
+              이 사람 찔러보기
+              <span class="hint">더미가 보냅니다. 상대 화면에 알림이 바로 갑니다.</span>
+            </div>
+            <div class="box-body">
+              <form method="post" th:action="@{/admin/pokes}" class="inline-form">
+                <input type="hidden" name="toUserId" th:value="${user.id}" />
+                <select class="input sm" name="fromUserId" required aria-label="보내는 더미">
+                  <option th:each="d : ${dummies}" th:value="${d.id}" th:text="${d.displayName()}"></option>
+                </select>
+                <span class="poke-arrow">→</span>
+                <select class="input sm" name="requestedItemId" required aria-label="요청할 카드">
+                  <option th:each="h : ${haveItems}" th:value="${h.item.id}" th:text="${h.item.name}"></option>
+                </select>
+                <button class="btn brand sm" type="submit">찔러보기</button>
+              </form>
+            </div>
+          </div>
+
           <div class="box">
-            <div class="box-head">이 사람의 교환</div>
+            <div class="box-head">
+              이 사람의 교환
+              <!--/*
+                카드는 맞는데 매칭이 안 붙어 있을 때 쓴다. 카드를 뗐다 붙이지 않아도 된다.
+                진행 중인 교환이 있으면 서버가 그냥 지나가므로 먼저 취소해야 새 상대를 찾는다.
+              */-->
+              <form method="post" th:action="@{/admin/exchanges/rematch}" class="inline-form">
+                <input type="hidden" name="userId" th:value="${user.id}" />
+                <button class="btn outline sm" type="submit">매칭 다시 돌리기</button>
+              </form>
+            </div>
             <div class="rows" th:if="${!#lists.isEmpty(userExchanges)}">
               <div class="row" th:each="ex : ${userExchanges}">
                 <div class="grow">
@@ -219,14 +275,18 @@
             >
               <span class="chip-card">
                 <img th:if="${i.item.imageUrl}" th:src="${i.item.imageUrl}" th:alt="${i.item.name}" />
-                <span th:unless="${i.item.imageUrl}" th:text="${i.item.code}">N74</span>
+                <span th:text="${i.item.code}">N74</span>
               </span>
 
               <span class="item-body">
                 <b th:text="${i.item.name}">카드</b>
                 <span class="counts">
-                  <span th:classappend="${#lists.isEmpty(i.holders)} ? 'zero'">
-                    내놓음 <b th:text="${#lists.size(i.holders)}">0</b>
+                  <!--/*
+                    사람 수가 아니라 지금 교환에 쓸 수 있는 수를 센다. 셋이 내놨어도 전부
+                    예약됐으면 매칭 후보는 0 이고, 사람 수만 보면 그게 안 보인다.
+                  */-->
+                  <span th:classappend="${i.availableHolders() == 0} ? 'zero'">
+                    내놓음 <b th:text="${i.availableHolders()}">0</b>
                   </span>
                   <span th:classappend="${#lists.isEmpty(i.seekers)} ? 'zero'">
                     찾음 <b th:text="${#lists.size(i.seekers)}">0</b>
@@ -245,7 +305,7 @@
           <div class="detail-head">
             <div class="chip-card lg">
               <img th:if="${item.item.imageUrl}" th:src="${item.item.imageUrl}" th:alt="${item.item.name}" />
-              <span th:unless="${item.item.imageUrl}" th:text="${item.item.code}">N74</span>
+              <span th:text="${item.item.code}">N74</span>
             </div>
             <h1 class="grow" th:text="${item.item.name}">카드</h1>
             <span class="badge danger" th:if="${item.deadEnd}">매칭 안 됨</span>
@@ -292,13 +352,21 @@
                 </form>
               </div>
               <div class="rows">
-                <a class="row" th:each="u : ${item.holders}" th:href="@{/admin(tab='users', userId=${u.id})}">
+                <a class="row" th:each="h : ${item.holders}" th:href="@{/admin(tab='users', userId=${h.user.id})}">
                   <div class="grow">
-                    <div class="title" th:text="${u.username} ?: u.shortId">이름</div>
-                    <div class="meta mono" th:text="${u.shortId}"></div>
+                    <div class="title" th:text="${h.user.displayName()}">이름</div>
+                    <div class="meta hold-state">
+                      <span
+                        class="hold-badge"
+                        th:classappend="${h.statusTone()}"
+                        th:text="${h.statusLabel()}"
+                        >교환 가능</span
+                      >
+                      <span>남은 <b th:text="${h.quantityLeft}">0</b> / 등록 <b th:text="${h.quantity}">0</b></span>
+                    </div>
                   </div>
-                  <span class="badge brand" th:if="${u.dummy}">더미</span>
-                  <span class="live-dot" th:if="${u.online}"></span>
+                  <span class="badge brand" th:if="${h.user.dummy}">더미</span>
+                  <span class="live-dot" th:if="${h.user.online}"></span>
                 </a>
               </div>
               <div class="empty sm" th:if="${#lists.isEmpty(item.holders)}">
@@ -400,9 +468,32 @@
           <div class="box">
             <div class="box-head">
               구역
+              <!--/*
+                약도 자리(X, Y)는 약도 너비·높이에 대한 백분율이다. 비워 두면 50/50 으로
+                들어가는데, 그러면 두 번째 구역부터 첫 핀에 그대로 포개져서 사용자 화면에서
+                고를 수가 없다. 급할 때는 이름만 넣고 넘어가되, 겹쳐 보이면 여기서 고친다.
+              */-->
               <form method="post" th:action="@{'/admin/booths/' + ${booth.id} + '/zones'}" class="inline-form">
                 <input class="input sm" name="name" placeholder="A 구역" required />
                 <input class="input sm" name="location" placeholder="부스 입구 왼쪽" />
+                <input
+                  class="input sm map-pos"
+                  name="mapX"
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="X"
+                  aria-label="약도 가로 위치(%)"
+                />
+                <input
+                  class="input sm map-pos"
+                  name="mapY"
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="Y"
+                  aria-label="약도 세로 위치(%)"
+                />
                 <button class="btn sm" type="submit">추가</button>
               </form>
             </div>
@@ -416,9 +507,31 @@
                 >
                   <input class="input sm" name="name" th:value="${z.name}" required style="flex: 1" />
                   <input class="input sm" name="location" th:value="${z.location}" placeholder="위치" style="flex: 2" />
+                  <input
+                    class="input sm map-pos"
+                    name="mapX"
+                    type="number"
+                    min="0"
+                    max="100"
+                    th:value="${z.mapX}"
+                    aria-label="약도 가로 위치(%)"
+                  />
+                  <input
+                    class="input sm map-pos"
+                    name="mapY"
+                    type="number"
+                    min="0"
+                    max="100"
+                    th:value="${z.mapY}"
+                    aria-label="약도 세로 위치(%)"
+                  />
                   <button class="btn outline sm" type="submit">저장</button>
                 </form>
-                <form method="post" th:action="@{'/admin/booths/' + ${booth.id} + '/zones/' + ${z.id} + '/delete'}">
+                <form
+                  method="post"
+                  th:action="@{'/admin/booths/' + ${booth.id} + '/zones/' + ${z.id} + '/delete'}"
+                  th:data-confirm="'구역 ' + ${z.name} + ' 을(를) 지웁니다. 되돌릴 수 없습니다.'"
+                >
                   <button class="icon-btn danger" type="submit" aria-label="삭제">×</button>
                 </form>
               </div>
@@ -426,6 +539,10 @@
             <div class="empty sm" th:if="${#lists.isEmpty(zones)}">
               구역이 없으면 만날 자리를 고르는 화면이 비어 버립니다.
             </div>
+            <p class="zone-hint" th:if="${!#lists.isEmpty(zones)}">
+              X, Y 는 약도 위 자리입니다. 왼쪽 위가 0, 오른쪽 아래가 100 입니다. 이 구역에서 만나기로 한 약속이 남아
+              있으면 지워지지 않습니다.
+            </p>
           </div>
 
           <div class="box">
@@ -490,7 +607,7 @@
                   <input type="checkbox" name="haveItemIds" th:value="${i.id}" />
                   <span class="tile-face">
                     <img th:if="${i.imageUrl}" th:src="${i.imageUrl}" th:alt="${i.name}" />
-                    <span th:unless="${i.imageUrl}" th:text="${i.code}">N74</span>
+                    <span th:text="${i.code}">N74</span>
                   </span>
                   <span class="tile-name" th:text="${i.name}">카드</span>
                   <span class="tile-check">✓</span>
@@ -511,7 +628,7 @@
                   <input type="checkbox" name="wantItemIds" th:value="${i.id}" />
                   <span class="tile-face">
                     <img th:if="${i.imageUrl}" th:src="${i.imageUrl}" th:alt="${i.name}" />
-                    <span th:unless="${i.imageUrl}" th:text="${i.code}">N74</span>
+                    <span th:text="${i.code}">N74</span>
                   </span>
                   <span class="tile-name" th:text="${i.name}">카드</span>
                   <span class="tile-check">✓</span>
@@ -583,6 +700,65 @@
       </div>
     </main>
 
+    <!--/* ===================== 찔러보기 ===================== */-->
+    <main class="full" th:if="${tab == 'pokes'}">
+      <div class="page-title">
+        <h1>찔러보기</h1>
+        <span class="hint">더미에게 온 것은 어드민이 대신 답해야 흐름이 이어집니다. 보내는 것은 사용자 탭에서 합니다.</span>
+      </div>
+
+      <div class="box" th:if="${!#lists.isEmpty(pokes)}">
+        <div class="rows">
+          <div class="row" th:each="p : ${pokes}">
+            <span class="poke-line grow">
+              <a th:href="@{/admin(tab='users', userId=${p.fromUserId})}" th:text="${p.fromName}">보낸 사람</a>
+              <span class="poke-arrow">→</span>
+              <a th:href="@{/admin(tab='users', userId=${p.toUserId})}" th:text="${p.toName}">받은 사람</a>
+              <span class="poke-item" th:text="'\'' + ${p.itemName} + '\' 요청'">카드 요청</span>
+              <span class="poke-state" th:classappend="${p.status.name().toLowerCase()}" th:text="${p.statusLabel()}">대기</span>
+            </span>
+
+            <!--/*
+              수락하려면 보낸 사람이 내놓은 카드 중 한 장을 골라야 한다. 그 목록을 여기서 주지
+              않으면 운영자가 카드 전체에서 찍어 맞혀야 한다.
+            */-->
+            <form
+              th:if="${p.acceptable()}"
+              method="post"
+              th:action="@{'/admin/pokes/' + ${p.id} + '/accept'}"
+              class="inline-form"
+            >
+              <select class="input sm" name="chosenItemId" required aria-label="받을 카드">
+                <option th:each="i : ${p.senderItems}" th:value="${i.id}" th:text="${i.name}"></option>
+              </select>
+              <button class="btn brand sm" type="submit">수락</button>
+            </form>
+
+            <form
+              th:if="${p.answerable()}"
+              method="post"
+              th:action="@{'/admin/pokes/' + ${p.id} + '/reject'}"
+            >
+              <button class="btn outline sm" type="submit">거절</button>
+            </form>
+
+            <span class="poke-note" th:if="${p.answerable() and !p.acceptable()}">
+              보낸 사람이 내놓은 카드가 없어 수락할 수 없습니다
+            </span>
+            <span class="poke-note" th:if="${p.status.name() == 'PENDING' and !p.receiverDummy}">본인 화면</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="box" th:if="${#lists.isEmpty(pokes)}">
+        <div class="empty">
+          아직 찔러보기가 없어요.
+          <br />
+          <span class="dim">사용자 탭에서 사람을 고르면 더미가 그 사람을 찔러볼 수 있습니다.</span>
+        </div>
+      </div>
+    </main>
+
     <!--/* ===================== 교환 ===================== */-->
     <main class="full" th:if="${tab == 'exchanges'}">
       <div class="page-title">
@@ -630,7 +806,112 @@
                   <button class="btn outline sm" type="submit">거절</button>
                 </form>
               </th:block>
+
+              <!--/*
+                더미 대신 도착을 누른다. 시각이 정해진 뒤에만 뜬다 — 만날 시각이 없으면
+                서버가 EXCHANGE_TIME_NOT_CONFIRMED 로 거절한다.
+              */-->
+              <form
+                th:if="${p.dummy and ex.timeConfirmed() and !p.arrived}"
+                method="post"
+                th:action="@{'/admin/exchanges/participants/' + ${p.id} + '/arrive'}"
+              >
+                <button class="btn outline sm" type="submit">도착</button>
+              </form>
+              <span class="ex-arrived" th:if="${p.arrived}">도착함</span>
             </div>
+          </div>
+
+          <!--/*
+            시간 칸.
+
+            사용자 화면(frontend/src/screens/TimeSelect.tsx)과 같은 8칸 격자다. 더미 줄만
+            고칠 수 있게 두는데, 실제 참가자 줄은 그 사람이 자기 화면에서 고른 것이라
+            운영자가 덮어쓰면 하지 않은 일이 그 사람 이름으로 남는다.
+
+            확정·완료·취소 상태에서는 아예 감춘다. 서버가 EXCHANGE_TIME_ALREADY_CONFIRMED
+            로 거절할 격자를 눌러 보게 두면 왜 안 되는지 화면에서 알 수 없다.
+          */-->
+          <div class="ex-time" th:if="${ex.timeGridOpen()}">
+            <div class="ex-time-head">
+              <span class="ex-time-name">시간</span>
+              <span
+                class="ex-time-label"
+                th:each="label, it : ${ex.slotLabels()}"
+                th:classappend="${ex.overlapSlot != null and ex.overlapSlot == it.index} ? 'all' : ''"
+                th:text="${label}"
+                >14:15</span
+              >
+              <span class="ex-time-act"></span>
+            </div>
+
+            <th:block th:each="p : ${ex.participants}">
+              <!--/*
+                체크박스를 display:none 으로 숨기지 않는다. 그러면 폼이 값을 안 보내고
+                키보드로도 닿지 않는다. 칸을 덮게 두고 투명하게만 만든다.
+              */-->
+              <form
+                th:if="${p.dummy}"
+                class="ex-time-row dummy"
+                method="post"
+                th:action="@{'/admin/exchanges/participants/' + ${p.id} + '/time-slots'}"
+              >
+                <span class="ex-time-name" th:text="${p.displayName()}">더미</span>
+                <label
+                  class="ex-cell"
+                  th:each="label, it : ${ex.slotLabels()}"
+                  th:classappend="${p.picked(it.index)} ? 'on' : ''"
+                  th:title="${label}"
+                >
+                  <input type="checkbox" name="slots" th:value="${it.index}" th:checked="${p.picked(it.index)}" />
+                </label>
+                <button class="btn brand sm ex-time-act" type="submit">저장</button>
+              </form>
+
+              <div th:unless="${p.dummy}" class="ex-time-row">
+                <span class="ex-time-name" th:text="${p.displayName()}">참가자</span>
+                <span
+                  class="ex-cell read"
+                  th:each="label, it : ${ex.slotLabels()}"
+                  th:classappend="${p.picked(it.index)} ? 'on' : ''"
+                  th:title="${label}"
+                ></span>
+                <span class="ex-time-act">본인 화면</span>
+              </div>
+            </th:block>
+
+            <div class="ex-time-note">
+              <span th:if="${ex.overlapSlot == null}">아직 전원이 겹치는 칸이 없습니다.</span>
+              <th:block th:if="${ex.overlapSlot != null}">
+                <span>
+                  모두 되는 가장 빠른 칸은 <b th:text="${ex.slotLabels()[ex.overlapSlot]}">14:15</b> 입니다.
+                </span>
+                <form method="post" th:action="@{'/admin/exchanges/' + ${ex.id} + '/confirm-time'}">
+                  <button class="btn brand sm" type="submit">이 시간으로 확정</button>
+                </form>
+              </th:block>
+            </div>
+          </div>
+
+          <!--/*
+            만날 자리.
+
+            푸터의 완료·취소 옆에 두었더니 한 줄이 꽉 차서 장소와 시각이 세 줄로 접혔다.
+            자리와 시간은 약속을 준비하는 것이고 완료·취소는 닫는 것이라, 하는 일도 다르다.
+          */-->
+          <div class="ex-place" th:if="${ex.status.name() != 'COMPLETED' and ex.status.name() != 'CANCELLED'}">
+            <span class="ex-place-label">자리</span>
+            <form method="post" th:action="@{'/admin/exchanges/' + ${ex.id} + '/place'}" class="inline-form grow">
+              <select class="input sm grow" name="zoneId" required aria-label="만날 자리">
+                <option
+                  th:each="z : ${allZones}"
+                  th:value="${z.id}"
+                  th:text="${z.name}"
+                  th:selected="${ex.zoneName != null and ex.zoneName == z.name}"
+                ></option>
+              </select>
+              <button class="btn outline sm" type="submit">옮기기</button>
+            </form>
           </div>
 
           <footer>

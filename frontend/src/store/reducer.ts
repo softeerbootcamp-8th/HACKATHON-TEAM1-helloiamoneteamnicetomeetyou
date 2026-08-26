@@ -1,7 +1,8 @@
-import { ALL_WAITING, FIXED_ZONE, itemById } from '@/mocks/data'
+import type { Exchange, Zone } from '@/lib/exchange'
+import { ALL_WAITING, itemById } from '@/mocks/data'
 
-import { findMatch, type ExchangePair, type MatchResult } from './matching'
-import { earliestOverlap } from './time'
+import { toAppointment } from './appointment'
+import type { ExchangePair, MatchResult } from './matching'
 import type { ActiveMatch, Appointment, IncomingPoke, State } from './types'
 
 /**
@@ -12,6 +13,8 @@ const NOTICE_BODY = '탭하여 확인'
 
 export const initialState: State = {
   onboarded: false,
+  boothId: null,
+  zones: [],
   setupDone: false,
   have: [],
   needs: [],
@@ -37,7 +40,8 @@ export type Action =
   | { type: 'clear-have'; itemId: string }
   | { type: 'clear-need'; itemId: string }
   | { type: 'enter-home' }
-  | { type: 'auto-match-tick' }
+  | { type: 'server-match-arrived'; match: ActiveMatch }
+  | { type: 'server-match-rejected'; exchangeId: number }
   | { type: 'open-match' }
   | { type: 'decline-match' }
   | { type: 'send-poke'; targetUserId: string }
@@ -46,13 +50,19 @@ export type Action =
   | { type: 'release-held-poke' }
   | { type: 'accept-incoming'; chosenItemId: string }
   | { type: 'reject-incoming' }
-  | { type: 'start-appointment' }
-  | { type: 'select-appointment'; id: string }
-  | { type: 'set-my-slots'; slots: number[] }
-  | { type: 'partner-slots-arrived'; slots: Record<string, number[]> }
-  | { type: 'confirm-time'; slot: number; label: string }
+  | { type: 'booth-loaded'; boothId: number; zones: Zone[] }
+  | {
+      type: 'exchange-synced'
+      exchange: Exchange
+      myUserId: string
+      /** 매칭 결과를 아는 자리에서만 넘긴다. 새로고침으로 들어온 경우에는 없다. */
+      match?: ActiveMatch | null
+      /** 이 약속을 지금 보고 있는 것으로 삼을지. 만들자마자 들어갈 때만 참이다. */
+      activate?: boolean
+    }
+  | { type: 'select-appointment'; id: number }
+  | { type: 'my-slots-picked'; slots: number[] }
   | { type: 'request-time-again' }
-  | { type: 'arrive' }
   | { type: 'complete' }
   | { type: 'cancel-appointment' }
   | { type: 'reset' }
@@ -110,19 +120,17 @@ function consume(state: State, pairs: ExchangePair[]): Partial<State> {
   return { have, needs, collection }
 }
 
-let apptSeq = 0
-
 export function activeAppointment(state: State): Appointment | null {
-  return state.appointments.find((a) => a.id === state.activeAppointmentId) ?? null
+  return state.appointments.find((a) => a.exchangeId === state.activeAppointmentId) ?? null
 }
 
 /** 지금 다루고 있는 약속 하나만 고친다. 나머지 약속은 그대로 둔다. */
 function patchActive(state: State, patch: (appt: Appointment) => Appointment): State {
-  if (!state.activeAppointmentId) return state
+  if (state.activeAppointmentId === null) return state
   return {
     ...state,
     appointments: state.appointments.map((a) =>
-      a.id === state.activeAppointmentId ? patch(a) : a,
+      a.exchangeId === state.activeAppointmentId ? patch(a) : a,
     ),
   }
 }
@@ -163,21 +171,33 @@ export function reducer(state: State, action: Action): State {
       return { ...state, autoMatching: canMatch, setupDone: true }
     }
 
-    case 'auto-match-tick': {
-      if (!state.autoMatching || state.match || state.appointments.length > 0) return state
-      const result = findMatch(
-        state.have.map((s) => s.itemId),
-        state.needs.map((s) => s.itemId),
-      )
-      if (!result) return state
-      if (partnersOf(result).some((id) => state.declined.includes(id))) return state
-
-      const match: ActiveMatch = { ...result, origin: 'auto' }
+    /**
+     * 서버가 SSE 로 실제 매칭을 알려온 것. 이미 화면에 매칭이나 약속이 떠 있으면 덮어쓰지 않는다.
+     */
+    case 'server-match-arrived': {
+      if (state.match || state.appointments.length > 0) return state
       return {
         ...state,
-        match,
+        match: action.match,
         autoMatching: false,
         notifications: notify(state, 'match', '내가 원하는 굿즈로 교환할 수 있어요!', NOTICE_BODY),
+      }
+    }
+
+    /**
+     * 상대가 이 매칭을 거절했다는 서버 알림. 내가 거절한 게 아니라 상대 쪽에서 온 거라
+     * `decline-match` 와는 다른 자리다. `exchangeId` 가 지금 뜬 매칭과 다르면(이미 다른
+     * 매칭으로 넘어갔거나 약속을 잡은 뒤) 조용히 무시한다 — 뒤늦게 도착한 알림이 엉뚱한
+     * 화면을 지우면 안 된다.
+     */
+    case 'server-match-rejected': {
+      if (state.match?.exchangeId !== action.exchangeId) return state
+      return {
+        ...state,
+        match: null,
+        autoMatching: state.appointments.length === 0 && state.needs.length > 0,
+        notifications: notify(state, 'match-rejected', '상대가 교환을 거절했어요', NOTICE_BODY),
+        toast: '상대가 거절해서 다시 상대를 찾을게요.',
       }
     }
 
@@ -240,6 +260,7 @@ export function reducer(state: State, action: Action): State {
         giveItemId,
         receiveItemId: target.itemId,
         origin: 'poke',
+        exchangeId: null,
       }
       return {
         ...state,
@@ -292,6 +313,7 @@ export function reducer(state: State, action: Action): State {
         giveItemId: incoming.wantItemId,
         receiveItemId: action.chosenItemId,
         origin: 'poke',
+        exchangeId: null,
       }
       return { ...state, incomingPoke: null, match, autoMatching: false }
     }
@@ -303,70 +325,66 @@ export function reducer(state: State, action: Action): State {
         toast: '교환 요청을 거절했어요',
       }
 
-    case 'start-appointment': {
-      if (!state.match) return state
-      apptSeq += 1
-      const appointment: Appointment = {
-        id: `appt${apptSeq}`,
-        match: state.match,
-        stage: 'place',
-        zoneId: FIXED_ZONE.id,
-        mySlots: [],
-        partnerSlots: {},
-        confirmedSlot: null,
-        confirmedLabel: null,
+    case 'booth-loaded':
+      return { ...state, boothId: action.boothId, zones: action.zones }
+
+    /**
+     * 서버에서 읽어 온 교환으로 약속을 갈아끼운다. 만들었을 때, 실시간 알림을 받았을 때,
+     * 앱을 다시 열었을 때 모두 이 하나를 거친다.
+     *
+     * 이미 들고 있던 같은 약속이 있으면 그 자리에 덮어쓴다. 무엇을 주고받는지는 서버가 모르는
+     * 값이라 이전 것에서 이어받는다.
+     */
+    case 'exchange-synced': {
+      const { exchange, myUserId } = action
+      const previous = state.appointments.find((a) => a.exchangeId === exchange.exchangeId)
+
+      // 끝났거나 취소된 약속은 목록에서 뺀다. 그대로 두면 오지 않을 약속을 계속 보여주게 된다.
+      if (exchange.status === 'CANCELLED') {
+        const appointments = state.appointments.filter((a) => a.exchangeId !== exchange.exchangeId)
+        return {
+          ...state,
+          appointments,
+          activeAppointmentId:
+            state.activeAppointmentId === exchange.exchangeId ? null : state.activeAppointmentId,
+          autoMatching: appointments.length === 0 && state.needs.length > 0,
+          toast: previous ? '교환이 취소됐어요' : state.toast,
+        }
       }
-      // 약속이 들고 갈 교환이라 화면 전역의 match 는 여기서 비운다.
+
+      const next = toAppointment(exchange, myUserId, previous, action.match)
+      const appointments = previous
+        ? state.appointments.map((a) => (a.exchangeId === next.exchangeId ? next : a))
+        : [...state.appointments, next]
+
+      // 겹치는 시간이 막 생긴 순간에만 알린다. 이미 알린 약속에 또 알리지 않는다.
+      const overlapAppeared = previous?.overlapSlot === null && next.overlapSlot !== null
+
       return {
         ...state,
-        match: null,
-        appointments: [...state.appointments, appointment],
-        activeAppointmentId: appointment.id,
+        match: action.match ? null : state.match,
+        appointments,
+        activeAppointmentId: action.activate ? next.exchangeId : state.activeAppointmentId,
         autoMatching: false,
+        notifications: overlapAppeared
+          ? notify(state, 'time-matched', '시간 매칭이 완료되었어요!', NOTICE_BODY)
+          : state.notifications,
       }
     }
 
     case 'select-appointment':
       return { ...state, activeAppointmentId: action.id }
 
-    case 'set-my-slots':
-      return patchActive(state, (appt) => ({
-        ...appt,
-        mySlots: action.slots,
-        stage: 'time-waiting',
-      }))
+    /**
+     * 칸을 눌렀을 때 화면을 먼저 바꾼다. 서버 응답을 기다렸다 칠하면 손가락을 뗀 뒤에야
+     * 칸이 차서 눌린 느낌이 사라진다. 저장이 실패하면 그때 다시 읽어 되돌린다.
+     */
+    case 'my-slots-picked':
+      return patchActive(state, (appt) => ({ ...appt, mySlots: action.slots }))
 
-    case 'partner-slots-arrived': {
-      const active = activeAppointment(state)
-      if (!active) return state
-      // 겹치는 시간이 생긴 순간에만 알린다. 없으면 조율 중인 채로 둔다.
-      const overlap = earliestOverlap([active.mySlots, ...Object.values(action.slots)])
-      const next = patchActive(state, (appt) => ({ ...appt, partnerSlots: action.slots }))
+    case 'request-time-again':
       return {
-        ...next,
-        notifications:
-          overlap === -1
-            ? state.notifications
-            : notify(state, 'time-matched', '시간 매칭이 완료되었어요!', NOTICE_BODY),
-      }
-    }
-
-    case 'confirm-time':
-      return patchActive(state, (appt) => ({
-        ...appt,
-        stage: 'confirmed',
-        confirmedSlot: action.slot,
-        confirmedLabel: action.label,
-      }))
-
-    case 'request-time-again': {
-      const next = patchActive(state, (appt) => ({
-        ...appt,
-        stage: 'time-conflict',
-        partnerSlots: {},
-      }))
-      return {
-        ...next,
+        ...state,
         notifications: notify(
           state,
           'time-request',
@@ -375,16 +393,13 @@ export function reducer(state: State, action: Action): State {
         ),
         toast: '상대에게 시간 조율을 요청했어요',
       }
-    }
-
-    case 'arrive':
-      return patchActive(state, (appt) => ({ ...appt, stage: 'arrived' }))
 
     case 'complete': {
       const active = activeAppointment(state)
       if (!active) return state
-      const next = consume(state, pairsOf(active.match))
-      const appointments = state.appointments.filter((a) => a.id !== active.id)
+      // 매칭 결과를 모르면 무엇을 주고받았는지도 모른다. 그때는 카드를 건드리지 않는다.
+      const next = active.match ? consume(state, pairsOf(active.match)) : {}
+      const appointments = state.appointments.filter((a) => a.exchangeId !== active.exchangeId)
       return {
         ...state,
         ...next,
@@ -398,7 +413,9 @@ export function reducer(state: State, action: Action): State {
     }
 
     case 'cancel-appointment': {
-      const appointments = state.appointments.filter((a) => a.id !== state.activeAppointmentId)
+      const appointments = state.appointments.filter(
+        (a) => a.exchangeId !== state.activeAppointmentId,
+      )
       return {
         ...state,
         appointments,
@@ -436,6 +453,7 @@ export function reducer(state: State, action: Action): State {
             receiveItemId: 'i5n',
             middleItemId: 'i30f',
             origin: 'auto',
+            exchangeId: null,
           },
           notifications: notify(
             state,

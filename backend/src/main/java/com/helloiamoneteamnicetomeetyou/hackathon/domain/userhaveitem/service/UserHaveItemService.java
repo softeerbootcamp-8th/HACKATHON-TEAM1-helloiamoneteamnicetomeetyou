@@ -3,17 +3,22 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.service;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.dto.BoothRosterChangedDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.repository.ItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.event.MatchTriggerEvent;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.dto.HaveItemRegisteredResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventPublisher;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventType;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,8 +28,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserHaveItemService {
 
     private final UserHaveItemRepository userHaveItemRepository;
+    // 상호 배제 검증에만 쓴다. 서비스가 아니라 레포지토리를 받는 것은 두 서비스가 서로를
+    // 주입하면 순환 의존이 되기 때문이다.
+    private final UserWantItemRepository userWantItemRepository;
     private final UserRepository userRepository;
     private final ItemRepository itemRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final SseEventPublisher sseEventPublisher;
 
     /**
@@ -48,12 +57,17 @@ public class UserHaveItemService {
         if (quantity < 1) {
             throw new ApplicationException(ErrorCode.INVALID_QUANTITY);
         }
+        // 찾기로 한 카드를 동시에 내놓을 수는 없다. 화면 제어만으로는 보장되지 않는다.
+        if (userWantItemRepository.existsByUserIdAndItemId(userId, itemId)) {
+            throw new ApplicationException(ErrorCode.ITEM_ALREADY_IN_WANT);
+        }
 
         Optional<UserHaveItem> existing =
                 userHaveItemRepository.findByUserIdAndItemId(userId, itemId);
         if (existing.isPresent()) {
             // 개수만 바뀐 것이라 목록에 없던 카드가 새로 생기지는 않는다. 알리지 않는다.
             existing.get().changeQuantity(quantity);
+            eventPublisher.publishEvent(new MatchTriggerEvent(userId));
             return false;
         }
 
@@ -63,6 +77,7 @@ public class UserHaveItemService {
                 .orElseThrow(() -> new ApplicationException(ErrorCode.ITEM_NOT_FOUND));
 
         userHaveItemRepository.save(UserHaveItem.of(user, item, quantity));
+        eventPublisher.publishEvent(new MatchTriggerEvent(userId));
 
         // 같은 부스를 보고 있는 사람들의 목록이 이 등록으로 달라진다. 알리지 않으면 상대가
         // 새로고침할 때까지 레이더에 뜨지 않는다.
@@ -75,5 +90,48 @@ public class UserHaveItemService {
                 new BoothRosterChangedDto(item.getBooth().getId(), item.getId()));
 
         return true;
+    }
+
+    /**
+     * 내가 지금 등록해 둔 내놓을 카드 전부.
+     *
+     * <p>등록 화면이 제출 직전에 읽어 해제할 카드를 가려낸다. 화면 상태는 새로고침에 사라지므로
+     * 서버가 유일한 기준이다.
+     */
+    public List<HaveItemRegisteredResponseDto> findMine(UUID userId) {
+        if (userId == null) {
+            throw new ApplicationException(ErrorCode.INVALID_INPUT);
+        }
+
+        return userHaveItemRepository.findAllByUserId(userId).stream()
+                .map(HaveItemRegisteredResponseDto::from)
+                .toList();
+    }
+
+    /**
+     * 내놓을 카드 등록을 해제한다.
+     *
+     * <p>없는 줄이면 아무 일도 하지 않고 끝낸다. 화면이 재시도해도 깨지지 않아야 한다.
+     *
+     * <p><b>교환에 예약된 카드는 막는다.</b> 지워 버리면 진행 중인 교환에서 상대가 받기로 한
+     * 카드가 사라진다. 그 카드를 빼고 싶으면 약속을 먼저 취소해야 한다.
+     *
+     * <p>재매칭을 걸지 않는다. 내놓을 카드가 줄어드는 방향이라 이걸로 새 매칭이 생길 수는 없다.
+     */
+    @Transactional
+    public void remove(UUID userId, Long itemId) {
+        if (userId == null || itemId == null) {
+            throw new ApplicationException(ErrorCode.INVALID_INPUT);
+        }
+
+        Optional<UserHaveItem> existing = userHaveItemRepository.findByUserIdAndItemId(userId, itemId);
+        if (existing.isEmpty()) {
+            return;
+        }
+        if (existing.get().isReserved()) {
+            throw new ApplicationException(ErrorCode.HAVE_ITEM_RESERVED);
+        }
+
+        userHaveItemRepository.delete(existing.get());
     }
 }

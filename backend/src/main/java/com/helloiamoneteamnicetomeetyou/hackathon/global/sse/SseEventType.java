@@ -40,7 +40,23 @@ public enum SseEventType {
 
     // 교환 약속. 만나는 자리(구역)가 정해지거나 바뀌면 EXCHANGE_PLACE_UPDATED 로 알린다.
     EXCHANGE_CREATED,
+
+    /**
+     * 시간 조율. <b>넷을 나눈 이유는 알림 문구가 넷 다 달라야 하기 때문이다</b>(시안 204:5026).
+     *
+     * <p>예전에는 시간과 관련된 모든 변화를 {@code EXCHANGE_TIME_UPDATED} 하나로 보냈다.
+     * {@code PushMessage} 가 타입 하나에 문구 하나를 고정해 두기 때문에, 그러면 "조율해 달라"
+     * 와 "시간이 맞았다" 와 "시간이 안 맞았다" 가 전부 같은 문구로 나간다.
+     *
+     * <p>{@code EXCHANGE_TIME_UPDATED} 는 시간이 확정됐을 때만 쓴다.
+     */
+    EXCHANGE_TIME_REQUESTED,
+    EXCHANGE_TIME_MATCHED,
+    EXCHANGE_TIME_MISMATCHED,
     EXCHANGE_TIME_UPDATED,
+
+    /** 참가자 한 명이 약속 장소에 도착했다. 시간이 바뀐 것이 아니라 따로 둔다. */
+    EXCHANGE_ARRIVED,
     EXCHANGE_PLACE_UPDATED,
     EXCHANGE_COMPLETED,
     EXCHANGE_CANCELLED
