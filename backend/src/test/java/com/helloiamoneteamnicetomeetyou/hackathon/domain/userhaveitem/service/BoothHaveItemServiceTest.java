@@ -319,6 +319,7 @@ class BoothHaveItemServiceTest {
         given(have.getUser()).willReturn(owner);
         given(have.getItem()).willReturn(item);
         given(have.getQuantity()).willReturn(quantity);
+        given(have.getQuantityLeft()).willReturn(quantity);
         return have;
     }
 

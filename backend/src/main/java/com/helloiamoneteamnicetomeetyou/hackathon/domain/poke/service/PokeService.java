@@ -77,11 +77,12 @@ public class PokeService {
         User fromUser = findUser(userId);
         User toUser = findUser(targetUserId);
 
-        // 상대가 실제로 그 카드를 내놓고 있는지. 수량이 0 이면 이미 다 나간 카드다.
+        // 상대가 실제로 그 카드를 지금 내놓고 있는지. quantityLeft 가 0 이면 전부 나갔거나
+        // 다른 교환에 예약돼 있어서, 총 등록 수량(quantity)만으로는 알 수 없다.
         UserHaveItem targetHave = userHaveItemRepository
                 .findByUserIdAndItemId(targetUserId, requestedItemId)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.POKE_ITEM_NOT_OWNED));
-        if (targetHave.getQuantity() == null || targetHave.getQuantity() < 1) {
+        if (targetHave.getQuantityLeft() == null || targetHave.getQuantityLeft() < 1) {
             throw new ApplicationException(ErrorCode.POKE_ITEM_SOLD_OUT);
         }
 
@@ -190,17 +191,17 @@ public class PokeService {
         User sender = poke.getFromUser();
         User receiver = poke.getToUser();
 
-        Item chosenItem = offerableItems(sender.getId()).stream()
-                .map(UserHaveItem::getItem)
-                .filter(item -> item.getId().equals(chosenItemId))
+        UserHaveItem senderHave = offerableItems(sender.getId()).stream()
+                .filter(have -> have.getItem().getId().equals(chosenItemId))
                 .findFirst()
                 .orElseThrow(
                         () -> new ApplicationException(ErrorCode.POKE_CHOSEN_ITEM_NOT_OFFERED));
+        Item chosenItem = senderHave.getItem();
 
         UserHaveItem receiverHave = userHaveItemRepository
                 .findByUserIdAndItemId(receiver.getId(), poke.getRequestedItem().getId())
                 .orElseThrow(() -> new ApplicationException(ErrorCode.POKE_ITEM_SOLD_OUT));
-        if (receiverHave.getQuantity() == null || receiverHave.getQuantity() < 1) {
+        if (receiverHave.getQuantityLeft() == null || receiverHave.getQuantityLeft() < 1) {
             throw new ApplicationException(ErrorCode.POKE_ITEM_SOLD_OUT);
         }
 
@@ -220,18 +221,27 @@ public class PokeService {
                 ExchangeItem.of(exchange, sender, chosenItem, receiver),
                 ExchangeItem.of(exchange, receiver, poke.getRequestedItem(), sender)));
 
+        // 찔러보기 수락은 카드 한 장씩만 오간다 (ExchangeItem.of 가 수량을 1로 고정하는 것과
+        // 같다). 이걸 안 하면 완료 전까지 이 카드가 계속 다른 사람에게도 제안 가능한 것으로
+        // 남아서, 같은 카드를 두 사람에게 동시에 약속하는 일이 생긴다.
+        senderHave.reserve(1);
+        receiverHave.reserve(1);
+
         poke.accept(chosenItem, exchange);
     }
 
     /**
-     * 내놓을 수 있는 카드. 수량이 남은 것만이다.
+     * 내놓을 수 있는 카드. 지금 새로 내줄 수 있는 개수(quantityLeft)가 남은 것만이다.
+     *
+     * <p>{@code quantity}(총 등록 수량)로 걸러내면 이미 다 나갔거나 다른 교환에 예약된 카드도
+     * "내놓을 수 있다" 고 나온다. 그 카드는 총 등록량이 여전히 양수이기 때문이다.
      *
      * <p>{@code (user, item)} 한 행만 유지되므로 같은 카드가 두 번 나오지 않는다
      * ({@code UserHaveItemService.register} 가 개수를 덮어쓴다).
      */
     private List<UserHaveItem> offerableItems(UUID userId) {
         return userHaveItemRepository.findAllByUserId(userId).stream()
-                .filter(have -> have.getQuantity() != null && have.getQuantity() > 0)
+                .filter(have -> have.getQuantityLeft() != null && have.getQuantityLeft() > 0)
                 .toList();
     }
 

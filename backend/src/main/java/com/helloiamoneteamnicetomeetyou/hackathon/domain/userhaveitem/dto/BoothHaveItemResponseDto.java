@@ -24,7 +24,8 @@ import java.util.UUID;
  * @param ownerId              이 카드를 가진 사람. 찔러보기의 {@code targetUserId} 가 이 값이다
  * @param ownerName            표시 이름. 아직 채우지 않는 값이라 보통 응답에서 빠진다
  * @param item                 카드. 찔러보기의 {@code requestedItemId} 가 {@code item.id} 다
- * @param quantity             주인이 내놓은 개수
+ * @param quantity             주인이 지금 새로 내줄 수 있는 개수 ({@code quantityLeft}). 총
+ *                             등록량이 아니라, 다른 교환에 이미 예약된 만큼은 뺀 값이다
  * @param wanted               내 희망 카드인가. 희망 카드를 하나도 등록하지 않았으면 전부 false 다
  * @param matched              이 사람과 지금 진행 중인 교환이 있는가
  * @param givableItemNames     그 주인에게 내가 줄 수 있는 카드 이름들 (상대 희망 ∩ 내 보유)
@@ -56,7 +57,7 @@ public record BoothHaveItemResponseDto(
                 haveItem.getUser().getId(),
                 haveItem.getUser().getUsername(),
                 ItemResponseDto.from(haveItem.getItem()),
-                haveItem.getQuantity(),
+                haveItem.getQuantityLeft(),
                 wanted,
                 matched,
                 givableItemNames,

@@ -2,6 +2,7 @@ import type { Exchange, Zone } from '@/lib/exchange'
 
 import { toAppointment } from './appointment'
 import type { ExchangePair, MatchPartner, MatchResult } from './matching'
+import { getPersistedSetupDone } from './setup-status'
 import type { ActiveMatch, Appointment, Selection, State } from './types'
 
 /**
@@ -14,7 +15,8 @@ export const initialState: State = {
   onboarded: false,
   boothId: null,
   zones: [],
-  setupDone: false,
+  // 기기가 전에 홈까지 가 본 적이 있으면 온보딩을 다시 보여주지 않는다.
+  setupDone: getPersistedSetupDone(),
   have: [],
   needs: [],
   autoMatching: false,
@@ -180,6 +182,12 @@ export function reducer(state: State, action: Action): State {
       return { ...state, needs: state.needs.filter((s) => s.itemId !== action.itemId) }
 
     /**
+     * 온보딩을 건너뛰고 곧바로 홈으로 온 사람의 카드를 서버에서 받아 채운다.
+     *
+     * `/have`, `/needs` 를 거쳐야만 `state.have`, `state.needs` 가 채워지는데, 이미 등록을
+     * 마친 기기는 그 화면을 안 거치고 홈으로 바로 온다. 그대로 두면 서버에는 카드가 있는데
+     * 화면에는 하나도 없는 것처럼 보인다.
+     *
      * 이번 방문에 이미 고른 것이 있으면 건드리지 않는다. 서버 응답이 늦게 도착했을 때
      * 방금 고른 카드를 옛 등록으로 덮으면 사용자가 한 일이 사라진다.
      */

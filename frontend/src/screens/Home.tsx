@@ -23,6 +23,7 @@ import { useItem } from '@/features/catalog/useItem'
 import { appointmentStatus, sortedAppointments } from '@/store/appointment-status'
 import { getDeviceId } from '@/store/identity'
 import type { WaitingStatus } from '@/store/matching'
+import { persistSetupDone } from '@/store/setup-status'
 import { useTopHaveItemId } from '@/store/top-card'
 import type { Selection } from '@/store/types'
 import { useStore } from '@/store/useStore'
@@ -68,6 +69,8 @@ export function Home() {
 
   useEffect(() => {
     dispatch({ type: 'enter-home' })
+    // 이 기기가 홈까지 와 봤다는 것을 기억해 둔다. 다음에 들어오면 온보딩을 건너뛴다.
+    persistSetupDone()
     // 홈에 들어올 때 한 번만 자동 매칭을 켠다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
