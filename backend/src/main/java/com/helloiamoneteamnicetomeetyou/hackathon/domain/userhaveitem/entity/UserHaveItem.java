@@ -106,39 +106,42 @@ public class UserHaveItem {
         this.quantity += amount;
     }
 
-    public void reserve() {
+    /**
+     * 이 중 {@code amount} 개를 이 순간 새로 제안할 수 없게 잠근다.
+     *
+     * <p><b>{@code quantityLeft} 를 그만큼 바로 깎는다.</b> 예전에는 여기서 상태만 바꾸고
+     * 개수는 완료 시점에 깎았는데, 그러면 3개 중 1개만 교환에 들어가도 행 전체가
+     * {@code RESERVED} 로 잠겨서 나머지 2개까지 후보 쿼리에서 사라졌다. 후보 쿼리가 이제
+     * {@code status} 대신 {@code quantityLeft > 0} 을 본다.
+     */
+    public void reserve(int amount) {
+        this.quantityLeft = Math.max(0, this.quantityLeft - amount);
         this.status = ItemStatus.RESERVED;
     }
 
-    /** 교환에 잡혀 있는가. 잡혀 있으면 등록을 해제할 수 없다. */
+    /** 지금 이 행에 진행 중인 예약이 하나라도 있는가. 있으면 등록을 통째로 해제할 수 없다. */
     public boolean isReserved() {
         return this.status == ItemStatus.RESERVED;
     }
 
-    public void completeExchange(int amount) {
-        this.quantityLeft -= amount;
-        if (this.quantityLeft <= 0) {
-            this.quantityLeft = 0;
-            this.status = ItemStatus.OUT;
-        } else {
-            this.status = ItemStatus.LEFT;
-        }
+    /**
+     * 예약해 둔 거래가 실제로 끝났다.
+     *
+     * <p>{@code quantityLeft} 는 이미 {@link #reserve} 에서 깎아 뒀으니 여기서 또 깎지 않는다.
+     * 상태만 지금 {@code quantityLeft} 에 맞게 정리한다.
+     */
+    public void completeExchange() {
+        this.status = this.quantityLeft > 0 ? ItemStatus.LEFT : ItemStatus.OUT;
     }
 
     /**
-     * 예약을 풀고 다시 매칭 후보로 돌려놓는다.
+     * 예약을 풀고 그만큼 다시 후보로 돌려놓는다.
      *
-     * <p>{@code quantityLeft} 는 건드리지 않는다. {@link #reserve()} 가 애초에 그 값을 깎지
-     * 않기 때문이다(깎는 시점은 {@link #completeExchange}, 즉 실제 거래 완료 때다). 예약
-     * 시점에 안 깎은 걸 여기서 더해 버리면 수량이 실제보다 부풀려진다.
-     *
-     * <p>{@code RESERVED} 일 때만 되돌린다. 상태를 보지 않고 {@code LEFT} 로 밀면 이미 다 나간
-     * ({@code OUT}) 카드까지 되살아나서, 없는 카드가 매칭 후보로 다시 올라온다.
+     * <p>{@link #reserve} 가 깎아 둔 만큼 {@code amount} 로 되돌려 받는다. 총 등록 수량
+     * ({@code quantity}) 을 넘지 않게 잡아 둔다 — 넘으면 실제보다 부풀려진 개수가 후보에 오른다.
      */
-    public void cancelReservation() {
-        if (this.status != ItemStatus.RESERVED) {
-            return;
-        }
+    public void cancelReservation(int amount) {
+        this.quantityLeft = Math.min(this.quantity, this.quantityLeft + amount);
         this.status = this.quantityLeft > 0 ? ItemStatus.LEFT : ItemStatus.OUT;
     }
 

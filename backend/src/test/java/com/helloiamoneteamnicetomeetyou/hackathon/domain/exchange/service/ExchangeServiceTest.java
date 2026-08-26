@@ -119,6 +119,42 @@ class ExchangeServiceTest {
         given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of());
     }
 
+    /**
+     * 매칭은 제안만 하고 잠그지 않는다(MatchingService). 실제로 잠그는 건 여기, 수락해서
+     * PENDING → IN_PROGRESS 로 넘어가는 순간이다. 제안 단계에서 먼저 잠그면, 수락 안 하고
+     * 흘려보낼 수도 있는 카드가 그동안 다른 사람에게는 안 보이게 된다.
+     */
+    @Test
+    @DisplayName("수락하면 오가는 카드를 잠근다")
+    void 수락하면_오가는_카드를_잠근다() throws Exception {
+        Item item = withId(Item.of(exchange.getZone().getBooth(), "카드", null), ITEM_ID);
+        UserHaveItem meHave = UserHaveItem.of(me, item, 3);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(userHaveItemRepository.findByUserIdAndItemId(ME, ITEM_ID)).willReturn(Optional.of(meHave));
+        given(zoneRepository.findByBoothIdOrderByIdAsc(BOOTH_ID)).willReturn(List.of(exchange.getZone()));
+
+        exchangeService.accept(EXCHANGE_ID, ME);
+
+        assertThat(meHave.getQuantityLeft()).isEqualTo(2);
+        assertThat(meHave.isReserved()).isTrue();
+    }
+
+    @Test
+    @DisplayName("이미 진행 중이면 수락해도 다시 잠그지 않는다")
+    void 이미_진행중이면_다시_잠그지_않는다() throws Exception {
+        exchange.startProgress();
+        Item item = withId(Item.of(exchange.getZone().getBooth(), "카드", null), ITEM_ID);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(zoneRepository.findByBoothIdOrderByIdAsc(BOOTH_ID)).willReturn(List.of(exchange.getZone()));
+
+        exchangeService.accept(EXCHANGE_ID, ME);
+
+        // findByExchangeId 는 boothIdOf 가 어차피 부른다. 잠갔는지는 이걸로 확인한다.
+        verify(userHaveItemRepository, never()).findByUserIdAndItemId(ME, ITEM_ID);
+    }
+
     @Test
     @DisplayName("교환을 만들면 서버가 격자 시작점을 정한다")
     void 교환을_만들면_격자_시작점을_정한다() {
@@ -182,26 +218,56 @@ class ExchangeServiceTest {
     */
 
     @Test
-    @DisplayName("시간을 저장했을 때 겹치는 칸이 없으면 상대에게만 매칭 실패를 알린다")
-    void 시간을_저장하면_겹치지_않으면_상대에게만_실패를_알린다() {
+    @DisplayName("칸을 저장하면 화면을 맞추도록 참가자 전원에게 알린다")
+    void 칸을_저장하면_전원의_화면을_맞춘다() {
         exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(2, 0, 2));
 
         verify(timeSlotRepository).deleteAllByExchangeIdAndUserId(EXCHANGE_ID, ME);
-        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_MISMATCHED), any());
-        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+        // 알림이 아니라 화면 갱신이라 누른 사람도 받는다. 탭을 여러 개 열어 뒀을 때 필요하다.
+        verify(sseEventPublisher).toUser(eq(ME), eq(SseEventType.EXCHANGE_SLOTS_UPDATED), any());
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_SLOTS_UPDATED), any());
     }
 
     @Test
-    @DisplayName("시간을 저장했을 때 겹치는 칸이 있으면 상대에게 매칭 성공을 알린다")
-    void 시간을_저장하면_겹치면_상대에게_성공을_알린다() {
-        given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of(
-                ExchangeTimeSlot.of(exchange, me, 1),
-                ExchangeTimeSlot.of(exchange, partner, 1)));
+    @DisplayName("상대가 한 칸도 안 골랐으면 내가 칸을 눌러도 매칭 실패를 알리지 않는다")
+    void 겹침_여부가_그대로면_알리지_않는다() {
+        exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(2, 0, 2));
+
+        /*
+          시간표는 칸을 누를 때마다 저장된다. 저장될 때마다 보내면 다섯 칸을 고르는 동안 상대
+          알림함에 "시간 매칭에 실패했어요" 가 다섯 건 쌓인다. 겹침 여부가 바뀌지 않았으면
+          상대가 알아야 할 새 사실이 없다.
+        */
+        verify(sseEventPublisher, never()).toUser(any(), eq(SseEventType.EXCHANGE_TIME_MISMATCHED), any());
+        verify(sseEventPublisher, never()).toUser(any(), eq(SseEventType.EXCHANGE_TIME_MATCHED), any());
+    }
+
+    @Test
+    @DisplayName("겹치는 칸이 새로 생기면 상대에게만 매칭 성공을 알린다")
+    void 겹치는_칸이_생기면_상대에게만_성공을_알린다() {
+        // 첫 번째가 저장 전, 두 번째부터가 저장 뒤다. 상대만 고른 상태에서 내가 같은 칸을 눌렀다.
+        given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(
+                List.of(ExchangeTimeSlot.of(exchange, partner, 1)),
+                List.of(ExchangeTimeSlot.of(exchange, me, 1), ExchangeTimeSlot.of(exchange, partner, 1)));
 
         exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(1));
 
         verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_MATCHED), any());
-        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), eq(SseEventType.EXCHANGE_TIME_MATCHED), any());
+    }
+
+    @Test
+    @DisplayName("겹치던 칸이 없어지면 상대에게만 매칭 실패를 알린다")
+    void 겹치던_칸이_없어지면_상대에게만_실패를_알린다() {
+        // 같은 칸을 골라 맞아 있던 상태에서 내가 다른 칸으로 바꿨다.
+        given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(
+                List.of(ExchangeTimeSlot.of(exchange, me, 1), ExchangeTimeSlot.of(exchange, partner, 1)),
+                List.of(ExchangeTimeSlot.of(exchange, me, 2), ExchangeTimeSlot.of(exchange, partner, 1)));
+
+        exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(2));
+
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_MISMATCHED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), eq(SseEventType.EXCHANGE_TIME_MISMATCHED), any());
     }
 
     @Test
@@ -247,8 +313,8 @@ class ExchangeServiceTest {
     }
 
     @Test
-    @DisplayName("자리를 옮기면 저장하고 참가자 전원에게 알린다")
-    void 자리를_옮기면_전원에게_알린다() throws Exception {
+    @DisplayName("자리를 옮기면 저장하고 옮긴 사람을 뺀 나머지에게 알린다")
+    void 자리를_옮기면_상대에게만_알린다() throws Exception {
         Booth booth = exchange.getZone().getBooth();
         Zone lounge = withId(Zone.of(booth, "라운지", "2층 라운지"), 2L);
         given(zoneRepository.findById(2L)).willReturn(Optional.of(lounge));
@@ -256,8 +322,8 @@ class ExchangeServiceTest {
         exchangeService.updateZone(EXCHANGE_ID, ME, 2L);
 
         assertThat(exchange.getZone()).isEqualTo(lounge);
-        verify(sseEventPublisher).toUser(eq(ME), eq(SseEventType.EXCHANGE_PLACE_UPDATED), any());
         verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_PLACE_UPDATED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
     }
 
     @Test
@@ -419,6 +485,8 @@ class ExchangeServiceTest {
     void 교환을_마치면_준_사람의_보유_수량이_준다() throws Exception {
         Item item = withId(Item.of(null, "카드", null), ITEM_ID);
         UserHaveItem meHave = UserHaveItem.of(me, item, 3);
+        // 개수는 예약 시점에 이미 줄어 있다. 완료는 그 뒤를 잇는 것뿐이라 여기서 먼저 예약해 둔다.
+        meHave.reserve(1);
         given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
                 .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
         given(userHaveItemRepository.findByUserIdAndItemId(ME, ITEM_ID)).willReturn(Optional.of(meHave));
@@ -558,7 +626,7 @@ class ExchangeServiceTest {
     private UserHaveItem reservedHaveItem() throws Exception {
         Item item = withId(Item.of(exchange.getZone().getBooth(), "IONIQ 5 N", null), 7L);
         UserHaveItem haveItem = UserHaveItem.of(me, item, 2);
-        haveItem.reserve();
+        haveItem.reserve(1);
         return haveItem;
     }
 }

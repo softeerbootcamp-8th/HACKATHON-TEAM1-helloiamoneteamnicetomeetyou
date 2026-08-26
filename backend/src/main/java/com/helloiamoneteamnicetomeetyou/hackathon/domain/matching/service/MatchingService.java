@@ -1,6 +1,7 @@
 package com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.service;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeStatus;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
@@ -14,6 +15,8 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRep
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
+import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventPublisher;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventType;
 
@@ -117,7 +120,11 @@ public class MatchingService {
 
     /**
      * 1대1 Exchange를 저장한다. give/receive는 이미 확정된 { itemId → qty }다.
-     * 매칭 시점에는 status를 RESERVED로 변경만 한다. quantityLeft 감소는 거래 완료 시점에 처리한다.
+     *
+     * <p><b>여기서는 카드를 잠그지 않는다.</b> 아직 제안일 뿐 누구도 수락하지 않았다. 후보 쿼리가
+     * 이미 {@code PENDING}/{@code IN_PROGRESS} 교환에 참가자로 걸린 사람을 통째로 빼기 때문에,
+     * 같은 카드가 다른 제안에 동시에 걸릴 일은 없다 — 잠그는 건 실제로 수락해서 진행 중으로
+     * 넘어가는 {@link ExchangeService#accept} 의 몫이다.
      */
     private Optional<Exchange> createExchange(
             User myUser,
@@ -143,12 +150,10 @@ public class MatchingService {
         give.forEach((itemId, qty) -> {
             UserHaveItem hi = myMap.get(itemId);
             items.add(ExchangeItem.create(exchange, myUser, hi.getItem(), bestUser, qty));
-            hi.reserve();
         });
         receive.forEach((itemId, qty) -> {
             UserHaveItem hi = bestMap.get(itemId);
             items.add(ExchangeItem.create(exchange, bestUser, hi.getItem(), myUser, qty));
-            hi.reserve();
         });
         exchangeItemRepository.saveAll(items);
         notifyParticipants(exchange, items, List.of(myUser, bestUser));
@@ -262,7 +267,9 @@ public class MatchingService {
 
     /**
      * 3인 Exchange를 저장한다. 교환할 아이템 ID는 이미 결정된 상태로 받는다.
-     * 매칭 시점에는 status를 RESERVED로 변경만 한다. quantityLeft 감소는 거래 완료 시점에 처리한다.
+     *
+     * <p>1대1과 같은 이유로 여기서는 잠그지 않는다. {@link ExchangeService#accept} 가 수락된
+     * 뒤에 잠근다.
      */
     private Optional<Exchange> createThreeWayExchange(
             User myUser,
@@ -297,10 +304,6 @@ public class MatchingService {
                 ExchangeItem.create(exchange, userC,  cHaveItem.getItem(),  myUser, 1)
         );
         exchangeItemRepository.saveAll(items);
-
-        myHaveItem.reserve();
-        bHaveItem.reserve();
-        cHaveItem.reserve();
 
         notifyParticipants(exchange, items, List.of(myUser, userB, userC));
         return Optional.of(exchange);
@@ -452,6 +455,54 @@ public class MatchingService {
 
     private int sum(Map<Long, Integer> m) {
         return m.values().stream().mapToInt(i -> i).sum();
+    }
+
+    /**
+     * 아직 수락하지 않은 매칭 제안. 없으면 {@code null} 이다.
+     *
+     * <p>실시간 연결이 붙을 때 부른다. 매칭 제안은 {@code MATCH_SUGGESTED} 로만 나가고 끊겼던
+     * 동안의 이벤트는 다시 오지 않기 때문에, 이게 없으면 재연결한 사람이 자기에게 온 제안을
+     * 영영 못 본다.
+     *
+     * <p>{@code GET /api/exchanges/active} 로는 대신할 수 없다. 그쪽은 자리와 시간이 잡힌
+     * 약속만 돌려주려고 제안 단계의 교환을 일부러 걸러낸다. 여기는 정확히 그 반대를 본다.
+     *
+     * <p>돌려주는 것은 {@code MATCH_SUGGESTED} 이벤트와 같은 payload 다. 화면이 실시간으로 받은
+     * 것과 다시 읽은 것을 같은 코드로 처리할 수 있어야 한다.
+     */
+    public MatchSuggestedResponseDto findPendingSuggestionOf(UUID userId) {
+        User viewer = userRepository.findById(userId)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_FOUND));
+
+        return exchangeRepository.findActiveByUserId(userId, List.of(ExchangeStatus.PENDING)).stream()
+                // 자리와 시간이 붙은 것은 이미 수락해서 약속으로 넘어간 교환이다. 그건 약속 화면이
+                // GET /api/exchanges/active 로 가져간다.
+                .filter(exchange -> !exchange.hasAppointment())
+                .map(exchange -> toSuggestion(exchange, viewer))
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * 제안 payload 를 만든다. 이 사람이 주거나 받을 것이 없으면 {@code null} 이다.
+     *
+     * <p>주고받을 것이 한쪽이라도 없는 교환은 제안으로 성립하지 않는다. 그런 데이터가 남아 있으면
+     * payload 를 만들다 터지는데, 화면이 500 을 받는 것보다 제안이 없다고 보는 편이 맞다.
+     */
+    private MatchSuggestedResponseDto toSuggestion(Exchange exchange, User viewer) {
+        List<ExchangeItem> items = exchangeItemRepository.findByExchangeId(exchange.getId());
+
+        boolean gives = items.stream().anyMatch(item -> item.getFromUser().getId().equals(viewer.getId()));
+        boolean receives = items.stream().anyMatch(item -> item.getToUser().getId().equals(viewer.getId()));
+
+        if (!gives || !receives) {
+            log.warn("주고받을 것이 없는 교환을 제안에서 건너뛴다: exchangeId={}, userId={}",
+                    exchange.getId(), viewer.getId());
+            return null;
+        }
+
+        return MatchSuggestedResponseDto.of(exchange, items, viewer);
     }
 
     /**

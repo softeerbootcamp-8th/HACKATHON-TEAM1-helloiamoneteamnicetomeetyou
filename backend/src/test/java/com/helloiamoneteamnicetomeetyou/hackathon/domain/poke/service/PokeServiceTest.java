@@ -472,6 +472,7 @@ class PokeServiceTest {
         given(have.getUser()).willReturn(user);
         given(have.getItem()).willReturn(item);
         given(have.getQuantity()).willReturn(quantity);
+        given(have.getQuantityLeft()).willReturn(quantity);
         return have;
     }
 

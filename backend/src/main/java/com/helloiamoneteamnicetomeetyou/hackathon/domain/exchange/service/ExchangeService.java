@@ -133,6 +133,11 @@ public class ExchangeService {
      * <p>상대가 아직 수락 전이어도 바로 IN_PROGRESS 로 옮긴다. 지금 화면 흐름은 양쪽이 서로의
      * 수락을 기다리지 않고 각자 장소·시간 화면으로 들어가 맞춰 보는 방식이라, "둘 다 눌러야
      * 진행 중" 같은 조건을 걸 이유가 없다.
+     *
+     * <p><b>오가는 카드는 여기서 처음 잠근다.</b> 제안만 됐을 뿐 누구도 수락하지 않은 상태에서
+     * 먼저 잠가 버리면, 정작 수락 안 하고 넘어갈 수도 있는 카드가 그동안 다른 사람에게는
+     * 안 보인다. {@code PENDING → IN_PROGRESS} 로 넘어가는 이 순간(교환당 한 번뿐이다)이 실제로
+     * "이 거래를 하기로 했다" 는 시점이라 여기서 잠근다.
      */
     @Transactional
     public void accept(Long exchangeId, UUID userId) {
@@ -141,11 +146,20 @@ public class ExchangeService {
 
         if (exchange.getStatus() == ExchangeStatus.PENDING) {
             exchange.startProgress();
+            reserveExchangeItems(exchangeId);
         }
 
         // 매칭은 만날 자리도 시간도 모른 채 교환을 만든다. 약속 화면이 필요한 것은 여기서 붙는다.
         // 먼저 수락한 사람이 정하고, 늦게 수락한 사람은 같은 값을 그대로 본다.
         prepareAppointment(exchange, boothIdOf(exchange));
+    }
+
+    /** 이 교환이 오가기로 한 카드를 전부 잠근다. {@link #accept} 가 딱 한 번만 부른다. */
+    private void reserveExchangeItems(Long exchangeId) {
+        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
+            userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
+                    .ifPresent(hi -> hi.reserve(item.getQuantity()));
+        }
     }
 
     /**
@@ -185,13 +199,13 @@ public class ExchangeService {
     /**
      * 이 교환이 잡아 둔 카드를 전부 풀어 다시 매칭 후보로 돌려놓는다.
      *
-     * <p>거절과 취소가 함께 쓴다. 풀지 않으면 카드가 {@code RESERVED} 에 갇혀 그 사람은 다시는
-     * 매칭되지 않는다 — 매칭 쿼리가 {@code status = 'LEFT'} 인 카드만 본다.
+     * <p>거절과 취소가 함께 쓴다. 풀지 않으면 카드가 {@code quantityLeft} 에 못 잡혀 그 사람은
+     * 다시는 매칭되지 않는다 — 매칭 쿼리가 {@code quantityLeft > 0} 인 카드만 본다.
      */
     private void releaseReservations(Long exchangeId) {
         for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
             userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
-                    .ifPresent(UserHaveItem::cancelReservation);
+                    .ifPresent(hi -> hi.cancelReservation(item.getQuantity()));
         }
     }
 
@@ -247,21 +261,35 @@ public class ExchangeService {
         List<Integer> distinctSlots = slots.stream().distinct().sorted().toList();
         TimeSlotGrid.validateAll(distinctSlots);
 
+        boolean matchedBefore = earliestOverlap(exchangeId) != null;
+
         timeSlotRepository.deleteAllByExchangeIdAndUserId(exchangeId, userId);
         timeSlotRepository.saveAll(
                 distinctSlots.stream().map(slot -> ExchangeTimeSlot.of(exchange, user, slot)).toList());
 
+        // 화면을 맞추는 것은 저장될 때마다 해야 한다. 알림이 아니라서 전원에게 보낸다. 누른
+        // 사람도 받아야 같은 사람이 탭을 여러 개 열어 뒀을 때 나머지 탭이 따라온다.
+        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_SLOTS_UPDATED);
+
+        boolean matchedAfter = earliestOverlap(exchangeId) != null;
+
         /*
           시안(204:5230)의 조건이 "상대 사용자가 시간을 입력 완료 & 일치하는 시간이 존재하는
           경우" 다. 상대가 볼 알림은 내가 무엇을 골랐는지가 아니라 시간이 맞았는지 안 맞았는지다.
-          그래서 저장한 뒤 겹치는 칸을 다시 세어 두 문구로 갈라 보낸다.
+
+          겹치는 칸의 유무가 실제로 바뀐 경우에만 보낸다. 저장될 때마다 보내면 시간표는 칸을
+          누를 때마다 저장되기 때문에, 상대가 다섯 칸을 고르는 동안 "시간 매칭에 실패했어요" 가
+          다섯 건 쌓인다. 상대가 한 칸도 고르지 않았으면 겹칠 일 자체가 없어 유무가 바뀌지
+          않으므로, 시안이 말하는 "상대가 입력 완료" 조건과 결과가 같아진다.
         */
-        notifyOthers(
-                exchangeId,
-                userId,
-                earliestOverlap(exchangeId) != null
-                        ? SseEventType.EXCHANGE_TIME_MATCHED
-                        : SseEventType.EXCHANGE_TIME_MISMATCHED);
+        if (matchedBefore != matchedAfter) {
+            notifyOthers(
+                    exchangeId,
+                    userId,
+                    matchedAfter
+                            ? SseEventType.EXCHANGE_TIME_MATCHED
+                            : SseEventType.EXCHANGE_TIME_MISMATCHED);
+        }
 
         return toResponse(exchange);
     }
@@ -276,8 +304,9 @@ public class ExchangeService {
      * <p><b>같은 부스의 구역만 고를 수 있다.</b> 약도는 부스마다 다른 그림이고 좌표도 그 그림
      * 안에서의 비율이라, 다른 부스의 구역을 넣으면 핀이 엉뚱한 자리를 가리킨다.
      *
-     * <p>바꾼 사람만 알면 소용없어서 참가자 전원에게 알린다. 상대가 옛 자리에서 기다리는 것이
-     * 이 기능에서 제일 나쁜 결과다.
+     * <p>바꾼 사람만 알면 소용없어서 나머지 참가자에게 알린다. 상대가 옛 자리에서 기다리는 것이
+     * 이 기능에서 제일 나쁜 결과다. 바꾼 본인은 응답으로 최신 자리를 이미 받았고, 알림까지 가면
+     * 자기가 방금 한 행동이 자기 알림함에 쌓인다.
      */
     @Transactional
     public ExchangeResponseDto updateZone(Long exchangeId, UUID userId, Long zoneId) {
@@ -302,7 +331,7 @@ public class ExchangeService {
 
         exchange.changeZone(zone);
 
-        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_PLACE_UPDATED);
+        notifyOthers(exchangeId, userId, SseEventType.EXCHANGE_PLACE_UPDATED);
 
         return toResponse(exchange);
     }
@@ -397,10 +426,14 @@ public class ExchangeService {
         return toResponse(exchange);
     }
 
-    /** 준 사람 쪽 재고를 줄인다. */
+    /**
+     * 준 사람 쪽 재고를 확정한다.
+     *
+     * <p>개수는 이미 예약 시점({@code reserve})에 깎여 있다. 여기서 또 깎으면 두 번 깎인다.
+     */
     private void giveAway(ExchangeItem item) {
         userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
-                .ifPresent(hi -> hi.completeExchange(item.getQuantity()));
+                .ifPresent(UserHaveItem::completeExchange);
     }
 
     /**

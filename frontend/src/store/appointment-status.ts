@@ -28,6 +28,25 @@ export function appointmentStatus(
     ? `${nameOf(match.giveItemId)}↔${nameOf(match.receiveItemId)}`
     : appointment.partners.map((p) => p.name).join(', ')
 
+  /*
+    끝난 약속. **이 분기가 없으면 맨 아래 "시간 조율 중이에요" 로 떨어진다.**
+
+    상대가 먼저 "만났어요" 를 누르면 EXCHANGE_COMPLETED 가 `exchange-synced` 로 들어와
+    단계만 완료로 바뀌고 목록에는 남는다. 목록에서 빼는 것은 `/complete` 화면이 도는
+    `complete` 액션인데, 내가 그 화면을 지나지 않으면 부를 사람이 없다. 그래서 끝난 약속이
+    홈 배너에 시간을 고르러 가라고 남아 있었다.
+
+    눌렀을 때 `/complete` 로 보내는 것이 그 자리를 푸는 길이기도 하다. 그 화면이 카드를
+    정리하고 목록에서 약속을 뺀다.
+  */
+  if (appointment.stage === 'completed') {
+    return {
+      id: appointment.exchangeId,
+      to: '/complete',
+      title: '교환이 완료됐어요',
+      sub: pair,
+    }
+  }
   if (appointment.stage === 'confirmed' || appointment.stage === 'arrived') {
     return {
       id: appointment.exchangeId,

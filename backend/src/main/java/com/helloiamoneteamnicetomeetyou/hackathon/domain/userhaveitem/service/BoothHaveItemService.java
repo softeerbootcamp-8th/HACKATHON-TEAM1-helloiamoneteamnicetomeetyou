@@ -180,7 +180,7 @@ public class BoothHaveItemService {
     private Map<Long, String> myHaveItemNames(UUID userId) {
         Map<Long, String> names = new LinkedHashMap<>();
         userHaveItemRepository.findAllByUserId(userId).stream()
-                .filter(have -> have.getQuantity() != null && have.getQuantity() > 0)
+                .filter(have -> have.getQuantityLeft() != null && have.getQuantityLeft() > 0)
                 .forEach(have -> names.putIfAbsent(have.getItem().getId(), have.getItem().getName()));
         return names;
     }
