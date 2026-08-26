@@ -8,6 +8,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -16,7 +17,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "user_want_items")
+@Table(name = "user_want_items", indexes = {
+        @Index(name = "idx_uwi_item_user", columnList = "item_id, user_id")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserWantItem {
@@ -45,6 +48,15 @@ public class UserWantItem {
 
     public static UserWantItem of(User user, Item item, Integer quantity) {
         return new UserWantItem(user, item, quantity);
+    }
+
+    /** 희망 카드는 수량 개념이 없어서 항상 1 로 둔다. */
+    public static UserWantItem of(User user, Item item) {
+        UserWantItem userWantItem = new UserWantItem();
+        userWantItem.user = user;
+        userWantItem.item = item;
+        userWantItem.quantity = 1;
+        return userWantItem;
     }
 
     /** 같은 (user, item) 으로 다시 등록하면 찾는 개수를 이 값으로 덮어쓴다. */

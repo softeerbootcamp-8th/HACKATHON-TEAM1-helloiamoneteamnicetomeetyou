@@ -11,6 +11,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -20,7 +21,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "exchanges")
+@Table(name = "exchanges", indexes = {
+        @Index(name = "idx_ex_status", columnList = "status")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Exchange {
@@ -46,10 +49,12 @@ public class Exchange {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    private Exchange(ExchangeType type) {
-        this.type = type;
-        this.status = ExchangeStatus.PENDING;
-        this.createdAt = LocalDateTime.now();
+    public static Exchange create(ExchangeType type) {
+        Exchange exchange = new Exchange();
+        exchange.type = type;
+        exchange.status = ExchangeStatus.PENDING;
+        exchange.createdAt = LocalDateTime.now();
+        return exchange;
     }
 
     /**
@@ -59,7 +64,17 @@ public class Exchange {
      * 두 사람이 약속 화면에서 정하는 것이라, 만드는 시점에는 알 수 없다.
      */
     public static Exchange oneToOne() {
-        return new Exchange(ExchangeType.ONE_TO_ONE);
+        return create(ExchangeType.ONE_TO_ONE);
+    }
+
+    /** 참가자가 매칭 결과를 확인하고 장소를 잡으러 들어갔다. */
+    public void startProgress() {
+        this.status = ExchangeStatus.IN_PROGRESS;
+    }
+
+    /** 참가자가 거절했다. 취소 자체는 어드민이 끊는 것과 같은 상태 전이라 여기로 모은다. */
+    public void cancel() {
+        this.status = ExchangeStatus.CANCELLED;
     }
 
     /**
@@ -70,7 +85,7 @@ public class Exchange {
      * 정리할 수 있게 열어 둔다.
      */
     public void cancelByAdmin() {
-        this.status = ExchangeStatus.CANCELLED;
+        cancel();
     }
 
     /** 실물 교환은 끝났는데 화면에서 완료 처리가 안 된 건을 어드민이 닫는다. */

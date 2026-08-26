@@ -7,8 +7,10 @@ import { EmptyState } from '@/components/domain/EmptyState'
 import { OneToOneView, ThreeWayView } from '@/components/domain/ExchangeCards'
 import { Button, TextButton } from '@/components/ui/Button'
 import { TopBar } from '@/components/ui/TopBar'
+import { acceptExchange, rejectExchange } from '@/features/matching/api'
 import { springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
+import { getDeviceId } from '@/store/identity'
 import { useStore } from '@/store/useStore'
 
 /**
@@ -94,6 +96,12 @@ export function MatchResult() {
       <div className="shrink-0 px-6 pt-4 pb-8">
         <Button
           onClick={() => {
+            // 목업 매칭은 exchangeId 가 없다 — 서버에 되돌릴 것이 없다.
+            if (match.exchangeId !== null) {
+              acceptExchange(match.exchangeId, getDeviceId()).catch((error: unknown) =>
+                console.error('[exchange] 수락 실패', error),
+              )
+            }
             dispatch({ type: 'start-appointment' })
             navigate('/place')
           }}
@@ -108,6 +116,11 @@ export function MatchResult() {
         onKeep={() => setRejectOpen(false)}
         onReject={() => {
           setRejectOpen(false)
+          if (match.exchangeId !== null) {
+            rejectExchange(match.exchangeId, getDeviceId()).catch((error: unknown) =>
+              console.error('[exchange] 거절 실패', error),
+            )
+          }
           dispatch({ type: 'decline-match' })
           navigate('/home')
         }}

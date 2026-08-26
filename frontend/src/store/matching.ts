@@ -1,18 +1,6 @@
 import { ALL_WAITING, type WaitingUser } from '@/mocks/data'
 import { itemById } from '@/mocks/data'
 
-/**
- * 매칭 규칙을 여기 모아 둔다. 목업이지만 화면에 보이는 결과가 실제로 이 함수에서
- * 나와야 흐름이 말이 된다. 데이터만 가짜고 판정은 진짜다.
- *
- * 기획서의 우선순위를 그대로 옮겼다.
- * 1. 1:1 교환이 가능한 상대를 먼저 찾는다
- * 2. 없으면 삼자 교환을 찾는다 (한 사람당 한 아이템만)
- * 3. 둘 다 없으면 실패로 두고 계속 기다린다
- *
- * 후보가 여럿이면 인기 많은 아이템(rank 가 작은 쪽)을 가진 상대를 고른다.
- */
-
 /** 주고받을 카드 한 쌍 */
 export type ExchangePair = {
   /** 내가 주는 카드 */
@@ -54,78 +42,11 @@ export function heldBy(user: WaitingUser): string[] {
   return [user.itemId, ...(user.alsoHasItemIds ?? [])]
 }
 
-/**
- * 서로 줄 수 있는 카드를 인기순으로 하나씩 맞물린다.
- * 한쪽이 더 많으면 적은 쪽 개수만큼만 바꾼다.
- */
-function pairUp(partner: WaitingUser, haveIds: string[], needIds: string[]): ExchangePair[] {
-  const mine = wantedFromMe(partner, haveIds)
-  const theirs = heldBy(partner)
-    .filter((id) => needIds.includes(id))
-    .sort((a, b) => itemById(a).rank - itemById(b).rank)
-
-  const count = Math.min(mine.length, theirs.length)
-  return Array.from({ length: count }, (_, i) => ({
-    giveItemId: mine[i],
-    receiveItemId: theirs[i],
-  }))
-}
-
 /** 이 사람이 내 카드 중 하나라도 원하는지. 원하면 그중 가장 인기 있는 것을 돌려준다. */
 export function wantedFromMe(user: WaitingUser, haveIds: string[]): string[] {
   return haveIds
     .filter((id) => user.needsItemIds.includes(id))
     .sort((a, b) => itemById(a).rank - itemById(b).rank)
-}
-
-export function findMatch(haveIds: string[], needIds: string[]): MatchResult | null {
-  if (haveIds.length === 0 || needIds.length === 0) return null
-
-  const need = new Set(needIds)
-
-  // 1. 서로 원하는 것이 정확히 맞는 상대
-  const direct = ALL_WAITING.filter(
-    (u) => heldBy(u).some((id) => need.has(id)) && wantedFromMe(u, haveIds).length > 0,
-  ).sort(byPopularity)
-
-  if (direct.length > 0) {
-    const partner = direct[0]
-    // 인기 많은 아이템을 먼저 내준다는 규칙은 pairUp 이 지킨다.
-    const pairs = pairUp(partner, haveIds, needIds)
-    return {
-      kind: 'ONE_TO_ONE',
-      partner,
-      pairs,
-      giveItemId: pairs[0].giveItemId,
-      receiveItemId: pairs[0].receiveItemId,
-    }
-  }
-
-  // 2. 삼자 교환. 내가 A 에게 받고, A 가 원하는 것을 B 가 가지고 있고,
-  //    B 는 내가 가진 것을 원하는 고리를 찾는다.
-  const givers = ALL_WAITING.filter((u) => need.has(u.itemId)).sort(byPopularity)
-  for (const giver of givers) {
-    const receivers = ALL_WAITING.filter(
-      (u) =>
-        u.id !== giver.id &&
-        giver.needsItemIds.includes(u.itemId) &&
-        wantedFromMe(u, haveIds).length > 0,
-    ).sort(byPopularity)
-    if (receivers.length > 0) {
-      const receiver = receivers[0]
-      return {
-        kind: 'THREE_WAY',
-        giver,
-        receiver,
-        giveItemId: wantedFromMe(receiver, haveIds)[0],
-        receiveItemId: giver.itemId,
-        middleItemId: receiver.itemId,
-      }
-    }
-  }
-
-  // 3. 경우의 수가 없다. 실패로 두고 계속 기다린다.
-  return null
 }
 
 /**
