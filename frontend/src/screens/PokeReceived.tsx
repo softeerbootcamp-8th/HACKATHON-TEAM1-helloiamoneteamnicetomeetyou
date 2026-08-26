@@ -44,11 +44,14 @@ function ReceivedView({
 }) {
   const navigate = useNavigate()
   const { dispatch } = useStore()
+  /*
+    고른 카드. 아무것도 고르지 않았으면 진행할 수 없다. 전에는 목록의 첫 카드를 기본값으로
+    잡아 뒀는데, 화면에 표시가 붙는 카드가 없어서 "선택이 안 되네" 하고 그냥 진행한 사람이
+    엉뚱한 카드로 성사됐다. 여기서 오가는 것은 실제 카드라 되돌릴 수 없다.
+  */
   const [picked, setPicked] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [rejectOpen, setRejectOpen] = useState(false)
-
-  const chosen = picked ?? poke.offeredItems[0]?.id ?? null
 
   /**
    * 수락하고 시안 `7. 찔러보기 성사` 로 넘어간다.
@@ -58,10 +61,10 @@ function ReceivedView({
    * 응답은 답한 사람 기준이라 `giveItemId` 가 그대로 "내가 주는 카드" 다.
    */
   const submitAccept = async () => {
-    if (chosen === null || submitting) return
+    if (picked === null || submitting) return
     setSubmitting(true)
     try {
-      const answer = await onAccept(poke.pokeId, chosen)
+      const answer = await onAccept(poke.pokeId, picked)
 
       if (
         answer.exchangeId !== undefined &&
@@ -122,7 +125,7 @@ function ReceivedView({
               <motion.div key={item.id} variants={staggerChild}>
                 <GoodsCard
                   item={item}
-                  selected={chosen === item.id}
+                  selected={picked === item.id}
                   onClick={() => setPicked(item.id)}
                 />
               </motion.div>
@@ -132,7 +135,7 @@ function ReceivedView({
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
-        <Button disabled={chosen === null || submitting} onClick={submitAccept}>
+        <Button disabled={picked === null || submitting} onClick={submitAccept}>
           {submitting ? '보내는 중...' : '이 카드로 교환할래요'}
         </Button>
         <TextButton onClick={() => setRejectOpen(true)}>다음에요</TextButton>

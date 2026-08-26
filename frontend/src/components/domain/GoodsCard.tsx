@@ -40,6 +40,16 @@ const PAD: Record<Size, string> = {
 export const CARD_SHELL = 'rounded-2xl bg-white ring-1 ring-line'
 
 /**
+ * 강조된 카드의 겉모양. 고른 카드와 끌어다 올린 표적이 이걸 쓴다.
+ *
+ * <b>`CARD_SHELL` 위에 `ring-2 ring-ink` 를 덧붙이는 방식으로는 색이 바뀌지 않는다.</b>
+ * `cn` 은 겹치는 클래스를 정리하지 않아서 `ring-line` 과 `ring-ink` 가 둘 다 남고, 생성된
+ * CSS 에서 `.ring-line` 이 뒤에 있어서(테마에 `--color-line` 이 `--color-ink` 보다 뒤에
+ * 적혀 있다) 옅은 테두리가 이긴다. 그래서 두 겹으로 얹지 않고 처음부터 하나만 준다.
+ */
+export const CARD_SHELL_ACTIVE = 'rounded-2xl bg-white ring-2 ring-ink'
+
+/**
  * 카드 앞면. 브랜드색 빛무리 위에 굿즈 이미지를 얹는다.
  *
  * 시안에서 이미지는 회색 타일보다 크게 그려져 위아래 양옆으로 삐져나온다. 타일 안에
@@ -189,10 +199,9 @@ export function GoodsCard({
       layout
       transition={springSnap}
       className={cn(
-        CARD_SHELL,
+        selected ? CARD_SHELL_ACTIVE : CARD_SHELL,
         PAD[size],
         'shadow-[0_2px_10px_rgba(0,0,0,0.06)]',
-        selected && 'ring-2 ring-ink',
         disabled && 'opacity-45',
       )}
     >

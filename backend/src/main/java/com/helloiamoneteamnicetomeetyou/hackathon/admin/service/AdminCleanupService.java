@@ -9,7 +9,9 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.poke.repository.PokeRep
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.push.repository.PushSubscriptionRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -96,11 +98,16 @@ public class AdminCleanupService {
      */
     @Transactional
     public int deleteUserDeep(UUID userId) {
-        List<Long> exchangeIds = exchangeParticipantRepository.findExchangeIdsByUserId(userId);
+        // 참가자 명단과 오간 카드를 둘 다 본다. 명단에서만 찾으면, 명단에는 없는데
+        // exchange_items 의 from_user_id 나 to_user_id 로만 남아 있는 교환이 외래 키로
+        // 삭제를 막는다. 두 컬럼 다 비울 수 없는 자리라 그 교환은 통째로 지워야 한다.
+        Set<Long> ids = new LinkedHashSet<>(exchangeParticipantRepository.findExchangeIdsByUserId(userId));
+        ids.addAll(exchangeItemRepository.findExchangeIdsByUserId(userId));
+
+        List<Long> exchangeIds = List.copyOf(ids);
         deleteExchanges(exchangeIds);
 
-        // 교환에 묶이지 않은 줄이 남아 있을 수 있다. 참가자로는 안 걸렸는데 카드만 오간
-        // 경우가 그렇다. 남은 것을 여기서 확실히 없앤다.
+        // 교환에 묶이지 않은 줄이 남아 있을 수 있다. 남은 것을 여기서 확실히 없앤다.
         exchangeTimeSlotRepository.deleteAllByUserId(userId);
         pokeRepository.deleteByFromUserId(userId);
         pokeRepository.deleteByToUserId(userId);

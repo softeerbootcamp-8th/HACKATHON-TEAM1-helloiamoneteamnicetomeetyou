@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
 
-import { CARD_SHELL, ItemCardBody } from '@/components/domain/GoodsCard'
+import { CARD_SHELL, CARD_SHELL_ACTIVE, ItemCardBody } from '@/components/domain/GoodsCard'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
 import type { Item } from '@/features/catalog/api'
@@ -84,10 +84,9 @@ export function RadarUser({
         transition={springSnap}
         style={{ animationDelay: `${index * 0.4}s` }}
         className={cn(
-          CARD_SHELL,
+          hovered ? CARD_SHELL_ACTIVE : CARD_SHELL,
           'block w-full p-2 shadow-[0_4px_16px_rgba(0,0,0,0.10)]',
           !hovered && !pending && 'anim-float-sm',
-          hovered && 'ring-2 ring-ink',
           pending && 'opacity-45 grayscale',
         )}
       >

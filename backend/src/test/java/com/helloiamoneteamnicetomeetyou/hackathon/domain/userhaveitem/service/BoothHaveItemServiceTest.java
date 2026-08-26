@@ -278,6 +278,27 @@ class BoothHaveItemServiceTest {
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
     }
 
+    /**
+     * 부스를 옮겼을 때 목록이 통째로 비지 않게 하는 검증이다.
+     *
+     * <p>카드는 부스 하나에만 속해서, 앞 부스에서 등록한 희망 카드는 이 부스 카드와 하나도
+     * 맞지 않는다. 내 희망 카드를 부스로 안 자르면 "희망 카드가 있는 사람" 으로 분류돼서
+     * 맞는 줄만 남기게 되고, 그 결과가 빈 목록이 된다.
+     */
+    @Test
+    @DisplayName("다른 부스에서 등록한 희망 카드는 이 부스 목록에 끼지 않는다")
+    void 내_희망_카드는_지금_부스_것만_본다() {
+        List<UserHaveItem> rows =
+                List.of(row(1L, OTHER_A, 10L, "i20 N", 1), row(2L, OTHER_B, 20L, "IONIQ 5 N", 1));
+
+        // 이 부스에는 등록해 둔 희망 카드가 없다. 앞 부스 것은 쿼리가 걸러서 오지 않는다.
+        stub(rows, List.of(), List.of(), List.of());
+
+        PageResponse<BoothHaveItemResponseDto> result = findFirstPage();
+
+        assertThat(result.content()).hasSize(2);
+    }
+
     @Test
     @DisplayName("page 가 음수면 INVALID_INPUT 으로 막는다")
     void page_가_음수면_INVALID_INPUT_이다() {
@@ -298,8 +319,8 @@ class BoothHaveItemServiceTest {
 
         given(userHaveItemRepository.findAllByBoothIdExcludingUser(BOOTH_ID, ME))
                 .willReturn(boothRows);
-        given(userWantItemRepository.findAllByUserId(ME)).willReturn(myWants);
-        given(userHaveItemRepository.findAllByUserId(ME)).willReturn(myHaves);
+        given(userWantItemRepository.findAllByUserIdAndBoothId(ME, BOOTH_ID)).willReturn(myWants);
+        given(userHaveItemRepository.findAllByUserIdAndBoothId(ME, BOOTH_ID)).willReturn(myHaves);
         given(userWantItemRepository.findAllByUserIdIn(anyCollection())).willReturn(ownerWants);
         given(exchangeParticipantRepository.findActivePartnerIds(ME)).willReturn(List.of());
     }
