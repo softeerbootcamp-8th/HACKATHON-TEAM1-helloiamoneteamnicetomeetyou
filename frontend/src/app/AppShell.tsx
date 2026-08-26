@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router'
 
 import { Toast } from '@/components/ui/Toast'
 import { useCatalog } from '@/features/catalog/useCatalog'
+import { fetchPendingMatch } from '@/features/matching/api'
 import { fromServerMatch, type ServerMatchSuggested } from '@/features/matching/from-server-match'
 import { usePokeSync } from '@/features/poke/use-poke-sync'
 import { useBoothEvents } from '@/lib/use-booth-events'
@@ -38,15 +39,37 @@ export function AppShell() {
    * (`server-match-arrived`). 여기서는 파싱과 dispatch 만 한다.
    */
   const boothId = catalog.status === 'ready' ? catalog.boothId : null
+
+  // 실시간으로 받은 제안과 다시 읽어 온 제안을 같은 자리에서 처리한다.
+  const applyMatch = (data: unknown) => {
+    const match = fromServerMatch(data as ServerMatchSuggested)
+    if (!match) {
+      console.warn('[match] 주고받을 카드가 비어 있어 알림을 무시합니다', data)
+      return
+    }
+    dispatch({ type: 'server-match-arrived', match })
+  }
+
   useBoothEvents(boothId, userId, {
-    MATCH_SUGGESTED: (data) => {
-      const match = fromServerMatch(data as ServerMatchSuggested)
-      if (!match) {
-        console.warn('[match] 주고받을 카드가 비어 있어 알림을 무시합니다', data)
-        return
-      }
-      dispatch({ type: 'server-match-arrived', match })
+    /*
+      끊겨 있던 동안 온 MATCH_SUGGESTED 는 다시 오지 않는다. 그래서 연결이 붙을 때마다
+      대기 중인 제안을 직접 읽는다. 이게 없으면 잠깐 끊긴 사람이 자기에게 온 매칭을
+      영영 못 본다.
+
+      제안이 없으면 서버가 204 를 주고, 이미 화면에 떠 있으면 리듀서가 무시한다.
+    */
+    CONNECTED: () => {
+      if (!userId) return
+      void (async () => {
+        try {
+          const pending = await fetchPendingMatch(userId)
+          if (pending) applyMatch(pending)
+        } catch {
+          // 잠깐 실패한 것이면 다음 재연결 때 다시 맞는다.
+        }
+      })()
     },
+    MATCH_SUGGESTED: applyMatch,
     MATCH_REJECTED: (data) => {
       const { exchangeId } = data as { exchangeId: number }
       dispatch({ type: 'server-match-rejected', exchangeId })
