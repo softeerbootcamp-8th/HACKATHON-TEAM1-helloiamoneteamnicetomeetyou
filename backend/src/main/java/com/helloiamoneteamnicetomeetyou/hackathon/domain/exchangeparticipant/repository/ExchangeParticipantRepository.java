@@ -78,4 +78,8 @@ public interface ExchangeParticipantRepository extends JpaRepository<ExchangePar
 
     /** 부스 초기화에서 쓴다. 교환을 지우기 전에 참가자 줄부터 없애야 FK 에 걸리지 않는다. */
     void deleteByExchangeIdIn(List<Long> exchangeIds);
+
+    /** 이 사람이 낀 교환들. 사용자를 지울 때 그 교환까지 걷어내려고 먼저 찾는다. */
+    @Query("select distinct p.exchange.id from ExchangeParticipant p where p.user.id = :userId")
+    List<Long> findExchangeIdsByUserId(@Param("userId") UUID userId);
 }

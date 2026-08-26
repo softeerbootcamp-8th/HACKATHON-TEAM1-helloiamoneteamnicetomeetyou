@@ -90,9 +90,9 @@ class PokeControllerTest {
                 7L,
                 UUID.fromString(SENDER),
                 null,
-                new ItemResponseDto(10L, "AVANTE N", null, null),
-                List.of(new ItemResponseDto(20L, "i20 N", null, null),
-                        new ItemResponseDto(30L, "i30 N", null, null)),
+                new ItemResponseDto(10L, "AVANTE N", null, null, "AN"),
+                List.of(new ItemResponseDto(20L, "i20 N", null, null, "I20N"),
+                        new ItemResponseDto(30L, "i30 N", null, null, "I30N")),
                 LocalDateTime.of(2026, 8, 25, 12, 0));
 
         given(pokeService.findReceived(any(UUID.class), anyInt(), anyInt()))

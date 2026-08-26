@@ -43,6 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminUserService {
 
     private final UserRepository userRepository;
+    private final AdminCleanupService adminCleanupService;
     private final ItemRepository itemRepository;
     private final UserHaveItemRepository userHaveItemRepository;
     private final UserWantItemRepository userWantItemRepository;
@@ -94,7 +95,7 @@ public class AdminUserService {
     public List<ItemDetailView> findItemDetails() {
         Set<UUID> connected = sseConnectionManager.connectedUserIds();
 
-        return itemRepository.findAll().stream()
+        return itemRepository.findAllWithBooth().stream()
                 .map(item -> toItemDetail(item.getId(), ItemView.of(item), connected))
                 .sorted(Comparator
                         .comparing(ItemDetailView::isDeadEnd).reversed()
@@ -251,15 +252,18 @@ public class AdminUserService {
      * 지우면 그 사람 화면이 그때부터 아무것도 못 하게 된다. 어드민이 만든 더미만 열어 둔다.
      */
     @Transactional
-    public void deleteDummy(UUID userId) {
+    public int deleteDummy(UUID userId) {
         User user = findUser(userId);
         if (!user.isAdminManaged()) {
             throw new ApplicationException(ErrorCode.INVALID_INPUT);
         }
 
-        userHaveItemRepository.deleteByUserId(userId);
-        userWantItemRepository.deleteByUserId(userId);
+        // 등록한 카드만 지우고 있었더니 찔러보기와 교환, 알림, 푸시 구독에 걸려 500 이 나갔다.
+        // 사람을 붙들고 있는 표가 여덟이라, 순서를 아는 곳을 AdminCleanupService 하나로 모았다.
+        int removedExchanges = adminCleanupService.deleteUserDeep(userId);
         userRepository.delete(user);
+
+        return removedExchanges;
     }
 
     private Item findItem(Long itemId) {

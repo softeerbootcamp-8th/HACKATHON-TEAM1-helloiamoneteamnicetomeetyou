@@ -16,14 +16,24 @@ import { useEffect } from 'react'
  */
 const IMAGE_BASE = 'https://sdumqvkniemiowanvsef.supabase.co/storage/v1/object/public/items/fruits'
 
+/**
+ * 그림 주소 끝에 붙는 번호. **버킷의 그림을 같은 이름으로 갈아 끼웠으면 이 숫자를 올린다.**
+ *
+ * 서비스 워커가 이 버킷을 CacheFirst 로 30일 들고 있는다(`sw.ts`). 주소가 그대로면 그림만
+ * 바꿔 올려도 이미 앱을 켰던 사람은 30일 내내 옛 그림을 본다. 실제로 새 과일을 올린 뒤에도
+ * 기기에 따라 이전 과일이 떠서, 같은 교환을 하는 두 사람이 서로 다른 그림을 들고 있었다.
+ * 숫자가 바뀌면 주소가 바뀌므로 캐시가 새로 받는다.
+ */
+const IMAGE_VERSION = 2
+
 export type IdentityMark = {
   name: string
-  /** 그림 주소. 파일 이름이 곧 내용이라 캐시에 그대로 얹힌다. */
+  /** 그림 주소. 파일 이름과 버전이 곧 내용이라 캐시에 그대로 얹힌다. */
   src: string
 }
 
 function mark(name: string, file: string): IdentityMark {
-  return { name, src: `${IMAGE_BASE}/${file}.webp` }
+  return { name, src: `${IMAGE_BASE}/${file}.webp?v=${IMAGE_VERSION}` }
 }
 
 export const IDENTITY_MARKS: IdentityMark[] = [
@@ -79,6 +89,11 @@ export function usePrefetchMark(markIndex: number | null): void {
     // 브라우저 캐시에만 올려 두면 되어서 결과를 쓰지 않는다. 실패해도 화면에서 다시
     // 부르기 때문에 조용히 넘어간다.
     const img = new Image()
+    // crossOrigin 을 안 붙이면 no-cors 로 나가서 응답이 opaque 로 온다. opaque 는 성공이든
+    // 404 든 status 가 0 이라, 서비스 워커가 실패한 응답을 성공으로 알고 캐시에 굳혀 버린다.
+    // 한 번 그렇게 되면 그 기기에서는 그림이 영영 안 뜬다. 버킷이 `access-control-allow-origin: *`
+    // 를 주기 때문에 이걸 붙이면 실제 status 가 그대로 온다.
+    img.crossOrigin = 'anonymous'
     img.src = src
   }, [src])
 }

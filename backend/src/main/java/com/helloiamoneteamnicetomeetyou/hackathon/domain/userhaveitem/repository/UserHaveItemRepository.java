@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -90,7 +91,35 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
     @Query("select h from UserHaveItem h join fetch h.item join fetch h.user order by h.id asc")
     List<UserHaveItem> findAllWithItem();
 
-    void deleteByUserId(UUID userId);
+    /**
+     * 사람이나 카드를 지울 때 딸린 등록을 걷어낸다.
+     *
+     * <p><b>파생 삭제({@code deleteByUserId})를 쓰지 않는다.</b> 그쪽은 줄을 하나씩 읽어서
+     * {@code where id = ? and version = ?} 로 지우는데, {@code version} 이 NULL 인 줄이 있으면
+     * 파라미터가 비어서 통째로 실패한다. 벌크 삭제는 버전을 보지 않는다.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("delete from UserHaveItem h where h.user.id = :userId")
+    void deleteByUserId(@Param("userId") UUID userId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from UserHaveItem h where h.item.id = :itemId")
+    void deleteByItemId(@Param("itemId") Long itemId);
+
+    /**
+     * {@code version} 이 비어 있는 줄을 0 으로 채운다. 뜰 때 한 번 돈다.
+     *
+     * <p><b>이 줄들은 지금 아무것도 못 한다.</b> {@code @Version} 을 붙이기 전에 들어간 줄이라
+     * 컬럼이 NULL 인데, JPA 는 {@code where id = ? and version = ?} 로 고치기 때문에 NULL 과는
+     * 절대 맞지 않는다. 그래서 매칭이 그 카드를 예약하려 들 때마다
+     * "expected row count 1 but was 0" 으로 죽었고, 그 사람은 영영 매칭이 안 됐다.
+     *
+     * <p>JPQL 벌크 업데이트로는 버전 컬럼을 못 건드려서 네이티브로 쓴다.
+     */
+    @Modifying
+    @Query(value = "UPDATE user_have_items SET version = 0 WHERE version IS NULL", nativeQuery = true)
+    int initializeNullVersions();
+
     // 내 아이템 중 지금 새로 내줄 수 있는 것 전체 (want-item 등록 후 매칭 트리거용)
     @Query("SELECT uhi FROM UserHaveItem uhi JOIN FETCH uhi.item WHERE uhi.user.id = :userId AND uhi.quantityLeft > 0")
     List<UserHaveItem> findMyLeftItems(@Param("userId") UUID userId);

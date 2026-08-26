@@ -6,9 +6,35 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface PokeRepository extends JpaRepository<Poke, Long> {
+
+    /**
+     * 지워질 교환에서 찔러보기를 떼어 낸다.
+     *
+     * <p>{@code exchange} 는 비어 있어도 되는 자리라(성사되지 않은 찔러보기가 그렇다) 지우지 않고
+     * 떼기만 한다. 누가 누구를 찔렀는지는 그대로 남는다.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("update Poke p set p.exchange = null where p.exchange.id in :exchangeIds")
+    void detachExchanges(@Param("exchangeIds") List<Long> exchangeIds);
+
+    /**
+     * 이 카드가 걸린 찔러보기를 지운다.
+     *
+     * <p>{@code requestedItem} 은 비울 수 없는 자리라 떼어 낼 수가 없다. 찔러보기는 "이 카드
+     * 주세요" 라는 말 자체라, 그 카드가 없어지면 남겨 둘 내용도 없다.
+     */
+    void deleteByRequestedItemId(Long itemId);
+
+    void deleteByChosenItemId(Long itemId);
+
+    void deleteByFromUserId(UUID userId);
+
+    void deleteByToUserId(UUID userId);
 
     /**
      * 어드민 목록이다. 사람과 카드를 같이 읽는다.

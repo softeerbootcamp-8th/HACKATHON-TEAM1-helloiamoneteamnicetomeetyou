@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -109,4 +110,9 @@ public interface UserWantItemRepository extends JpaRepository<UserWantItem, Long
     List<UserWantItem> findAllWithItem();
 
     void deleteByUserId(UUID userId);
+
+    /** 카드를 지울 때 딸린 등록을 같이 지운다. */
+    @Modifying(flushAutomatically = true)
+    @Query("delete from UserWantItem w where w.item.id = :itemId")
+    void deleteByItemId(@Param("itemId") Long itemId);
 }

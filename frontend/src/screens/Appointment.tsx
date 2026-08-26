@@ -98,7 +98,7 @@ export function Appointment() {
         </motion.div>
 
         <div className="mt-10">
-          {/* 무엇을 주고받는지는 아직 화면 목업이 아는 값이라, 없으면 도착 여부만 보여준다. */}
+          {/* 무엇을 주고받는지는 서버가 약속에 담아 주지 않아서, 없으면 도착 여부만 보여준다. */}
           {!match ? (
             <div className="flex items-center justify-center gap-6">
               <div className="text-center">

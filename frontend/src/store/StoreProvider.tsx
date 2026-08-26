@@ -5,11 +5,8 @@ import { useCatalog } from '@/features/catalog/useCatalog'
 import { fetchActiveExchange, fetchExchange, fetchZones } from '@/lib/exchange'
 import { useBoothEvents } from '@/lib/use-booth-events'
 
-import { ALL_WAITING } from '@/mocks/data'
-
 import { StoreContext } from './context'
 import { initialState, reducer } from './reducer'
-import type { Selection } from './types'
 
 /** 시안의 `토스트 정리` 가 정한 노출 시간이다. 5초 뒤에 스스로 사라진다. */
 const TOAST_MS = 5000
@@ -22,8 +19,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     부스는 CatalogProvider 가 이미 골라 놨다. 그 부스의 교환 장소를 받아 두고, 진행 중인 약속이
     있으면 그 자리로 돌아온다. 새로고침하면 화면 상태가 통째로 사라지기 때문에 필요하다.
 
-    카탈로그가 준비되기 전에는 아무것도 하지 않는다. 서버에 못 닿았으면 약속 화면만 막히고
-    나머지는 목업으로 계속 돈다.
+    카탈로그가 준비되기 전에는 아무것도 하지 않는다. 부스를 모르면 읽을 것도 없다.
   */
   const boothId = catalog.status === 'ready' ? catalog.boothId : null
 
@@ -53,54 +49,55 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [boothId, myUserId])
 
-  /**
-   * 온보딩을 건너뛰거나 /have, /needs 로 곧바로 들어온 사람의 카드를 서버에서 받아 채운다.
-   *
-   * `state.have`, `state.needs` 는 그 두 화면을 실제로 거쳐야만 채워지는 로컬 상태라, 새로고침
-   * 한 번이면 서버에는 등록이 남아 있어도 화면은 빈 채로 시작한다. 이미 뭔가 골라 둔 상태를
-   * 덮어쓰지 않도록, 아직 하나도 안 채워졌을 때만 받는다.
-   *
-   * <b>"한 번만 시도했는지"를 ref 로 막지 않는다.</b> StrictMode 가 개발 모드에서 이 effect 를
-   * 마운트 → 정리 → 마운트로 두 번 돌리는데, 정리 단계가 첫 번째 요청을 그새 끊어 버린다.
-   * ref 를 먼저 세워 두면 두 번째(진짜) 마운트가 "이미 시도했다" 며 아예 다시 안 불러서,
-   * 개발 모드에서는 영영 안 채워졌다. 대신 `state.have`/`state.needs` 길이만 본다 — 채워지고
-   * 나면 길이가 바뀌어 더 이상 이 조건을 만족하지 않으므로 두 번 부를 일이 없다.
-   */
+  /*
+    서버에 이미 등록해 둔 카드를 화면으로 되살린다.
+
+    새로고침하면 화면 상태가 통째로 사라지는데 서버 등록은 그대로 남는다. 그 상태로 등록
+    화면에 들어가면 아무것도 안 고른 것처럼 보이고, "교환하러 가기" 를 누르는 순간 등록
+    동기화가 "이번 선택에 없는 카드" 로 보고 서버에 있던 것을 전부 해제한다.
+
+    <b>지금 부스에 있는 카드만 되살린다.</b> 등록 조회는 부스를 가리지 않고 내 등록 전부를
+    돌려주는데, 부스를 옮기면 그 목록에 앞 부스 카드가 섞여 있다. 그대로 넣으면 부스를 옮길 때
+    화면을 비우는 처리(`Onboarding` 의 `pickBooth`)가 무의미해지고, 지금 부스에서는 고를 수도
+    없는 카드가 개수에만 잡힌다.
+
+    실패하면 조용히 넘어간다. 되살리지 못한 것뿐이라 화면을 세울 이유가 없다.
+  */
   useEffect(() => {
     if (catalog.status !== 'ready') return
-    if (state.have.length > 0 || state.needs.length > 0) return
 
-    const { mockIdOf } = catalog
+    const { itemById } = catalog
     const controller = new AbortController()
-
-    // qty 가 0 이하인 Selection 은 이 앱에서 존재하지 않는 상태다 (setQty/bump 가 0 이하면
-    // 아예 목록에서 뺀다). 지금 새로 낼 게 없는(quantity_left = 0, 예약되었거나 다 나간)
-    // 카드까지 그대로 넣으면 "가지고 있다는데 수량이 0" 으로 화면이 그 규칙을 어기게 된다.
-    const toSelections = (rows: RegisteredItem[]): Selection[] =>
-      rows
-        .filter((row) => row.quantity > 0)
-        .map((row) => ({ itemId: mockIdOf(row.itemId), qty: row.quantity }))
-        .filter((s): s is Selection => s.itemId !== undefined)
+    const { signal } = controller
 
     void (async () => {
       try {
         const [have, needs] = await Promise.all([
-          fetchMyHaveItems(myUserId, controller.signal),
-          fetchMyWantItems(myUserId, controller.signal),
+          fetchMyHaveItems(myUserId, signal),
+          fetchMyWantItems(myUserId, signal),
         ])
-        if (controller.signal.aborted) return
+        if (signal.aborted) return
+
+        // qty 가 0 이하인 Selection 은 이 앱에서 존재하지 않는 상태다 (setQty/bump 가 0 이하면
+        // 아예 목록에서 뺀다). 지금 새로 낼 게 없는(quantity_left = 0, 예약되었거나 다 나간)
+        // 카드까지 그대로 넣으면 "가지고 있다는데 수량이 0" 으로 화면이 그 규칙을 어기게 된다.
+        const inThisBooth = (rows: RegisteredItem[]) =>
+          rows
+            .filter((row) => row.quantity > 0 && itemById(row.itemId) !== undefined)
+            .map((row) => ({ itemId: row.itemId, qty: row.quantity }))
+
         dispatch({
-          type: 'have-needs-hydrated',
-          have: toSelections(have),
-          needs: toSelections(needs),
+          type: 'registrations-loaded',
+          have: inThisBooth(have),
+          needs: inThisBooth(needs),
         })
       } catch {
-        // 못 받아도 화면은 뜬다. /have 에서 직접 고치면 그때 다시 맞는다.
+        // 되살리지 못했을 뿐이다. 고르는 것부터 다시 하면 된다.
       }
     })()
 
     return () => controller.abort()
-  }, [catalog, myUserId, state.have.length, state.needs.length])
+  }, [catalog, myUserId])
 
   /**
    * 실시간 알림을 받으면 약속을 서버에서 다시 읽는다.
@@ -151,36 +148,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     EXCHANGE_COMPLETED: (data) => void syncExchange(data),
     EXCHANGE_CANCELLED: (data) => void syncExchange(data),
   })
-
-  // 지금 다루고 있는 약속. 아래 효과들이 이것만 보고 돌면 되므로 밖에서 한 번 꺼내 둔다.
-
-  // 매칭이 끝나면 붙잡아 둔 찔러보기를 그때 알린다.
-  useEffect(() => {
-    if (state.autoMatching || !state.heldIncoming) return
-    const timer = window.setTimeout(() => dispatch({ type: 'release-held-poke' }), 700)
-    return () => window.clearTimeout(timer)
-  }, [state.autoMatching, state.heldIncoming])
-
-  // 보낸 찔러보기에 대한 상대의 응답.
-  useEffect(() => {
-    if (state.outgoingPoke?.status !== 'pending') return
-    const timer = window.setTimeout(() => {
-      const target = ALL_WAITING.find((u) => u.id === state.outgoingPoke?.targetUserId)
-
-      // 상대는 자기가 원하는 카드가 내 묶음에 있으면 그걸 고르고, 없으면 아무 한 장을
-      // 고른다. 찔러보기는 원래 원하는 것이 없는 상대에게 보내는 것이라 뒤쪽이 보통이다.
-      // 서버 연동에서는 이 자리에 실제로 고른 카드가 들어온다.
-      const wanted = state.have.find((s) => target?.needsItemIds.includes(s.itemId))
-      const chosen = wanted ?? state.have[0]
-
-      dispatch({
-        type: 'poke-answered',
-        accepted: Boolean(target && chosen),
-        chosenItemId: chosen?.itemId,
-      })
-    }, 3200)
-    return () => window.clearTimeout(timer)
-  }, [state.outgoingPoke, state.have])
 
   // 토스트는 스스로 사라진다.
   useEffect(() => {
