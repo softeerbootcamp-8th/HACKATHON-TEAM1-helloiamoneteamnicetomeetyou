@@ -48,7 +48,7 @@ class BoothHaveItemControllerTest {
                 7L,
                 OWNER_ID,
                 null,
-                new ItemResponseDto(10L, "IONIQ 5 N", null, null),
+                new ItemResponseDto(10L, "IONIQ 5 N", null, null, "I5N"),
                 2,
                 true,
                 true,

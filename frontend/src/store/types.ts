@@ -2,7 +2,8 @@ import type { Zone } from '@/lib/exchange'
 
 import type { MatchResult } from './matching'
 
-export type Selection = { itemId: string; qty: number }
+/** 고른 카드 한 줄. `itemId` 는 서버가 매긴 카드 id 다. */
+export type Selection = { itemId: number; qty: number }
 
 export type NotificationKind =
   | 'match'
@@ -18,21 +19,6 @@ export type AppNotification = {
   kind: NotificationKind
   title: string
   body: string
-}
-
-export type OutgoingPoke = {
-  targetUserId: string
-  /** 상대에게 요청한 카드 */
-  wantItemId: string
-  status: 'pending' | 'accepted' | 'rejected'
-}
-
-export type IncomingPoke = {
-  fromUserId: string
-  /** 상대가 원하는 내 카드 */
-  wantItemId: string
-  /** 상대가 내놓은 카드 묶음. 이 중 한 장을 고른다. */
-  offeredItemIds: string[]
 }
 
 export type AppointmentStage =
@@ -59,9 +45,9 @@ export type Appointment = {
   /**
    * 이 약속이 성사시킨 교환. 약속마다 상대와 카드가 다르기 때문에 약속이 들고 있는다.
    *
-   * **없을 수 있다.** 무엇을 주고받는지는 아직 화면 목업이 정하는 값이라 서버가 모른다.
-   * 매칭을 거치지 않고 약속으로 들어온 경우(새로고침, 상대가 만든 약속)에는 비어 있고,
-   * 그때 화면은 카드 그림만 빼고 나머지를 보여준다.
+   * **없을 수 있다.** 무엇을 주고받는지는 서버가 약속에 담아 주지 않는다. 매칭을 거치지 않고
+   * 약속으로 들어온 경우(새로고침, 상대가 만든 약속)에는 비어 있고, 그때 화면은 카드 그림만
+   * 빼고 나머지를 보여준다.
    */
   match: ActiveMatch | null
   stage: AppointmentStage
@@ -87,10 +73,10 @@ export type Appointment = {
 /**
  * 화면에 보여줄 매칭. 자동 매칭인지 찔러보기 성사인지에 따라 제목이 달라진다.
  *
- * `exchangeId` 가 있으면 서버가 실제로 만든 교환이라 수락·거절이 `/api/exchanges`
- * 를 부른다. 목업(자동 매칭 시뮬레이션·찔러보기)은 서버에 아무것도 없어서 `null` 이다.
+ * `exchangeId` 는 서버가 만든 교환이다. 매칭은 자동이든 찔러보기든 서버가 성사시키므로
+ * 언제나 있고, 수락과 거절이 이 값으로 `/api/exchanges` 를 부른다.
  */
-export type ActiveMatch = MatchResult & { origin: 'auto' | 'poke'; exchangeId: number | null }
+export type ActiveMatch = MatchResult & { origin: 'auto' | 'poke'; exchangeId: number }
 
 export type State = {
   onboarded: boolean
@@ -104,12 +90,6 @@ export type State = {
   /** 자동 매칭이 돌고 있는지. 약속이 있으면 돌지 않는다. */
   autoMatching: boolean
   match: ActiveMatch | null
-  /** 거절한 상대는 다시 매칭에 올리지 않는다. */
-  declined: string[]
-  outgoingPoke: OutgoingPoke | null
-  incomingPoke: IncomingPoke | null
-  /** 매칭이 도는 동안 들어온 찔러보기는 끝날 때까지 알리지 않는다. */
-  heldIncoming: IncomingPoke | null
   /** 진행 중이거나 확정된 약속들. 현재 시간에서 가까운 순으로 화면에 깔린다. */
   appointments: Appointment[]
   /** 지금 장소·시간·약속 화면이 다루고 있는 약속. 서버 교환 id 다. */
@@ -120,6 +100,6 @@ export type State = {
   zones: Zone[]
   notifications: AppNotification[]
   /** 교환으로 얻은 카드 */
-  collection: string[]
+  collection: number[]
   toast: string | null
 }

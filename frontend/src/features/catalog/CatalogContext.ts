@@ -1,28 +1,27 @@
 import { createContext } from 'react'
 
-import type { Item } from '@/mocks/data'
-
-import type { ServerBooth } from './api'
+import type { Item, ServerBooth } from './api'
 
 /**
  * 서버 연동 준비 상태.
  *
  * - `loading`: 사용자 등록과 카드 목록을 받아오는 중
- * - `ready`: 카드 등록을 서버로 보낼 수 있다
+ * - `ready`: 카드 목록을 받았다. 등록 화면이 이걸 그린다
  * - `empty`: 서버는 붙었는데 부스나 카드가 아직 없다 (어드민에서 넣어야 한다)
  * - `error`: 서버에 닿지 못했다
+ *
+ * **`ready` 가 아니면 화면은 카드를 그리지 않는다.** 전에는 목업 카드로 떨어졌는데, 그러면
+ * 고를 수는 있지만 서버에 없는 카드라 등록도 매칭도 되지 않는 상태로 흐름을 계속 타게 된다.
  */
 export type CatalogState =
   | { status: 'loading' }
   | {
       status: 'ready'
       boothId: number
-      serverIdOf: (mockItemId: string) => number | undefined
-      /** 서버 카드 id → 목업 카드 id. SSE 로 오는 매칭 알림을 화면에 그릴 때 쓴다. */
-      mockIdOf: (serverItemId: number) => string | undefined
-      /** 서버 카드 id → 목업 카드. 서버에서 받은 것을 화면에 그릴 때 쓴다. */
-      mockItemOf: (serverItemId: number) => Item | undefined
-      unmatched: Item[]
+      /** 이 부스가 내놓은 카드 전부. 등록 화면이 이 순서 그대로 그린다. */
+      items: Item[]
+      /** 서버 카드 id 로 카드를 찾는다. 목록에 없는 id 면 `undefined` 다. */
+      itemById: (itemId: number) => Item | undefined
     }
   | { status: 'empty'; reason: string }
   | { status: 'error'; reason: string }

@@ -2,8 +2,6 @@ import { apiVoid } from '@/lib/api'
 
 /**
  * 매칭 결과를 보고 장소를 잡으러 들어간다. 서버 교환을 PENDING 에서 IN_PROGRESS 로 옮긴다.
- *
- * 목업 매칭(`exchangeId` 가 없는 매칭)에는 부를 게 없다. 호출하는 쪽에서 이미 걸러서 부른다.
  */
 export function acceptExchange(
   exchangeId: number,

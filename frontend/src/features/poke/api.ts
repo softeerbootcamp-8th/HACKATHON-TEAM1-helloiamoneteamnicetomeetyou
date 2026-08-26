@@ -1,3 +1,4 @@
+import type { Item } from '@/features/catalog/api'
 import { apiData } from '@/lib/api'
 
 /** 서버가 내려주는 목록 껍데기. 형식은 `contracts.md` 가 기준이다. */
@@ -10,13 +11,14 @@ export type PageResponse<T> = {
   size: number
 }
 
-/** 서버 카드. `imageUrl` 이 없으면 화면이 그라데이션 썸네일을 그린다. */
-export type ServerItemRef = {
-  id: number
-  name: string
-  description?: string
-  imageUrl?: string
-}
+/**
+ * 서버 카드. 카드 등록 화면이 받는 것과 같은 형식이라 그대로 그릴 수 있다.
+ *
+ * 목록 응답이 카드를 통째로 싣고 오기 때문에 화면이 따로 카드를 찾을 일이 없다. 전에는
+ * 여기 담긴 것이 id 와 이름뿐이라 그림을 목업에서 이름으로 찾아 왔고, 못 찾은 카드는
+ * 화면에서 조용히 빠졌다.
+ */
+export type ServerItemRef = Item
 
 /**
  * 부스 안 다른 사람이 내놓은 카드 한 줄. `GET /api/booths/{boothId}/have-items`

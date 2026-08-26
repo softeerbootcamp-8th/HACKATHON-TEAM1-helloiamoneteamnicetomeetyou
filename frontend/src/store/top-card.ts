@@ -26,10 +26,10 @@ const TOP_CARD_PICK = Math.random()
  * 넣으면 렌더마다 새 참조라 매번 다시 돈다. 고른 카드가 없으면 `null` 이고, 가지고 있지도
  * 않은 카드를 세우지 않는다.
  */
-export function useTopHaveItemId(have: Selection[]): string | null {
+export function useTopHaveItemId(have: Selection[]): number | null {
   const haveKey = have.map((s) => s.itemId).join(',')
   return useMemo(() => {
-    const ids = haveKey ? haveKey.split(',') : []
+    const ids = haveKey ? haveKey.split(',').map(Number) : []
     return ids.length > 0 ? ids[Math.floor(TOP_CARD_PICK * ids.length)] : null
   }, [haveKey])
 }
