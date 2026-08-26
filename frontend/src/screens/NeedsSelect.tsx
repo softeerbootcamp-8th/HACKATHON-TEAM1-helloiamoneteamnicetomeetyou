@@ -10,7 +10,7 @@ export function NeedsSelect() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
   const { state: catalog } = useCatalog()
-  const { submit, submitting, error } = useRegisterSelections('want')
+  const { submit, submitting, error } = useRegisterSelections()
 
   return (
     <SelectScreen
@@ -27,7 +27,8 @@ export function NeedsSelect() {
       onToggle={(itemId) => dispatch({ type: 'toggle-need', itemId })}
       onChangeQty={(itemId, qty) => dispatch({ type: 'set-need-qty', itemId, qty })}
       onClear={(itemId) => dispatch({ type: 'clear-need', itemId })}
-      onSubmit={() => void submit(state.needs, () => navigate('/home'))}
+      // 두 화면에서 고른 것을 여기서 한 번에 보낸다. 등록이 끝나야 서버 매칭이 돈다.
+      onSubmit={() => void submit(state.have, state.needs, () => navigate('/home'))}
     />
   )
 }

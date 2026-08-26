@@ -1,9 +1,10 @@
 package com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
+import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -21,6 +22,9 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
 
     Optional<UserHaveItem> findByUserIdAndItemId(UUID userId, Long itemId);
 
+    /** 찾는 카드 등록이 이 카드를 이미 내놓기로 했는지 확인할 때 쓴다. */
+    boolean existsByUserIdAndItemId(UUID userId, Long itemId);
+
     /**
      * 부스 안에서 <b>나를 뺀</b> 다른 사용자들의 보유 카드다.
      *
@@ -28,9 +32,12 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
      * 카드를 하나라도 보유 등록한 사람으로 유도한다. 부스에 왔지만 아직 등록하지 않은 사람은
      * 목록에 뜨지 않는다.
      *
-     * <p>수량이 0 인 줄은 뺀다. 교환으로 다 나간 카드를 찔러봐도 성사될 수 없다.
+     * <p><b>{@code LEFT} 이고 남은 수량이 있는 줄만 남긴다</b>(시안 desc 165:3500 2·5번).
+     * 매칭이 성사되면 {@link com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.service.MatchingService}
+     * 가 그 카드를 {@code RESERVED} 로 바꾸는데, 그 줄을 계속 내려보내면 이미 임자가 있는 카드가
+     * 대기장에 남아서 찔러봐야 성사되지 않는다. 매칭 쿼리들이 쓰는 조건과 같은 것이다.
      *
-     * <p>정렬 기준이 행마다 달라져서(내 희망 카드인지, 줄 수 있는 카드가 있는지) SQL 로 옮길 수
+     * <p>정렬 기준이 행마다 달라져서(내 희망 카드인지, 몇 번째로 찾는 카드인지) SQL 로 옮길 수
      * 없다. 여기서는 {@code id} 오름차순으로만 고정해 두고 나머지는 서비스가 메모리에서 정렬한다.
      * 부스 규모에서는 전부 읽어 오는 편이 싸다.
      */
@@ -40,7 +47,8 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
             join fetch h.user
             where i.booth.id = :boothId
               and h.user.id <> :userId
-              and h.quantity > 0
+              and h.status = 'LEFT'
+              and h.quantityLeft > 0
             order by h.id asc
             """)
     List<UserHaveItem> findAllByBoothIdExcludingUser(Long boothId, UUID userId);
@@ -114,6 +122,10 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
                 AND ei.from_user_id = uhi.user_id
                 AND ei.to_user_id = :myUserId
                 AND ei.item_id = uhi.item_id
+                AND EXISTS (
+                    SELECT 1 FROM exchange_participants ep2
+                    WHERE ep2.exchange_id = e2.id AND ep2.status = 'REJECTED'
+                )
           )
         ORDER BY uhi.created_at ASC
         """, nativeQuery = true)
@@ -132,7 +144,9 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
                LEAST(uhi.quantity_left, uwi.quantity) AS qty
         FROM user_have_items uhi
         JOIN user_want_items uwi ON uwi.item_id = uhi.item_id
-        WHERE uhi.user_id IN :bIds
+        JOIN items bc_item ON bc_item.id = uhi.item_id
+        WHERE bc_item.booth_id = :boothId
+          AND uhi.user_id IN :bIds
           AND uwi.user_id IN :cIds
           AND uhi.user_id != uwi.user_id
           AND uhi.status = 'LEFT'
@@ -144,10 +158,16 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
                 AND ei.from_user_id = uhi.user_id
                 AND ei.to_user_id = uwi.user_id
                 AND ei.item_id = uhi.item_id
+                AND EXISTS (
+                    SELECT 1 FROM exchange_participants ep2
+                    WHERE ep2.exchange_id = e2.id AND ep2.status = 'REJECTED'
+                )
           )
         ORDER BY uhi.created_at ASC
         """, nativeQuery = true)
-    List<Object[]> findBToCData(@Param("bIds") Set<String> bIds, @Param("cIds") Set<String> cIds);
+    List<Object[]> findBToCData(@Param("boothId") Long boothId,
+                                @Param("bIds") Collection<String> bIds,
+                                @Param("cIds") Collection<String> cIds);
 
     // createExchange에서 UserHaveItem 엔티티 로드 (quantityLeft 감소용)
     @Query("SELECT uhi FROM UserHaveItem uhi JOIN FETCH uhi.item WHERE uhi.user.id = :userId AND uhi.item.id IN :itemIds AND uhi.status = 'LEFT' AND uhi.quantityLeft > 0")

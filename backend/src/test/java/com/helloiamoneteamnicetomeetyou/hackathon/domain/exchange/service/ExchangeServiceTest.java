@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.entity.Booth;
@@ -34,6 +35,15 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.entity.Zone;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.repository.ZoneRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.event.MatchTriggerEvent;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.entity.UserWantItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventPublisher;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventType;
 import java.lang.reflect.Field;
@@ -82,6 +92,8 @@ class ExchangeServiceTest {
     private UserWantItemRepository userWantItemRepository;
     @Mock
     private SseEventPublisher sseEventPublisher;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ExchangeService exchangeService;
@@ -459,5 +471,64 @@ class ExchangeServiceTest {
     /** 만든 교환을 화면이 받는 모양으로 읽는다. 조회 경로와 같은 값을 보게 된다. */
     private ExchangeResponseDto toResponseOf(Exchange created) {
         return exchangeService.find(created.getId());
+    }
+
+    // ──────────────────────────────────────────
+    // 카드 수명주기 — 예약 해제와 소진
+    // ──────────────────────────────────────────
+
+    /**
+     * 약속을 취소하면 잡아 뒀던 카드가 풀려야 한다.
+     *
+     * <p>풀리지 않으면 카드가 {@code RESERVED} 에 갇힌다. 매칭 쿼리가 {@code LEFT} 인 카드만 보기
+     * 때문에, 그 사람은 취소 한 번으로 다시는 매칭되지 않는다.
+     */
+    @Test
+    @DisplayName("약속을 취소하면 잡아 둔 카드가 풀리고 재매칭이 걸린다")
+    void 취소하면_카드가_풀린다() throws Exception {
+        UserHaveItem reserved = reservedHaveItem();
+        givenExchangeItem(reserved);
+
+        exchangeService.cancel(EXCHANGE_ID, ME);
+
+        assertThat(reserved.isReserved()).isFalse();
+        // 카드가 풀렸으니 남은 사람들은 다시 상대를 찾아야 한다.
+        verify(eventPublisher, times(2)).publishEvent(any(MatchTriggerEvent.class));
+    }
+
+    @Test
+    @DisplayName("교환을 마치면 내놓은 수량이 줄고 찾는 카드가 빠진다")
+    void 마치면_수량이_줄어든다() throws Exception {
+        exchange.confirmTime(1);
+
+        UserHaveItem given = reservedHaveItem();
+        UserWantItem wanted = UserWantItem.of(partner, given.getItem(), 1);
+        givenExchangeItem(given);
+        given(userWantItemRepository.findByUserIdAndItemId(PARTNER, given.getItem().getId()))
+                .willReturn(Optional.of(wanted));
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        // 두 장 중 한 장이 나갔다.
+        assertThat(given.getQuantityLeft()).isEqualTo(1);
+        // 받은 사람은 더 이상 이 카드를 찾지 않는다. 남겨 두면 곧바로 같은 카드로 재매칭된다.
+        assertThat(wanted.getQuantity()).isZero();
+        verify(userWantItemRepository).delete(wanted);
+    }
+
+    /** ME 가 PARTNER 에게 카드 한 장을 주는 교환 한 줄을 깔아 둔다. */
+    private void givenExchangeItem(UserHaveItem haveItem) {
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.of(exchange, me, haveItem.getItem(), partner)));
+        given(userHaveItemRepository.findByUserIdAndItemId(ME, haveItem.getItem().getId()))
+                .willReturn(Optional.of(haveItem));
+    }
+
+    /** 매칭이 잡아 둔 상태의 보유 카드. 두 장 중 한 장이 이번 교환에 걸려 있다. */
+    private UserHaveItem reservedHaveItem() throws Exception {
+        Item item = withId(Item.of(exchange.getZone().getBooth(), "IONIQ 5 N", null), 7L);
+        UserHaveItem haveItem = UserHaveItem.of(me, item, 2);
+        haveItem.reserve();
+        return haveItem;
     }
 }

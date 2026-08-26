@@ -7,6 +7,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.Exc
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.repository.ExchangeParticipantRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.repository.ItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.dto.MatchSuggestedResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
@@ -33,6 +34,7 @@ public class MatchingService {
     private final UserHaveItemRepository userHaveItemRepository;
     private final UserWantItemRepository userWantItemRepository;
     private final UserRepository userRepository;
+    private final ItemRepository itemRepository;
     private final ExchangeRepository exchangeRepository;
     private final ExchangeParticipantRepository exchangeParticipantRepository;
     private final ExchangeItemRepository exchangeItemRepository;
@@ -55,6 +57,8 @@ public class MatchingService {
         Map<UUID, Long> earliestReg = new HashMap<>();
         Map<UUID, Map<Long, Integer>> toThem = buildToThem(userId, earliestReg);
         Map<UUID, Map<Long, Integer>> toMe   = buildToMe(userId);
+
+        dropSelfDefeating(toThem, toMe);
 
         if (toThem.isEmpty() || toMe.isEmpty()) return;
 
@@ -88,8 +92,8 @@ public class MatchingService {
         Map<Long, Integer> receive = toMe.get(bestId);
         int exchangeQty = Math.min(sum(give), sum(receive));
 
-        return Optional.of(createExchange(myUser, bestId,
-                capTo(give, exchangeQty), capTo(receive, exchangeQty)));
+        return createExchange(myUser, bestId,
+                capTo(give, exchangeQty), capTo(receive, exchangeQty));
     }
 
     /**
@@ -115,12 +119,14 @@ public class MatchingService {
      * 1대1 Exchange를 저장한다. give/receive는 이미 확정된 { itemId → qty }다.
      * 매칭 시점에는 status를 RESERVED로 변경만 한다. quantityLeft 감소는 거래 완료 시점에 처리한다.
      */
-    private Exchange createExchange(
+    private Optional<Exchange> createExchange(
             User myUser,
             UUID bestId,
             Map<Long, Integer> give,
             Map<Long, Integer> receive
     ) {
+        if (!lockParticipants(List.of(myUser.getId(), bestId))) return Optional.empty();
+
         User bestUser = userRepository.findById(bestId).orElseThrow();
 
         Map<Long, UserHaveItem> myMap   = indexByItemId(
@@ -146,7 +152,7 @@ public class MatchingService {
         });
         exchangeItemRepository.saveAll(items);
         notifyParticipants(exchange, items, List.of(myUser, bestUser));
-        return exchange;
+        return Optional.of(exchange);
     }
 
     // ──────────────────────────────────────────
@@ -166,9 +172,35 @@ public class MatchingService {
     ) {
         if (toThem.isEmpty() || toMe.isEmpty()) return Optional.empty();
 
-        // 추가 쿼리: B → C (B ∈ toThem, C ∈ toMe)
+        // 사이클의 세 다리가 같은 부스여야 한다. 다른 부스 카드가 섞이면 한 자리에 모여서
+        // 교환할 수 없는 상대가 짝으로 잡힌다. 1대1 은 두 사람이 같은 카드로 이어지므로
+        // (카드는 부스 하나에만 속한다) 저절로 한 부스 안이고, 사이클만 이 검사가 필요하다.
+        Map<Long, Long> boothOf = boothOfItems(toThem, toMe);
+
+        for (Long boothId : new LinkedHashSet<>(boothOf.values())) {
+            Optional<Exchange> exchange =
+                    tryThreeWayInBooth(myUser, boothId, boothOf, toThem, toMe, earliestReg);
+            if (exchange.isPresent()) return exchange;
+        }
+        return Optional.empty();
+    }
+
+    /** 한 부스 안에서만 A→B→C→A 사이클을 찾는다. */
+    private Optional<Exchange> tryThreeWayInBooth(
+            User myUser,
+            Long boothId,
+            Map<Long, Long> boothOf,
+            Map<UUID, Map<Long, Integer>> toThem,
+            Map<UUID, Map<Long, Integer>> toMe,
+            Map<UUID, Long> earliestReg
+    ) {
+        Map<UUID, Map<Long, Integer>> theirs = keepBooth(toThem, boothOf, boothId);
+        Map<UUID, Map<Long, Integer>> mine   = keepBooth(toMe, boothOf, boothId);
+        if (theirs.isEmpty() || mine.isEmpty()) return Optional.empty();
+
+        // 추가 쿼리: B → C (B ∈ theirs, C ∈ mine)
         // bToC: bId → cId → { itemId → qty }
-        Map<UUID, Map<UUID, Map<Long, Integer>>> bToC = buildBToC(toThem.keySet(), toMe.keySet());
+        Map<UUID, Map<UUID, Map<Long, Integer>>> bToC = buildBToC(boothId, theirs.keySet(), mine.keySet());
         if (bToC.isEmpty()) return Optional.empty();
 
         // B는 want를 먼저 등록한 순서(earliestReg 최솟값)로 선정, C는 첫 번째
@@ -178,20 +210,61 @@ public class MatchingService {
         UUID cId = bToC.get(bId).keySet().iterator().next();
 
         // 각 방향에서 교환할 아이템 1개씩 결정
-        Long aToBItemId = toThem.get(bId).keySet().iterator().next();
+        Long aToBItemId = theirs.get(bId).keySet().iterator().next();
         Long bToCItemId = bToC.get(bId).get(cId).keySet().iterator().next();
-        Long cToAItemId = toMe.get(cId).keySet().iterator().next();
 
-        return Optional.of(createThreeWayExchange(
+        // 내가 내놓은 카드를 사이클을 한 바퀴 돌아 도로 받으면 교환이 아니다. 다른 카드를 찾고,
+        // 없으면 이 조합은 포기한다. 1대1 쪽 dropSelfDefeating 과 같은 이유다.
+        Long cToAItemId = mine.get(cId).keySet().stream()
+                .filter(itemId -> !itemId.equals(aToBItemId))
+                .findFirst()
+                .orElse(null);
+        if (cToAItemId == null) return Optional.empty();
+
+        return createThreeWayExchange(
                 myUser, bId, cId, aToBItemId, bToCItemId, cToAItemId
-        ));
+        );
+    }
+
+    /** 두 후보 맵에 등장하는 카드가 각각 어느 부스 것인지 한 번에 읽는다. */
+    private Map<Long, Long> boothOfItems(
+            Map<UUID, Map<Long, Integer>> toThem,
+            Map<UUID, Map<Long, Integer>> toMe
+    ) {
+        Set<Long> itemIds = new LinkedHashSet<>();
+        toThem.values().forEach(m -> itemIds.addAll(m.keySet()));
+        toMe.values().forEach(m -> itemIds.addAll(m.keySet()));
+        if (itemIds.isEmpty()) return Map.of();
+
+        Map<Long, Long> result = new LinkedHashMap<>();
+        for (Object[] row : itemRepository.findBoothIdsByItemIds(itemIds)) {
+            result.put(toLong(row[0]), toLong(row[1]));
+        }
+        return result;
+    }
+
+    /** 후보 맵에서 이 부스 카드만 남긴다. 남는 카드가 없어진 후보는 통째로 뺀다. */
+    private Map<UUID, Map<Long, Integer>> keepBooth(
+            Map<UUID, Map<Long, Integer>> source,
+            Map<Long, Long> boothOf,
+            Long boothId
+    ) {
+        Map<UUID, Map<Long, Integer>> result = new LinkedHashMap<>();
+        source.forEach((candidateId, items) -> {
+            Map<Long, Integer> kept = new LinkedHashMap<>();
+            items.forEach((itemId, qty) -> {
+                if (boothId.equals(boothOf.get(itemId))) kept.put(itemId, qty);
+            });
+            if (!kept.isEmpty()) result.put(candidateId, kept);
+        });
+        return result;
     }
 
     /**
      * 3인 Exchange를 저장한다. 교환할 아이템 ID는 이미 결정된 상태로 받는다.
      * 매칭 시점에는 status를 RESERVED로 변경만 한다. quantityLeft 감소는 거래 완료 시점에 처리한다.
      */
-    private Exchange createThreeWayExchange(
+    private Optional<Exchange> createThreeWayExchange(
             User myUser,
             UUID bId,
             UUID cId,
@@ -199,6 +272,8 @@ public class MatchingService {
             Long bToCItemId,
             Long cToAItemId
     ) {
+        if (!lockParticipants(List.of(myUser.getId(), bId, cId))) return Optional.empty();
+
         User userB = userRepository.findById(bId).orElseThrow();
         User userC = userRepository.findById(cId).orElseThrow();
 
@@ -228,7 +303,7 @@ public class MatchingService {
         cHaveItem.reserve();
 
         notifyParticipants(exchange, items, List.of(myUser, userB, userC));
-        return exchange;
+        return Optional.of(exchange);
     }
 
     // ──────────────────────────────────────────
@@ -274,9 +349,9 @@ public class MatchingService {
      * 쿼리 C (3인 전용): B가 C에게 줄 수 있는 아이템과 수량을 조회한다.
      * 결과: bId → cId → { itemId → qty }
      */
-    private Map<UUID, Map<UUID, Map<Long, Integer>>> buildBToC(Set<UUID> bIds, Set<UUID> cIds) {
+    private Map<UUID, Map<UUID, Map<Long, Integer>>> buildBToC(Long boothId, Set<UUID> bIds, Set<UUID> cIds) {
         Map<UUID, Map<UUID, Map<Long, Integer>>> result = new LinkedHashMap<>();
-        for (Object[] row : userHaveItemRepository.findBToCData(toStrings(bIds), toStrings(cIds))) {
+        for (Object[] row : userHaveItemRepository.findBToCData(boothId, toStrings(bIds), toStrings(cIds))) {
             UUID bId    = toUUID(row[0]);
             UUID cId    = toUUID(row[1]);
             Long itemId = toLong(row[2]);
@@ -291,6 +366,58 @@ public class MatchingService {
     // ──────────────────────────────────────────
     // 공통 유틸
     // ──────────────────────────────────────────
+
+    /**
+     * 교환을 만들기 직전에 참가자 전원을 잠그고, 그 사이 누가 다른 매칭에 묶이지 않았는지 다시 본다.
+     *
+     * <p>{@code runMatching} 첫 줄의 {@code existsActiveExchange} 검사와 실제 저장 사이에는 락이
+     * 없다. 매칭은 스레드 4개로 동시에 돌기 때문에, 두 사람의 매칭이 서로를 후보로 잡으면 양쪽 다
+     * 검사를 통과하고 교환을 두 건 만든다. 그 사이를 막는 자리가 여기다.
+     *
+     * <p>UUID 오름차순으로 잠근다. 순서를 고정하지 않으면 두 스레드가 서로가 쥔 행을 기다려
+     * 교착에 빠진다.
+     *
+     * @return 전원이 아직 비어 있어 이 교환을 만들어도 되면 true
+     */
+    private boolean lockParticipants(List<UUID> userIds) {
+        List<UUID> ordered = userIds.stream().sorted().toList();
+
+        for (UUID userId : ordered) {
+            userRepository.findByIdForUpdate(userId).orElseThrow();
+        }
+        return ordered.stream().noneMatch(exchangeParticipantRepository::existsActiveExchange);
+    }
+
+    /**
+     * 같은 카드를 주면서 동시에 받는 조합을 후보에서 걷어낸다.
+     *
+     * <p>내가 카드 X 를 보유와 희망 양쪽에 등록해 두면(등록 API 가 이제 막지만 예전에 쌓인 행이
+     * 남아 있다) 상대 하나가 toThem 과 toMe 양쪽에 X 로 잡힌다. 그대로 두면 X 를 건네고 X 를
+     * 돌려받는 교환이 성사돼 양쪽 카드가 예약만 되고 아무것도 달라지지 않는다.
+     *
+     * <p>score 계산 전에 걷어내야 한다. 남겨 두면 의미 없는 수량이 점수를 부풀려 엉뚱한 상대가
+     * 최적으로 뽑힌다.
+     */
+    private void dropSelfDefeating(
+            Map<UUID, Map<Long, Integer>> toThem,
+            Map<UUID, Map<Long, Integer>> toMe
+    ) {
+        for (UUID candidateId : Set.copyOf(toThem.keySet())) {
+            Map<Long, Integer> give    = toThem.get(candidateId);
+            Map<Long, Integer> receive = toMe.get(candidateId);
+            if (receive == null) continue;
+
+            Set<Long> both = new HashSet<>(give.keySet());
+            both.retainAll(receive.keySet());
+            if (both.isEmpty()) continue;
+
+            both.forEach(give::remove);
+            both.forEach(receive::remove);
+
+            if (give.isEmpty())    toThem.remove(candidateId);
+            if (receive.isEmpty()) toMe.remove(candidateId);
+        }
+    }
 
     /**
      * 1대1 후보의 score를 계산한다.

@@ -65,6 +65,20 @@ public class UserWantItem {
     }
 
     /**
+     * 교환으로 이 카드를 받았다. 그만큼 찾는 개수를 줄인다.
+     *
+     * <p>줄이지 않으면 이미 받은 카드를 계속 원하는 사람으로 남아, 교환이 끝나자마자 같은
+     * 카드로 다시 매칭된다.
+     *
+     * @return 더 찾을 것이 없어져서 이 줄을 지워야 하면 true
+     */
+    public boolean decrease(int amount) {
+        this.quantity -= amount;
+        if (this.quantity <= 0) {
+            this.quantity = 0;
+            return true;
+        }
+        return false;
      * 교환으로 이만큼 받아서 그만큼 덜 찾아도 된다.
      *
      * <p>0 이하가 됐을 때 행을 지울지는 부르는 쪽(서비스)이 정한다. 여기서는 수량만 옮긴다.
