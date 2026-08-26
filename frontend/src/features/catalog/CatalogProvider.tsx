@@ -1,7 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { messageOf } from '@/lib/api'
-import { ALL_ITEMS } from '@/mocks/data'
+import { ALL_ITEMS, myUsername } from '@/mocks/data'
 import { getDeviceId } from '@/store/identity'
 
 import { fetchBoothItems, fetchBooths, registerUser } from './api'
@@ -35,7 +35,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
 
     async function load() {
       try {
-        await registerUser(userId, signal)
+        await registerUser(userId, myUsername(userId), signal)
 
         const booths = await fetchBooths(signal)
         if (booths.length === 0) {

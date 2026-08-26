@@ -28,11 +28,18 @@ export function fetchBoothItems(boothId: number, signal?: AbortSignal): Promise<
  *
  * 이걸 부르지 않으면 카드 등록이 전부 `USER_NOT_FOUND` 로 막힌다. UUID 를 만들어
  * localStorage 에 넣는 것만으로는 서버가 그 사람을 모르기 때문이다.
+ *
+ * 이름은 약속 화면에서 상대 줄의 라벨이 된다. 기기마다 달라야 두 사람이 붙었을 때 서로를
+ * 화면에서 가릴 수 있다.
  */
-export function registerUser(userId: string, signal?: AbortSignal): Promise<void> {
+export function registerUser(
+  userId: string,
+  username: string,
+  signal?: AbortSignal,
+): Promise<void> {
   return apiVoid('/api/users', {
     method: 'POST',
-    body: JSON.stringify({ userId }),
+    body: JSON.stringify({ userId, username }),
     signal,
   })
 }

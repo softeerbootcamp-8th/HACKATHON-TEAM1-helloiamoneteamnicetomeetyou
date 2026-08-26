@@ -29,6 +29,8 @@ export const SSE_EVENT_TYPES = [
   // 교환 약속. 만나는 자리(구역)가 정해지거나 바뀌면 EXCHANGE_PLACE_UPDATED 로 온다.
   'EXCHANGE_CREATED',
   'EXCHANGE_TIME_UPDATED',
+  // 참가자 한 명이 약속 장소에 도착했다.
+  'EXCHANGE_ARRIVED',
   'EXCHANGE_PLACE_UPDATED',
   'EXCHANGE_COMPLETED',
   'EXCHANGE_CANCELLED',

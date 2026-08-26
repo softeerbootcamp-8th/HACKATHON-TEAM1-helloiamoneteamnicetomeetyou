@@ -10,7 +10,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.entity.Booth;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service.ExchangeService;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
@@ -33,6 +36,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorType;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.response.PageResponse;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventPublisher;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventType;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -62,6 +66,7 @@ import org.mockito.quality.Strictness;
 class PokeServiceTest {
 
     private static final UUID SENDER = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final Long BOOTH_ID = 1L;
     private static final UUID RECEIVER = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final Long REQUESTED_ITEM_ID = 10L;
     private static final Long OFFERED_ITEM_ID = 20L;
@@ -77,10 +82,7 @@ class PokeServiceTest {
     private UserHaveItemRepository userHaveItemRepository;
 
     @Mock
-    private ExchangeRepository exchangeRepository;
-
-    @Mock
-    private ExchangeParticipantRepository exchangeParticipantRepository;
+    private ExchangeService exchangeService;
 
     @Mock
     private ExchangeItemRepository exchangeItemRepository;
@@ -214,7 +216,7 @@ class PokeServiceTest {
     @DisplayName("수락하면 교환 카드 두 줄을 만들고 방향이 서로 반대다")
     void 수락하면_교환을_만든다() {
         Poke poke = Poke.of(sender, receiver, requestedItem);
-        Exchange exchange = Exchange.oneToOne();
+        Exchange exchange = 성사된_교환();
         수락할_수_있는_상태(poke, exchange);
 
         PokeAnswerResponseDto response =
@@ -247,19 +249,18 @@ class PokeServiceTest {
     }
 
     @Test
-    @DisplayName("수락하면 양쪽이 이미 수락한 참가자로 들어간다")
-    void 수락하면_참가자_둘을_넣는다() {
-        수락할_수_있는_상태(Poke.of(sender, receiver, requestedItem), Exchange.oneToOne());
+    @DisplayName("수락하면 두 사람으로 교환을 만들어 달라고 맡긴다")
+    void 수락하면_교환_생성을_맡긴다() {
+        수락할_수_있는_상태(Poke.of(sender, receiver, requestedItem), 성사된_교환());
 
         pokeService.answer(POKE_ID, RECEIVER, PokeStatus.ACCEPTED, OFFERED_ITEM_ID);
 
+        // 만나는 자리와 시간 격자, 약속 식별자가 거기서 함께 붙는다. 여기서 직접 만들지 않는다.
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<ExchangeParticipant>> captor = ArgumentCaptor.forClass(List.class);
-        verify(exchangeParticipantRepository).saveAll(captor.capture());
-        assertThat(captor.getValue()).hasSize(2);
-        assertThat(captor.getValue())
-                .extracting(ExchangeParticipant::getUser)
-                .containsExactlyInAnyOrder(sender, receiver);
+        ArgumentCaptor<List<UUID>> captor = ArgumentCaptor.forClass(List.class);
+        verify(exchangeService)
+                .createExchange(eq(BOOTH_ID), eq(ExchangeType.ONE_TO_ONE), captor.capture());
+        assertThat(captor.getValue()).containsExactlyInAnyOrder(SENDER, RECEIVER);
     }
 
     @Test
@@ -274,7 +275,7 @@ class PokeServiceTest {
         assertThat(response.status()).isEqualTo(PokeStatus.REJECTED);
         assertThat(response.exchangeId()).isNull();
         assertThat(poke.getStatus()).isEqualTo(PokeStatus.REJECTED);
-        verify(exchangeRepository, never()).save(any(Exchange.class));
+        verify(exchangeService, never()).createExchange(any(), any(), any());
         verify(exchangeItemRepository, never()).saveAll(anyList());
         verify(sseEventPublisher).toUser(eq(SENDER), eq(SseEventType.POKE_REJECTED), any());
     }
@@ -307,14 +308,14 @@ class PokeServiceTest {
     @Test
     @DisplayName("상대 묶음에 없는 카드를 고르면 막는다")
     void 묶음에_없는_카드를_고르면_막는다() {
-        수락할_수_있는_상태(Poke.of(sender, receiver, requestedItem), Exchange.oneToOne());
+        수락할_수_있는_상태(Poke.of(sender, receiver, requestedItem), 성사된_교환());
 
         assertThatThrownBy(() -> pokeService.answer(POKE_ID, RECEIVER, PokeStatus.ACCEPTED, 999L))
                 .isInstanceOf(ApplicationException.class)
                 .extracting(PokeServiceTest::errorTypeOf)
                 .isEqualTo(ErrorCode.POKE_CHOSEN_ITEM_NOT_OFFERED);
 
-        verify(exchangeRepository, never()).save(any(Exchange.class));
+        verify(exchangeService, never()).createExchange(any(), any(), any());
     }
 
     @Test
@@ -346,7 +347,7 @@ class PokeServiceTest {
                 .extracting(PokeServiceTest::errorTypeOf)
                 .isEqualTo(ErrorCode.POKE_ITEM_SOLD_OUT);
 
-        verify(exchangeRepository, never()).save(any(Exchange.class));
+        verify(exchangeService, never()).createExchange(any(), any(), any());
     }
 
     @Test
@@ -397,7 +398,7 @@ class PokeServiceTest {
     @DisplayName("보낸 목록은 상대가 고른 카드를 함께 준다")
     void 보낸_목록은_고른_카드를_준다() {
         Poke poke = Poke.of(sender, receiver, requestedItem);
-        poke.accept(offeredItem, Exchange.oneToOne());
+        poke.accept(offeredItem, 성사된_교환());
         given(pokeRepository.findAllByFromUserId(SENDER)).willReturn(List.of(poke));
 
         PageResponse<SentPokeResponseDto> result = pokeService.findSent(SENDER, 0, 20);
@@ -440,7 +441,7 @@ class PokeServiceTest {
         given(userHaveItemRepository.findAllByUserId(SENDER)).willReturn(List.of(senderHasOffered));
         given(userHaveItemRepository.findByUserIdAndItemId(RECEIVER, REQUESTED_ITEM_ID))
                 .willReturn(Optional.of(receiverHasRequested));
-        given(exchangeRepository.save(any(Exchange.class))).willReturn(exchange);
+        given(exchangeService.createExchange(any(), any(), any())).willReturn(exchange);
     }
 
     // ---------- 픽스처 ----------
@@ -456,8 +457,13 @@ class PokeServiceTest {
     }
 
     private static Item item(long id) {
+        Booth booth = mock(Booth.class);
+        given(booth.getId()).willReturn(BOOTH_ID);
+
         Item item = mock(Item.class);
         given(item.getId()).willReturn(id);
+        // 교환을 만들 때 이 부스의 만나는 자리를 고른다.
+        given(item.getBooth()).willReturn(booth);
         return item;
     }
 
@@ -467,5 +473,16 @@ class PokeServiceTest {
         given(have.getItem()).willReturn(item);
         given(have.getQuantity()).willReturn(quantity);
         return have;
+    }
+
+    /**
+     * 찔러보기가 성사되며 만들어지는 교환.
+     *
+     * <p>실제 흐름은 {@code ExchangeService.createExchange} 를 거쳐 만나는 자리와 시간 격자
+     * 시작점, 약속별 식별자를 함께 받는다. 여기서는 교환 한 건이 있다는 것만 필요해서 그 값들을
+     * 채우지 않는다.
+     */
+    private static Exchange 성사된_교환() {
+        return Exchange.create(ExchangeType.ONE_TO_ONE);
     }
 }

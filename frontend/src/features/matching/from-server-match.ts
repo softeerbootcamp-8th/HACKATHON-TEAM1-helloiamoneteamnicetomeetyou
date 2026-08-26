@@ -55,6 +55,8 @@ function expandToMockIds(
 function toWaitingUser(user: ServerMatchedUser): WaitingUser {
   return {
     id: user.id,
+    // 서버 매칭 상대는 목업 id 가 따로 없다. 둘 다 서버가 준 UUID 다.
+    userId: user.id,
     nickname: user.username ?? '상대',
     itemId: '',
     needsItemIds: [],

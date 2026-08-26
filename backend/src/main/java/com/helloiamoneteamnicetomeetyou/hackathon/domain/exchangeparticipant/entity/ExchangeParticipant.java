@@ -87,4 +87,13 @@ public class ExchangeParticipant {
         participant.joinedAt = LocalDateTime.now();
         return participant;
     }
+
+    public boolean hasArrived() {
+        return status == ParticipantStatus.ARRIVED;
+    }
+
+    /** 약속 장소에 도착했다. 상대 화면의 "도착" 배지가 이걸 본다. */
+    public void arrive() {
+        this.status = ParticipantStatus.ARRIVED;
+    }
 }
