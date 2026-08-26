@@ -70,9 +70,23 @@ export function AppShell() {
       })()
     },
     MATCH_SUGGESTED: applyMatch,
+    /*
+      상대가 거절하거나 약속을 취소하면 지금 보고 있던 화면(매칭 대기, 약속 화면)이
+      더 볼 것이 없어진다. 알림 카드를 눌러야만 홈으로 돌아오게 두면 그 화면에 그대로
+      갇혀서 "다음" 버튼만 안 눌리는 것처럼 보인다.
+
+      `exchangeId` 를 지금 상태와 대조하고 나서 옮긴다. 이미 다른 매칭·약속으로 넘어간
+      뒤에 뒤늦게 도착한 알림이 그 화면을 밀어내면 안 된다 — 리듀서가 같은 이유로
+      `server-match-rejected` 를 무시하는 조건과 맞춘다.
+    */
     MATCH_REJECTED: (data) => {
       const { exchangeId } = data as { exchangeId: number }
+      if (state.match?.exchangeId === exchangeId) navigate('/home')
       dispatch({ type: 'server-match-rejected', exchangeId })
+    },
+    EXCHANGE_CANCELLED: (data) => {
+      const { exchangeId } = data as { exchangeId: number }
+      if (state.activeAppointmentId === exchangeId) navigate('/home')
     },
   })
 
