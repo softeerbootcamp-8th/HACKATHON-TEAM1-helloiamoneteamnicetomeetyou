@@ -30,6 +30,19 @@ import {
 } from '@/store/matching'
 import { useStore } from '@/store/useStore'
 
+/**
+ * 묶음 맨 위에 어느 카드를 세울지 고르는 값 (시안 desc 165:3500 3번 "랜덤 노출").
+ *
+ * <b>렌더 안에서 뽑지 않는다.</b> `Math.random()` 은 순수하지 않아서 React Compiler 가 막고,
+ * 막지 않더라도 리렌더마다 그림이 바뀌어 카드가 깜빡인다. 그래서 앱이 뜰 때 한 번만 뽑아
+ * 두고, 보유 카드 수에 곱해서 몇 번째 카드를 세울지 정한다.
+ *
+ * 앱을 켜 있는 동안에는 같은 카드가 서 있고 다시 켜면 달라진다. 화면에 들어올 때마다 다시
+ * 뽑으려면 여기가 아니라 마운트 효과에서 뽑아야 하는데, 그러면 첫 그림이 한 번 바뀌어
+ * 보인다. 깜빡이지 않는 쪽을 골랐다.
+ */
+const TOP_CARD_PICK = Math.random()
+
 export function Home() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
@@ -55,8 +68,16 @@ export function Home() {
   const [dragging, setDragging] = useState(false)
   // 방금 카드를 놓은 상대. 고리가 한 번 터지고 나서 찔러보기 확인 화면으로 넘어간다.
   const [burstOn, setBurstOn] = useState<string | null>(null)
-  // "다른 카드 보기" 를 누른 횟수. 레이더에 뒷순위 카드를 올리는 데 쓴다.
+  // "다른 카드 보기" 를 누른 횟수. 목업 레이더가 페이지 번호로 받는다.
   const [radarPage, setRadarPage] = useState(0)
+  /**
+   * 서버 레이더에서 지금까지 넘긴 카드 수.
+   *
+   * <b>누른 횟수로 곱셈을 하면 안 된다.</b> 한 번에 채우는 칸 수는 답변 대기 중인 카드가
+   * 몇 장이냐에 따라 5에서 4, 3으로 줄어든다. 그러면 보폭이 바뀌어서 다음 장이 앞으로
+   * 당겨지고, 방금 본 카드가 도로 올라온다. 넘긴 개수를 그대로 들고 있어야 한다.
+   */
+  const [radarCursor, setRadarCursor] = useState(0)
   // 내 카드 묶음을 눌러서 펼쳐 본 상태. 펼친 동안에는 끌어놓기를 하지 않는다.
   const [fanOpen, setFanOpen] = useState(false)
   const bannerDragRef = useRef(false)
@@ -126,8 +147,9 @@ export function Home() {
    * 무엇을 담을지는 서버가 이미 정해서 준다(희망 카드가 있으면 그와 맞는 것만, 없으면 내가
    * 가진 카드를 뺀 전부). 여기서 다시 걸러내지 않는다.
    *
-   * <b>목업에 짝이 없는 카드는 세우지 않는다.</b> 카드 그림과 약칭이 목업에만 있어서 그릴
-   * 수가 없다. 어드민 시드를 목업 이름과 맞추면 이 일이 생기지 않는다.
+   * <b>목업에 짝이 없는 카드도 세운다.</b> 카드 그림이 목업에만 있어서 그림은 못 그리지만,
+   * 그 줄을 통째로 빼면 어드민 시드 이름이 하나만 어긋나도 레이더가 비어 보인다. 전체리스트가
+   * 이미 하는 것처럼 이름만이라도 보여준다.
    */
   const serverRadarPool = useMemo(() => {
     const seen = new Set<number>()
@@ -136,12 +158,16 @@ export function Home() {
       .sort((a, b) => a.haveItemId - b.haveItemId)
       .flatMap((row) => {
         if (seen.has(row.item.id)) return []
-        const item = mockItemOf?.(row.item.id)
-        if (!item) return []
         seen.add(row.item.id)
-        return [{ row, item }]
+        return [{ row, item: mockItemOf?.(row.item.id) }]
       })
   }, [serverWaiting, mockItemOf])
+
+  /** 답변을 기다리는 카드가 자리를 지키고 남은 칸. 커서를 미는 보폭이기도 하다. */
+  const radarRoom = useMemo(() => {
+    const held = serverRadarPool.filter((s) => pendingOwnerIds.has(s.row.ownerId)).length
+    return Math.max(5 - Math.min(held, 5), 0)
+  }, [serverRadarPool, pendingOwnerIds])
 
   /**
    * 지금 세울 다섯 명. "다른 카드 보기" 를 누르면 뒷순위로 넘어간다.
@@ -152,15 +178,14 @@ export function Home() {
   const serverRadar = useMemo(() => {
     const held = serverRadarPool.filter((s) => pendingOwnerIds.has(s.row.ownerId)).slice(0, 5)
     const rest = serverRadarPool.filter((s) => !pendingOwnerIds.has(s.row.ownerId))
-    const room = Math.max(5 - held.length, 0)
     const rotated =
       rest.length === 0
         ? []
-        : Array.from({ length: Math.min(room, rest.length) }, (_, i) => {
-            return rest[(radarPage * room + i) % rest.length]
+        : Array.from({ length: Math.min(radarRoom, rest.length) }, (_, i) => {
+            return rest[(radarCursor + i) % rest.length]
           })
     return [...held, ...rotated]
-  }, [serverRadarPool, pendingOwnerIds, radarPage])
+  }, [serverRadarPool, pendingOwnerIds, radarRoom, radarCursor])
 
   /**
    * 레이더 한 칸. 서버와 목업을 같은 모양으로 맞춰 두면 배치와 끌어놓기 코드가 하나로 남는다.
@@ -169,7 +194,8 @@ export function Home() {
    */
   const radarSlots: {
     targetId: string
-    item: Item
+    /** 목업에 짝이 없는 서버 카드면 없다. 그때는 이름만 그린다. */
+    item: Item | undefined
     label: string
     pending: boolean
   }[] = useServerData
@@ -189,8 +215,20 @@ export function Home() {
       }))
 
   const haveIds = state.have.map((h) => h.itemId)
-  const topItemId = state.have[0]?.itemId ?? 'avn'
   const haveCount = state.have.reduce((sum, s) => sum + s.qty, 0)
+
+  /**
+   * 묶음 맨 위에 보이는 카드. <b>보유 카드 중에서 랜덤이다</b>(시안 desc 165:3500 3번).
+   *
+   * 위 `needKey` 와 같은 수를 써서 보유 목록이 실제로 달라졌을 때만 다시 고른다. 배열을
+   * 그대로 의존성에 넣으면 렌더마다 새 참조라 매번 다시 돈다. 고른 카드가 없으면 `null`
+   * 이고, 가지고 있지도 않은 카드를 세우지 않는다.
+   */
+  const haveKey = state.have.map((s) => s.itemId).join(',')
+  const topItemId = useMemo(() => {
+    const ids = haveKey ? haveKey.split(',') : []
+    return ids.length > 0 ? ids[Math.floor(TOP_CARD_PICK * ids.length)] : null
+  }, [haveKey])
   const match = state.match
 
   // 매칭이 잡힌 상대는 전체리스트에서 "매칭됨" 으로 나온다.
@@ -439,6 +477,7 @@ export function Home() {
             onClick={() => {
               tick(8)
               setRadarPage((page) => page + 1)
+              setRadarCursor((cursor) => cursor + radarRoom)
             }}
             whileTap={{ scale: 0.94 }}
             transition={springSnap}
@@ -518,17 +557,6 @@ export function Home() {
                       ? row.givableItemNames.join(' · ')
                       : '아직 없어요'}
                   </p>
-
-                  {row.ownerWantedItemNames.length > 0 && (
-                    <>
-                      <p className="mt-1 text-[10px] font-medium text-[#aeaeb2]">
-                        상대방이 원하는 것
-                      </p>
-                      <p className="truncate text-[11px] text-[#8b8b8b]">
-                        {row.ownerWantedItemNames.join(' · ')}
-                      </p>
-                    </>
-                  )}
                 </div>
 
                 {waitingReply && (
@@ -610,10 +638,8 @@ export function Home() {
 
   const listHeader = (
     <div className="flex items-end justify-between">
-      <div>
-        <span className="block text-[17px] font-extrabold text-ink">전체리스트</span>
-        <span className="block text-[11px] text-neutral-400">눌러서 찔러보기</span>
-      </div>
+      {/* 시안 desc 165:3500 5번 — 접힌 머리에는 제목과 전체 개수만 있다. */}
+      <span className="text-[17px] font-extrabold text-ink">전체리스트</span>
       <span className="text-[12px] text-neutral-400">전체 {listCount}개</span>
     </div>
   )

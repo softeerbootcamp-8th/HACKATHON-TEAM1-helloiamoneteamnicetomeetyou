@@ -136,23 +136,51 @@ class BoothHaveItemServiceTest {
     }
 
     @Test
-    @DisplayName("희망 카드끼리는 교환이 바로 성립하는 쪽을 먼저 올린다")
-    void 교환이_성립하는_쪽이_먼저다() {
-        // 둘 다 내 희망 카드인데 OTHER_B 만 내가 가진 카드(99L)를 원한다.
+    @DisplayName("내가 찾겠다고 먼저 적은 카드가 위에 온다")
+    void 희망_등록_순서대로_내려준다() {
+        // 나는 IONIQ 5 N(20L) 을 먼저, i20 N(10L) 을 나중에 찾겠다고 적었다.
+        // 그러면 교환이 바로 성립하는 쪽(OTHER_A) 이 있어도 IONIQ 5 N 줄이 먼저다
+        // (시안 desc 165:3500 5번).
         List<UserHaveItem> rows =
                 List.of(row(1L, OTHER_A, 10L, "i20 N", 1), row(2L, OTHER_B, 20L, "IONIQ 5 N", 1));
-        List<UserWantItem> myWants = List.of(want(ME, 10L, "i20 N"), want(ME, 20L, "IONIQ 5 N"));
+        List<UserWantItem> myWants = List.of(want(ME, 20L, "IONIQ 5 N"), want(ME, 10L, "i20 N"));
         List<UserHaveItem> myHaves = List.of(row(9L, ME, 99L, "AVANTE N", 3));
-        List<UserWantItem> ownerWants = List.of(want(OTHER_B, 99L, "AVANTE N"));
+        List<UserWantItem> ownerWants = List.of(want(OTHER_A, 99L, "AVANTE N"));
 
         stub(rows, myWants, myHaves, ownerWants);
 
         PageResponse<BoothHaveItemResponseDto> result = findFirstPage();
 
         assertThat(result.content().get(0).haveItemId()).isEqualTo(2L);
-        assertThat(result.content().get(0).givableItemNames()).containsExactly("AVANTE N");
+        assertThat(result.content().get(0).givableItemNames()).isEmpty();
         assertThat(result.content().get(1).haveItemId()).isEqualTo(1L);
-        assertThat(result.content().get(1).givableItemNames()).isEmpty();
+        assertThat(result.content().get(1).givableItemNames()).containsExactly("AVANTE N");
+    }
+
+    @Test
+    @DisplayName("같은 카드를 여럿이 내놓았으면 그 안에서는 먼저 등록한 줄이 앞이다")
+    void 같은_카드끼리는_먼저_등록한_줄이_앞이다() {
+        List<UserHaveItem> rows =
+                List.of(row(7L, OTHER_A, 10L, "i20 N", 1), row(3L, OTHER_B, 10L, "i20 N", 1));
+        List<UserWantItem> myWants = List.of(want(ME, 10L, "i20 N"));
+
+        stub(rows, myWants, List.of(), List.of());
+
+        assertThat(findFirstPage().content()).extracting(BoothHaveItemResponseDto::haveItemId)
+                .containsExactly(3L, 7L);
+    }
+
+    @Test
+    @DisplayName("희망 카드를 등록하지 않았으면 먼저 등록된 줄 순서다")
+    void 희망_카드가_없으면_먼저_등록된_순이다() {
+        // 순위가 전부 같아져서 마지막 기준인 haveItemId 오름차순으로 떨어진다.
+        List<UserHaveItem> rows =
+                List.of(row(5L, OTHER_A, 10L, "i20 N", 1), row(2L, OTHER_B, 20L, "IONIQ 5 N", 1));
+
+        stub(rows, List.of(), List.of(), List.of());
+
+        assertThat(findFirstPage().content()).extracting(BoothHaveItemResponseDto::haveItemId)
+                .containsExactly(2L, 5L);
     }
 
     @Test
