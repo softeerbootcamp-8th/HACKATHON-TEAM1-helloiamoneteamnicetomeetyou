@@ -21,9 +21,13 @@ export type ServerItemRef = {
 /**
  * 부스 안 다른 사람이 내놓은 카드 한 줄. `GET /api/booths/{boothId}/have-items`
  *
- * 상태 배지는 `wanted` 와 `givableItemNames` 조합으로 정한다 (시안 desc 204:4948).
- * - 교환 가능: `wanted` 이고 줄 수 있는 카드가 있다
- * - 그래도 찔러보기: `wanted` 인데 줄 수 있는 카드가 없다
+ * 목록에 무엇이 담기는지는 내가 찾는 카드를 등록했는지에 따라 서버가 가른다.
+ * 등록했으면 그와 맞는 줄만, 아직이면 내가 가진 카드를 뺀 전부다 (시안 desc 204:4928).
+ *
+ * 상태 배지는 세 가지를 위에서부터 본다 (시안 desc 204:4948).
+ * - 매칭됨: `matched`. 이 사람과 진행 중인 교환이 있다
+ * - 교환 가능: 줄 수 있는 카드가 있다
+ * - 그래도 찔러보기: 줄 수 있는 카드가 없다
  */
 export type BoothHaveItem = {
   haveItemId: number
@@ -31,7 +35,10 @@ export type BoothHaveItem = {
   ownerName?: string
   item: ServerItemRef
   quantity: number
+  /** 내 희망 카드인가. 희망 카드를 하나도 등록하지 않았으면 전부 false 다 */
   wanted: boolean
+  /** 이 사람과 지금 진행 중인 교환이 있는가 */
+  matched: boolean
   givableItemNames: string[]
   ownerWantedItemNames: string[]
 }
