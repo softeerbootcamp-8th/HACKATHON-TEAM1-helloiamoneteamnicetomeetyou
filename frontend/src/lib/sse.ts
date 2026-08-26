@@ -35,6 +35,9 @@ export const SSE_EVENT_TYPES = [
   'EXCHANGE_TIME_MISMATCHED',
   'EXCHANGE_TIME_UPDATED',
 
+  // 참가자가 고른 칸이 바뀌었다. 화면을 맞추기 위한 것이라 알림함에는 쌓이지 않는다.
+  'EXCHANGE_SLOTS_UPDATED',
+
   // 참가자 한 명이 약속 장소에 도착했다.
   'EXCHANGE_ARRIVED',
   'EXCHANGE_PLACE_UPDATED',

@@ -270,21 +270,35 @@ public class ExchangeService {
         List<Integer> distinctSlots = slots.stream().distinct().sorted().toList();
         TimeSlotGrid.validateAll(distinctSlots);
 
+        boolean matchedBefore = earliestOverlap(exchangeId) != null;
+
         timeSlotRepository.deleteAllByExchangeIdAndUserId(exchangeId, userId);
         timeSlotRepository.saveAll(
                 distinctSlots.stream().map(slot -> ExchangeTimeSlot.of(exchange, user, slot)).toList());
 
+        // 화면을 맞추는 것은 저장될 때마다 해야 한다. 알림이 아니라서 전원에게 보낸다. 누른
+        // 사람도 받아야 같은 사람이 탭을 여러 개 열어 뒀을 때 나머지 탭이 따라온다.
+        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_SLOTS_UPDATED);
+
+        boolean matchedAfter = earliestOverlap(exchangeId) != null;
+
         /*
           시안(204:5230)의 조건이 "상대 사용자가 시간을 입력 완료 & 일치하는 시간이 존재하는
           경우" 다. 상대가 볼 알림은 내가 무엇을 골랐는지가 아니라 시간이 맞았는지 안 맞았는지다.
-          그래서 저장한 뒤 겹치는 칸을 다시 세어 두 문구로 갈라 보낸다.
+
+          겹치는 칸의 유무가 실제로 바뀐 경우에만 보낸다. 저장될 때마다 보내면 시간표는 칸을
+          누를 때마다 저장되기 때문에, 상대가 다섯 칸을 고르는 동안 "시간 매칭에 실패했어요" 가
+          다섯 건 쌓인다. 상대가 한 칸도 고르지 않았으면 겹칠 일 자체가 없어 유무가 바뀌지
+          않으므로, 시안이 말하는 "상대가 입력 완료" 조건과 결과가 같아진다.
         */
-        notifyOthers(
-                exchangeId,
-                userId,
-                earliestOverlap(exchangeId) != null
-                        ? SseEventType.EXCHANGE_TIME_MATCHED
-                        : SseEventType.EXCHANGE_TIME_MISMATCHED);
+        if (matchedBefore != matchedAfter) {
+            notifyOthers(
+                    exchangeId,
+                    userId,
+                    matchedAfter
+                            ? SseEventType.EXCHANGE_TIME_MATCHED
+                            : SseEventType.EXCHANGE_TIME_MISMATCHED);
+        }
 
         return toResponse(exchange);
     }
@@ -299,8 +313,9 @@ public class ExchangeService {
      * <p><b>같은 부스의 구역만 고를 수 있다.</b> 약도는 부스마다 다른 그림이고 좌표도 그 그림
      * 안에서의 비율이라, 다른 부스의 구역을 넣으면 핀이 엉뚱한 자리를 가리킨다.
      *
-     * <p>바꾼 사람만 알면 소용없어서 참가자 전원에게 알린다. 상대가 옛 자리에서 기다리는 것이
-     * 이 기능에서 제일 나쁜 결과다.
+     * <p>바꾼 사람만 알면 소용없어서 나머지 참가자에게 알린다. 상대가 옛 자리에서 기다리는 것이
+     * 이 기능에서 제일 나쁜 결과다. 바꾼 본인은 응답으로 최신 자리를 이미 받았고, 알림까지 가면
+     * 자기가 방금 한 행동이 자기 알림함에 쌓인다.
      */
     @Transactional
     public ExchangeResponseDto updateZone(Long exchangeId, UUID userId, Long zoneId) {
@@ -325,7 +340,7 @@ public class ExchangeService {
 
         exchange.changeZone(zone);
 
-        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_PLACE_UPDATED);
+        notifyOthers(exchangeId, userId, SseEventType.EXCHANGE_PLACE_UPDATED);
 
         return toResponse(exchange);
     }

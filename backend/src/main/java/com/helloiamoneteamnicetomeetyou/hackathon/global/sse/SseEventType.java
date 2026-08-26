@@ -55,6 +55,16 @@ public enum SseEventType {
     EXCHANGE_TIME_MISMATCHED,
     EXCHANGE_TIME_UPDATED,
 
+    /**
+     * 참가자 한 명이 고른 칸이 바뀌었다. <b>화면을 맞추기 위한 것이라 알릴 문구가 없다.</b>
+     *
+     * <p>{@code PushMessage} 에 등록하지 않는다. 시간표는 칸을 누를 때마다 저장되는데, 그 하나
+     * 하나를 알림으로 만들면 상대가 다섯 칸을 고르는 동안 내 알림함에 다섯 건이 쌓인다. 알릴
+     * 값이 있는 것은 겹치는 시간이 생겼는지 없어졌는지가 바뀐 순간이고, 그건
+     * {@code EXCHANGE_TIME_MATCHED} 와 {@code EXCHANGE_TIME_MISMATCHED} 가 맡는다.
+     */
+    EXCHANGE_SLOTS_UPDATED,
+
     /** 참가자 한 명이 약속 장소에 도착했다. 시간이 바뀐 것이 아니라 따로 둔다. */
     EXCHANGE_ARRIVED,
     EXCHANGE_PLACE_UPDATED,

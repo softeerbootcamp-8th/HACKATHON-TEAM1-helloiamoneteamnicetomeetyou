@@ -95,6 +95,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     EXCHANGE_TIME_MATCHED: (data) => void syncExchange(data),
     EXCHANGE_TIME_MISMATCHED: (data) => void syncExchange(data),
     EXCHANGE_TIME_UPDATED: (data) => void syncExchange(data),
+    EXCHANGE_SLOTS_UPDATED: (data) => void syncExchange(data),
     EXCHANGE_PLACE_UPDATED: (data) => void syncExchange(data),
     EXCHANGE_ARRIVED: (data) => void syncExchange(data),
     EXCHANGE_COMPLETED: (data) => void syncExchange(data),

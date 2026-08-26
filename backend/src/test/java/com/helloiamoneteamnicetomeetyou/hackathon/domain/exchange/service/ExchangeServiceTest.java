@@ -182,26 +182,56 @@ class ExchangeServiceTest {
     */
 
     @Test
-    @DisplayName("시간을 저장했을 때 겹치는 칸이 없으면 상대에게만 매칭 실패를 알린다")
-    void 시간을_저장하면_겹치지_않으면_상대에게만_실패를_알린다() {
+    @DisplayName("칸을 저장하면 화면을 맞추도록 참가자 전원에게 알린다")
+    void 칸을_저장하면_전원의_화면을_맞춘다() {
         exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(2, 0, 2));
 
         verify(timeSlotRepository).deleteAllByExchangeIdAndUserId(EXCHANGE_ID, ME);
-        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_MISMATCHED), any());
-        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+        // 알림이 아니라 화면 갱신이라 누른 사람도 받는다. 탭을 여러 개 열어 뒀을 때 필요하다.
+        verify(sseEventPublisher).toUser(eq(ME), eq(SseEventType.EXCHANGE_SLOTS_UPDATED), any());
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_SLOTS_UPDATED), any());
     }
 
     @Test
-    @DisplayName("시간을 저장했을 때 겹치는 칸이 있으면 상대에게 매칭 성공을 알린다")
-    void 시간을_저장하면_겹치면_상대에게_성공을_알린다() {
-        given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of(
-                ExchangeTimeSlot.of(exchange, me, 1),
-                ExchangeTimeSlot.of(exchange, partner, 1)));
+    @DisplayName("상대가 한 칸도 안 골랐으면 내가 칸을 눌러도 매칭 실패를 알리지 않는다")
+    void 겹침_여부가_그대로면_알리지_않는다() {
+        exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(2, 0, 2));
+
+        /*
+          시간표는 칸을 누를 때마다 저장된다. 저장될 때마다 보내면 다섯 칸을 고르는 동안 상대
+          알림함에 "시간 매칭에 실패했어요" 가 다섯 건 쌓인다. 겹침 여부가 바뀌지 않았으면
+          상대가 알아야 할 새 사실이 없다.
+        */
+        verify(sseEventPublisher, never()).toUser(any(), eq(SseEventType.EXCHANGE_TIME_MISMATCHED), any());
+        verify(sseEventPublisher, never()).toUser(any(), eq(SseEventType.EXCHANGE_TIME_MATCHED), any());
+    }
+
+    @Test
+    @DisplayName("겹치는 칸이 새로 생기면 상대에게만 매칭 성공을 알린다")
+    void 겹치는_칸이_생기면_상대에게만_성공을_알린다() {
+        // 첫 번째가 저장 전, 두 번째부터가 저장 뒤다. 상대만 고른 상태에서 내가 같은 칸을 눌렀다.
+        given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(
+                List.of(ExchangeTimeSlot.of(exchange, partner, 1)),
+                List.of(ExchangeTimeSlot.of(exchange, me, 1), ExchangeTimeSlot.of(exchange, partner, 1)));
 
         exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(1));
 
         verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_MATCHED), any());
-        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), eq(SseEventType.EXCHANGE_TIME_MATCHED), any());
+    }
+
+    @Test
+    @DisplayName("겹치던 칸이 없어지면 상대에게만 매칭 실패를 알린다")
+    void 겹치던_칸이_없어지면_상대에게만_실패를_알린다() {
+        // 같은 칸을 골라 맞아 있던 상태에서 내가 다른 칸으로 바꿨다.
+        given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(
+                List.of(ExchangeTimeSlot.of(exchange, me, 1), ExchangeTimeSlot.of(exchange, partner, 1)),
+                List.of(ExchangeTimeSlot.of(exchange, me, 2), ExchangeTimeSlot.of(exchange, partner, 1)));
+
+        exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(2));
+
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_MISMATCHED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), eq(SseEventType.EXCHANGE_TIME_MISMATCHED), any());
     }
 
     @Test
@@ -247,8 +277,8 @@ class ExchangeServiceTest {
     }
 
     @Test
-    @DisplayName("자리를 옮기면 저장하고 참가자 전원에게 알린다")
-    void 자리를_옮기면_전원에게_알린다() throws Exception {
+    @DisplayName("자리를 옮기면 저장하고 옮긴 사람을 뺀 나머지에게 알린다")
+    void 자리를_옮기면_상대에게만_알린다() throws Exception {
         Booth booth = exchange.getZone().getBooth();
         Zone lounge = withId(Zone.of(booth, "라운지", "2층 라운지"), 2L);
         given(zoneRepository.findById(2L)).willReturn(Optional.of(lounge));
@@ -256,8 +286,8 @@ class ExchangeServiceTest {
         exchangeService.updateZone(EXCHANGE_ID, ME, 2L);
 
         assertThat(exchange.getZone()).isEqualTo(lounge);
-        verify(sseEventPublisher).toUser(eq(ME), eq(SseEventType.EXCHANGE_PLACE_UPDATED), any());
         verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_PLACE_UPDATED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
     }
 
     @Test
