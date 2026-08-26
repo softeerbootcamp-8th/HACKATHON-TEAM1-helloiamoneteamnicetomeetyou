@@ -1,6 +1,6 @@
 import { createContext } from 'react'
 
-import type { BoothHaveItem, ReceivedPoke, SentPoke } from './api'
+import type { BoothHaveItem, PokeAnswerResult, ReceivedPoke, SentPoke } from './api'
 
 /**
  * 서버에 실제로 오간 찔러보기다. 목업 흐름(`store/`)과 나란히 돈다.
@@ -18,10 +18,23 @@ export type PokeValue = {
   waiting: BoothHaveItem[]
   /** 서버 연동이 준비됐는지. 아니면 화면이 목업으로 돈다 */
   ready: boolean
+  /**
+   * 목록을 한 번이라도 읽었는지.
+   *
+   * `ready` 는 부스를 알아냈다는 뜻일 뿐이라 첫 응답이 오기 전에도 참이다. "빈 목록"
+   * 과 "아직 안 읽음" 을 갈라야 하는 쪽이 이걸 본다.
+   */
+  loaded: boolean
   /** 목록을 다시 읽는다. 알림을 받았을 때와 응답한 뒤에 부른다 */
   refresh: () => void
   send: (targetUserId: string, requestedItemId: number) => Promise<void>
-  accept: (pokeId: number, chosenItemId: number) => Promise<void>
+  /**
+   * 받은 찔러보기를 수락한다. 서버가 만든 교환과 주고받을 카드를 그대로 돌려준다.
+   *
+   * <b>이 값을 버리면 성사 화면을 그릴 수 없다.</b> 상대 묶음에서 무엇을 골랐는지와
+   * 어느 교환이 생겼는지는 서버만 아는 값이라, 화면이 다시 계산해 낼 방법이 없다.
+   */
+  accept: (pokeId: number, chosenItemId: number) => Promise<PokeAnswerResult>
   reject: (pokeId: number) => Promise<void>
   /** 마지막으로 실패한 요청의 사유. 화면이 토스트로 띄운다 */
   error: string | null

@@ -12,6 +12,7 @@ import { usePoke } from '@/features/poke/usePoke'
 import { springSnap } from '@/lib/motion'
 import { ALL_WAITING, itemById } from '@/mocks/data'
 import { useLastDefined } from '@/lib/useLastDefined'
+import { useTopHaveItemId } from '@/store/top-card'
 import { useStore } from '@/store/useStore'
 
 /**
@@ -37,21 +38,32 @@ export function PokeConfirm() {
 /** 서버 사용자에게 실제로 보낸다. */
 function ServerPokeConfirm({ target }: { target: BoothHaveItem }) {
   const navigate = useNavigate()
-  const { state } = useStore()
+  const { state, dispatch } = useStore()
   const { send } = usePoke()
   const { state: catalog } = useCatalog()
   const [submitting, setSubmitting] = useState(false)
 
   const mockItemOf = catalog.status === 'ready' ? catalog.mockItemOf : undefined
   const targetItem = mockItemOf?.(target.item.id)
-  const topItemId = state.have[0]?.itemId ?? 'avn'
+  const topItemId = useTopHaveItemId(state.have) ?? 'avn'
   const haveCount = state.have.reduce((sum, s) => sum + s.qty, 0)
 
+  /**
+   * 보내고 교환 대기장으로 돌아간다.
+   *
+   * 돌아간 자리에서 토스트로 무엇을 보냈는지 알린다 (시안 `토스트 정리` 204:5148 의
+   * "찔러보기 제안한 경우"). 화면이 바뀌면서 요청이 나갔다는 흔적이 사라지기 때문에,
+   * 이 한 줄이 없으면 아무 일도 없던 것처럼 보인다.
+   */
   const submit = async () => {
     if (submitting) return
     setSubmitting(true)
     try {
       await send(target.ownerId, target.item.id)
+      dispatch({
+        type: 'toast',
+        message: `${targetItem?.name ?? target.item.name} 교환을 제안했어요\n답변 기다리는 중`,
+      })
       navigate('/home')
     } catch {
       // 사유는 PokeProvider 가 들고 있고 홈 화면이 띄운다. 되돌아가지 않는다.
@@ -127,7 +139,7 @@ function MockPokeConfirm() {
 
   // 나가는 중에는 주소가 이미 다음 화면 것이라, 처음 잡은 상대를 계속 들고 있는다.
   const target = useLastDefined(ALL_WAITING.find((u) => u.id === (params.get('to') ?? '')))
-  const topItemId = state.have[0]?.itemId ?? 'avn'
+  const topItemId = useTopHaveItemId(state.have) ?? 'avn'
   const haveCount = state.have.reduce((sum, s) => sum + s.qty, 0)
 
   if (!target) {

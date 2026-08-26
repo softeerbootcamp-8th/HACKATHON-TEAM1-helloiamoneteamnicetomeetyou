@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 
 import { RejectDialog } from '@/components/domain/ConfirmDialogs'
 import { useCatalog } from '@/features/catalog/useCatalog'
-import type { ReceivedPoke } from '@/features/poke/api'
+import type { PokeAnswerResult, ReceivedPoke } from '@/features/poke/api'
 import { usePoke } from '@/features/poke/usePoke'
 import { EmptyState } from '@/components/domain/EmptyState'
 import { GoodsCard, ItemCard } from '@/components/domain/GoodsCard'
@@ -40,10 +40,11 @@ function ServerPokeReceived({
   onReject,
 }: {
   poke: ReceivedPoke
-  onAccept: (pokeId: number, chosenItemId: number) => Promise<void>
+  onAccept: (pokeId: number, chosenItemId: number) => Promise<PokeAnswerResult>
   onReject: (pokeId: number) => Promise<void>
 }) {
   const navigate = useNavigate()
+  const { dispatch } = useStore()
   const { state: catalog } = useCatalog()
   const [picked, setPicked] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -53,11 +54,32 @@ function ServerPokeReceived({
   const requested = mockItemOf?.(poke.requestedItem.id)
   const chosen = picked ?? poke.offeredItems[0]?.id ?? null
 
+  /**
+   * 수락하고 시안 `7. 찔러보기 성사` 로 넘어간다.
+   *
+   * <b>서버가 돌려준 값으로 성사 화면을 세운다.</b> 어느 교환이 생겼는지도, 내가 상대
+   * 묶음에서 무엇을 골랐는지도 서버만 아는 값이라 화면이 다시 계산할 수 없다.
+   * 응답은 답한 사람 기준이라 `giveItemId` 가 그대로 "내가 주는 카드" 다.
+   */
   const submitAccept = async () => {
     if (chosen === null || submitting) return
     setSubmitting(true)
     try {
-      await onAccept(poke.pokeId, chosen)
+      const answer = await onAccept(poke.pokeId, chosen)
+      const give = answer.giveItemId === undefined ? undefined : mockItemOf?.(answer.giveItemId)
+      const receive =
+        answer.receiveItemId === undefined ? undefined : mockItemOf?.(answer.receiveItemId)
+
+      if (answer.exchangeId !== undefined && give && receive) {
+        dispatch({
+          type: 'server-poke-matched',
+          exchangeId: answer.exchangeId,
+          giveItemId: give.id,
+          receiveItemId: receive.id,
+          partnerUserId: poke.fromUserId,
+          partnerName: poke.fromUserName,
+        })
+      }
       navigate('/match')
     } catch {
       // 사유는 PokeProvider 가 들고 있고 홈 화면이 띄운다. 여기서는 화면을 붙잡아 둔다.

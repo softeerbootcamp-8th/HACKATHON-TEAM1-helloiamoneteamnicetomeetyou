@@ -28,20 +28,8 @@ import {
   wantedFromMe,
   type WaitingStatus,
 } from '@/store/matching'
+import { useTopHaveItemId } from '@/store/top-card'
 import { useStore } from '@/store/useStore'
-
-/**
- * 묶음 맨 위에 어느 카드를 세울지 고르는 값 (시안 desc 165:3500 3번 "랜덤 노출").
- *
- * <b>렌더 안에서 뽑지 않는다.</b> `Math.random()` 은 순수하지 않아서 React Compiler 가 막고,
- * 막지 않더라도 리렌더마다 그림이 바뀌어 카드가 깜빡인다. 그래서 앱이 뜰 때 한 번만 뽑아
- * 두고, 보유 카드 수에 곱해서 몇 번째 카드를 세울지 정한다.
- *
- * 앱을 켜 있는 동안에는 같은 카드가 서 있고 다시 켜면 달라진다. 화면에 들어올 때마다 다시
- * 뽑으려면 여기가 아니라 마운트 효과에서 뽑아야 하는데, 그러면 첫 그림이 한 번 바뀌어
- * 보인다. 깜빡이지 않는 쪽을 골랐다.
- */
-const TOP_CARD_PICK = Math.random()
 
 export function Home() {
   const navigate = useNavigate()
@@ -217,18 +205,7 @@ export function Home() {
   const haveIds = state.have.map((h) => h.itemId)
   const haveCount = state.have.reduce((sum, s) => sum + s.qty, 0)
 
-  /**
-   * 묶음 맨 위에 보이는 카드. <b>보유 카드 중에서 랜덤이다</b>(시안 desc 165:3500 3번).
-   *
-   * 위 `needKey` 와 같은 수를 써서 보유 목록이 실제로 달라졌을 때만 다시 고른다. 배열을
-   * 그대로 의존성에 넣으면 렌더마다 새 참조라 매번 다시 돈다. 고른 카드가 없으면 `null`
-   * 이고, 가지고 있지도 않은 카드를 세우지 않는다.
-   */
-  const haveKey = state.have.map((s) => s.itemId).join(',')
-  const topItemId = useMemo(() => {
-    const ids = haveKey ? haveKey.split(',') : []
-    return ids.length > 0 ? ids[Math.floor(TOP_CARD_PICK * ids.length)] : null
-  }, [haveKey])
+  const topItemId = useTopHaveItemId(state.have)
   const match = state.match
 
   // 매칭이 잡힌 상대는 전체리스트에서 "매칭됨" 으로 나온다.
