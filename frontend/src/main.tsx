@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router'
 
 import { router } from '@/app/router'
 import { CatalogProvider } from '@/features/catalog/CatalogProvider'
+import { NotificationProvider } from '@/features/notification/NotificationProvider'
 import { PokeProvider } from '@/features/poke/PokeProvider'
 import { StoreProvider } from '@/store/StoreProvider'
 
@@ -20,9 +21,12 @@ createRoot(document.getElementById('root')!).render(
         {/* 서버에 오간 찔러보기를 들고 실시간 알림을 구독한다. 부스를 알아야 구독할 수
             있어서 CatalogProvider 안쪽이다. */}
         <PokeProvider>
-          <StoreProvider>
-            <RouterProvider router={router} />
-          </StoreProvider>
+          {/* 알림함도 부스를 알아야 실시간 갱신을 구독할 수 있어서 같은 자리다. */}
+          <NotificationProvider>
+            <StoreProvider>
+              <RouterProvider router={router} />
+            </StoreProvider>
+          </NotificationProvider>
         </PokeProvider>
       </CatalogProvider>
     </MotionConfig>

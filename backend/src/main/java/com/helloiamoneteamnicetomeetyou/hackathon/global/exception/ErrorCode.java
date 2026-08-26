@@ -8,7 +8,7 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 /**
  * 도메인별로 코드 앞자리를 나눠 쓴다. 1000 공통, 2000 사용자, 3000 부스와 구역, 4000 교환,
- * 5000 카드와 보유·희망 등록이다.
+ * 5000 카드와 보유·희망 등록, 6000 알림이다.
  */
 public enum ErrorCode implements ErrorType {
 
@@ -44,7 +44,11 @@ public enum ErrorCode implements ErrorType {
 
     // Item / UserHaveItem / UserWantItem
     ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, 5000, "카드를 찾을 수 없습니다."),
-    INVALID_QUANTITY(HttpStatus.BAD_REQUEST, 5001, "수량은 1개 이상이어야 합니다.");
+    INVALID_QUANTITY(HttpStatus.BAD_REQUEST, 5001, "수량은 1개 이상이어야 합니다."),
+
+    // Notification
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, 6000, "알림을 찾을 수 없습니다."),
+    NOTIFICATION_NOT_RECIPIENT(HttpStatus.FORBIDDEN, 6001, "이 알림의 수신자가 아닙니다.");
 
     private final HttpStatus httpStatus;
     private final Integer errorCode;
