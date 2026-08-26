@@ -117,12 +117,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (state.outgoingPoke?.status !== 'pending') return
     const timer = window.setTimeout(() => {
-      // 상대가 내 묶음에서 원하는 카드를 찾을 수 있으면 수락한다.
       const target = ALL_WAITING.find((u) => u.id === state.outgoingPoke?.targetUserId)
-      const accepted = Boolean(
-        target && state.have.some((s) => target.needsItemIds.includes(s.itemId)),
-      )
-      dispatch({ type: 'poke-answered', accepted })
+
+      // 상대는 자기가 원하는 카드가 내 묶음에 있으면 그걸 고르고, 없으면 아무 한 장을
+      // 고른다. 찔러보기는 원래 원하는 것이 없는 상대에게 보내는 것이라 뒤쪽이 보통이다.
+      // 서버 연동에서는 이 자리에 실제로 고른 카드가 들어온다.
+      const wanted = state.have.find((s) => target?.needsItemIds.includes(s.itemId))
+      const chosen = wanted ?? state.have[0]
+
+      dispatch({
+        type: 'poke-answered',
+        accepted: Boolean(target && chosen),
+        chosenItemId: chosen?.itemId,
+      })
     }, 3200)
     return () => window.clearTimeout(timer)
   }, [state.outgoingPoke, state.have])

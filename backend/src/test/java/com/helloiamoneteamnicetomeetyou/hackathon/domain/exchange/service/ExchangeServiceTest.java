@@ -86,7 +86,7 @@ class ExchangeServiceTest {
 
         given(exchangeRepository.findById(EXCHANGE_ID)).willReturn(Optional.of(exchange));
         given(participantRepository.findAllByExchangeId(EXCHANGE_ID))
-                .willReturn(List.of(ExchangeParticipant.of(exchange, me), ExchangeParticipant.of(exchange, partner)));
+                .willReturn(List.of(ExchangeParticipant.accepted(exchange, me), ExchangeParticipant.accepted(exchange, partner)));
         given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of());
     }
 

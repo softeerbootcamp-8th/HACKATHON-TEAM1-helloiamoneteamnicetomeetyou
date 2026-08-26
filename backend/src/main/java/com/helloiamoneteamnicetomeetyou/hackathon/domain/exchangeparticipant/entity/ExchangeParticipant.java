@@ -52,13 +52,12 @@ public class ExchangeParticipant {
     }
 
     /**
-     * 교환에 참가자를 넣는다.
+     * 이미 수락한 참가자로 넣는다.
      *
-     * <p>{@code ACCEPTED} 로 시작한다. 지금은 매칭 결과 화면에서 수락한 사람들만 여기까지 오기
-     * 때문이다. 매칭 알고리즘이 붙어서 서버가 먼저 제안하게 되면 {@code PENDING} 으로 만들고
-     * 수락을 기다리는 흐름이 필요해진다.
+     * <p>찔러보기가 수락된 교환은 두 사람의 뜻이 이미 확인된 상태다. 보낸 쪽은 제안할 때,
+     * 받은 쪽은 카드를 고를 때 수락한 것이라 {@code PENDING} 을 거칠 일이 없다.
      */
-    public static ExchangeParticipant of(Exchange exchange, User user) {
+    public static ExchangeParticipant accepted(Exchange exchange, User user) {
         return new ExchangeParticipant(exchange, user, ParticipantStatus.ACCEPTED);
     }
 
@@ -72,7 +71,7 @@ public class ExchangeParticipant {
         this.status = ParticipantStatus.ACCEPTED;
     }
 
-    /** 어드민이 더미 사용자 대신 거절한다. 수락과 같은 이유로 열어 둔다. */
+    /** 어드민이 더미 사용자 대신 거절한다. 거절 흐름도 시연에서 보여 줘야 한다. */
     public void reject() {
         this.status = ParticipantStatus.REJECTED;
     }
@@ -81,7 +80,7 @@ public class ExchangeParticipant {
         return status == ParticipantStatus.ARRIVED;
     }
 
-    /** 약속 장소에 도착했다. 이미 도착했으면 아무 일도 하지 않는다. */
+    /** 약속 장소에 도착했다. 상대 화면의 "도착" 배지가 이걸 본다. */
     public void arrive() {
         this.status = ParticipantStatus.ARRIVED;
     }

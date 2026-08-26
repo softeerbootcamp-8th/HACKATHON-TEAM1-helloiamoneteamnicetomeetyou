@@ -82,6 +82,20 @@ public class ExchangeService {
      */
     @Transactional
     public ExchangeResponseDto create(Long boothId, ExchangeType type, List<UUID> participantUserIds) {
+        return toResponse(createExchange(boothId, type, participantUserIds));
+    }
+
+    /**
+     * 교환을 만들고 엔티티를 돌려준다.
+     *
+     * <p>만든 교환에 곧바로 다른 것을 붙여야 하는 쪽이 쓴다. 찔러보기가 성사되면 교환을 만든 뒤
+     * 주고받을 카드를 이어 붙이는데, 그때 응답 DTO 가 아니라 엔티티가 필요하다.
+     *
+     * <p><b>교환을 만드는 길은 여기 하나다.</b> 장소와 격자 시작점, 식별자가 전부 여기서 붙는다.
+     * 다른 데서 {@code Exchange} 를 직접 만들면 그것들이 비어서 약속 화면이 깨진다.
+     */
+    @Transactional
+    public Exchange createExchange(Long boothId, ExchangeType type, List<UUID> participantUserIds) {
         List<UUID> distinctIds = participantUserIds.stream().distinct().toList();
 
         if (distinctIds.size() < 2) {
@@ -99,12 +113,12 @@ public class ExchangeService {
         for (UUID userId : distinctIds) {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_FOUND));
-            participantRepository.save(ExchangeParticipant.of(exchange, user));
+            participantRepository.save(ExchangeParticipant.accepted(exchange, user));
         }
 
         notifyParticipants(exchange.getId(), distinctIds, SseEventType.EXCHANGE_CREATED);
 
-        return toResponse(exchange);
+        return exchange;
     }
 
     public ExchangeResponseDto find(Long exchangeId) {

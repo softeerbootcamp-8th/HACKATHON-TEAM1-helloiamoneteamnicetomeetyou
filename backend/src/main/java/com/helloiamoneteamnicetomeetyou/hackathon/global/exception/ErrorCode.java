@@ -37,6 +37,17 @@ public enum ErrorCode implements ErrorType {
     EXCHANGE_TIME_NOT_CONFIRMED(HttpStatus.CONFLICT, 4007, "아직 만날 시간이 정해지지 않았습니다."),
     EXCHANGE_ALREADY_FINISHED(HttpStatus.CONFLICT, 4008, "이미 끝난 약속입니다."),
 
+    // Poke (찔러보기). 교환 제안이라 교환 대역을 이어 쓴다.
+    POKE_NOT_FOUND(HttpStatus.NOT_FOUND, 4010, "찔러보기를 찾을 수 없습니다."),
+    POKE_ALREADY_ANSWERED(HttpStatus.CONFLICT, 4011, "이미 응답한 찔러보기입니다."),
+    POKE_DUPLICATE_PENDING(HttpStatus.CONFLICT, 4012, "이미 답변을 기다리는 찔러보기가 있습니다."),
+    POKE_SELF_NOT_ALLOWED(HttpStatus.BAD_REQUEST, 4013, "자신에게는 찔러볼 수 없습니다."),
+    POKE_NOT_RECEIVER(HttpStatus.FORBIDDEN, 4014, "이 찔러보기에 응답할 수 있는 사용자가 아닙니다."),
+    POKE_ITEM_NOT_OWNED(HttpStatus.BAD_REQUEST, 4015, "상대가 가지고 있지 않은 카드입니다."),
+    POKE_CHOSEN_ITEM_NOT_OFFERED(HttpStatus.BAD_REQUEST, 4016, "상대가 내놓은 카드가 아닙니다."),
+    POKE_NO_OFFERABLE_ITEM(HttpStatus.BAD_REQUEST, 4017, "내놓을 카드가 없어 찔러볼 수 없습니다."),
+    POKE_ITEM_SOLD_OUT(HttpStatus.CONFLICT, 4018, "상대의 카드가 모두 교환되었습니다."),
+
     // Item / UserHaveItem / UserWantItem
     ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, 5000, "카드를 찾을 수 없습니다."),
     INVALID_QUANTITY(HttpStatus.BAD_REQUEST, 5001, "수량은 1개 이상이어야 합니다.");
