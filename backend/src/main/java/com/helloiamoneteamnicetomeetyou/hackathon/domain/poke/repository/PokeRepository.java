@@ -11,6 +11,21 @@ import org.springframework.data.jpa.repository.Query;
 public interface PokeRepository extends JpaRepository<Poke, Long> {
 
     /**
+     * 어드민 목록이다. 사람과 카드를 같이 읽는다.
+     *
+     * <p>fetch join 이 없으면 행마다 보낸 사람, 받은 사람, 카드 조회가 따로 나간다.
+     */
+    @Query("""
+            select p from Poke p
+            join fetch p.fromUser
+            join fetch p.toUser
+            join fetch p.requestedItem
+            order by p.id desc
+            """)
+    List<Poke> findAllForAdmin();
+
+
+    /**
      * 이 상대에게 이미 답을 기다리는 찔러보기가 있는지.
      *
      * <p>시안이 "이미 신청해 대답을 기다리고 있는 사용자에게는 재신청 불가" 라고 못박았다
