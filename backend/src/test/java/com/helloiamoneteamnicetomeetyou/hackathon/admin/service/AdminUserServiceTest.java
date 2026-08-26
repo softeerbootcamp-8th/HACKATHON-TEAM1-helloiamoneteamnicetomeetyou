@@ -169,6 +169,28 @@ class AdminUserServiceTest {
                 .containsExactly("아반떼");
     }
 
+    /**
+     * 나간 사람도 줄이 그대로 남는다. 만든 순서로만 두면 지금 부스에 서 있는 사람이 떠난
+     * 사람들 밑으로 밀려서, 목록을 끝까지 내려야 상대할 사람이 나온다.
+     */
+    @Test
+    @DisplayName("접속 중인 사람이 목록 위로 온다")
+    void 접속_중인_사람을_먼저_보여_준다() {
+        User left = User.dummy(UUID.fromString("44444444-4444-4444-8444-444444444444"), "손님 11");
+        User here = User.dummy(UUID.fromString("55555555-5555-4555-8555-555555555555"), "손님 22");
+
+        given(userHaveItemRepository.findAllWithItem()).willReturn(List.of());
+        given(userWantItemRepository.findAllWithItem()).willReturn(List.of());
+        given(userRepository.findAllByOrderByCreatedAtDesc()).willReturn(List.of(left, here));
+        given(sseConnectionManager.connectedUserIds()).willReturn(Set.of(here.getId()));
+
+        List<UserView> users = adminUserService.findUsers();
+
+        assertThat(users)
+                .extracting(UserView::displayName)
+                .containsExactly("손님 22", "손님 11");
+    }
+
     /** 저장한 사용자를 그대로 돌려주게 해서, 서비스가 발급한 UUID 를 테스트가 알 수 있게 한다. */
     private UUID saveReturnsSame() {
         UUID userId = UUID.fromString("11111111-1111-4111-8111-111111111111");

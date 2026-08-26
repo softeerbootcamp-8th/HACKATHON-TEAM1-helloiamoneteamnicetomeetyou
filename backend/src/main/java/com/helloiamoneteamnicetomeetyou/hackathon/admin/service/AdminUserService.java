@@ -57,6 +57,10 @@ public class AdminUserService {
      *
      * <p>카드를 사람마다 따로 읽으면 사용자 수만큼 쿼리가 나간다. 전부 한 번에 읽어 와서
      * 메모리에서 묶는다. 부스 규모에서는 이쪽이 훨씬 싸다.
+     *
+     * <p><b>접속 중인 사람을 위로 올린다.</b> 나간 사람도 줄이 그대로 남기 때문에, 만든 순서로만
+     * 두면 지금 부스에 서 있는 사람이 떠난 사람들 밑으로 밀린다. 같은 접속 상태끼리는 원래 순서,
+     * 그러니까 최근에 만들어진 순이다.
      */
     public List<UserView> findUsers() {
         Map<UUID, List<ItemView>> have = groupHave();
@@ -69,6 +73,7 @@ public class AdminUserService {
                         have.getOrDefault(user.getId(), List.of()),
                         want.getOrDefault(user.getId(), List.of()),
                         connected.contains(user.getId())))
+                .sorted(Comparator.comparing(UserView::online).reversed())
                 .toList();
     }
 
