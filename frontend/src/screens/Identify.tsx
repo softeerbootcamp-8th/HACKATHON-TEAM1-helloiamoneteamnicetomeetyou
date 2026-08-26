@@ -68,7 +68,7 @@ export function Identify() {
       dispatch({ type: 'exchange-synced', exchange, myUserId })
       navigate('/complete')
     } catch {
-      dispatch({ type: 'toast', message: '상대가 먼저 거래를 취소했어요' })
+      dispatch({ type: 'toast', message: '상대가 먼저 교환을 취소했어요' })
       navigate('/home')
     } finally {
       setBusy(false)

@@ -144,7 +144,7 @@ export function TimeSelect() {
       return
     }
 
-    dispatch({ type: 'toast', message: '잠시 후 다시 시도해주세요' })
+    dispatch({ type: 'toast', message: '잠시 뒤에 다시 시도해 주세요' })
   }
 
   return (
@@ -258,7 +258,7 @@ export function TimeSelect() {
             onClick={() => {
               void run(() => resetTimeSlots(appt.exchangeId, myUserId)).then((ok) => {
                 if (!ok) {
-                  dispatch({ type: 'toast', message: '잠시 후 다시 시도해주세요' })
+                  dispatch({ type: 'toast', message: '잠시 뒤에 다시 시도해 주세요' })
                   return
                 }
                 dispatch({ type: 'request-time-again' })

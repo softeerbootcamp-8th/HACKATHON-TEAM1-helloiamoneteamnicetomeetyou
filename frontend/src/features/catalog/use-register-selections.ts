@@ -86,8 +86,8 @@ export function useRegisterSelections() {
  * 것 자체가 없어서 화면이 사유만 보여주고 멈춘다.
  */
 export function catalogNotice(state: CatalogState): string | undefined {
-  if (state.status === 'loading') return '카드 목록을 받아오는 중입니다.'
+  if (state.status === 'loading') return '카드 목록을 받아오는 중이에요'
   if (state.status === 'empty') return state.reason
-  if (state.status === 'error') return `${state.reason} 잠시 뒤에 다시 시도해 주세요.`
+  if (state.status === 'error') return `${state.reason} 잠시 뒤에 다시 시도해 주세요`
   return undefined
 }

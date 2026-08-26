@@ -52,7 +52,7 @@ async function toApiError(res: Response, path: string, method: string): Promise<
     console.warn(`[api] ${method} ${path} → ${res.status} (팀 응답 형식이 아님)`)
   }
 
-  return new ApiError(res.status, '서버에 닿지 못했습니다. 잠시 뒤에 다시 시도해 주세요.')
+  return new ApiError(res.status, '서버에 닿지 못했어요. 잠시 뒤에 다시 시도해 주세요')
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -91,7 +91,7 @@ export async function apiData<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.success || res.data === undefined) {
     // 여기까지 왔다는 것은 HTTP 는 2xx 였다는 뜻이라 상태 코드는 200 으로 둔다.
-    throw new ApiError(200, res.message ?? '서버 응답 형식이 예상과 다릅니다.', res.code)
+    throw new ApiError(200, res.message ?? '서버 응답이 예상과 달라요', res.code)
   }
 
   return res.data
@@ -105,5 +105,5 @@ export async function apiVoid(path: string, init?: RequestInit): Promise<void> {
 /** 어떤 예외든 화면에 그대로 띄울 수 있는 한글 한 문장으로 바꾼다. */
 export function messageOf(error: unknown): string {
   if (error instanceof ApiError) return error.message
-  return '서버에 닿지 못했습니다. 잠시 뒤에 다시 시도해 주세요.'
+  return '서버에 닿지 못했어요. 잠시 뒤에 다시 시도해 주세요'
 }

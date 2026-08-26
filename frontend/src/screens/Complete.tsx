@@ -78,7 +78,7 @@ export function Complete() {
             navigate('/')
           }}
         >
-          교환 끝 ~
+          교환 끝~
         </TextButton>
       </div>
     </div>
