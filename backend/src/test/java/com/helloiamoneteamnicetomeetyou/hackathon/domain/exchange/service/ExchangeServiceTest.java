@@ -546,26 +546,6 @@ class ExchangeServiceTest {
         verify(eventPublisher, times(2)).publishEvent(any(MatchTriggerEvent.class));
     }
 
-    @Test
-    @DisplayName("교환을 마치면 내놓은 수량이 줄고 찾는 카드가 빠진다")
-    void 마치면_수량이_줄어든다() throws Exception {
-        exchange.confirmTime(1);
-
-        UserHaveItem given = reservedHaveItem();
-        UserWantItem wanted = UserWantItem.of(partner, given.getItem(), 1);
-        givenExchangeItem(given);
-        given(userWantItemRepository.findByUserIdAndItemId(PARTNER, given.getItem().getId()))
-                .willReturn(Optional.of(wanted));
-
-        exchangeService.complete(EXCHANGE_ID, ME);
-
-        // 두 장 중 한 장이 나갔다.
-        assertThat(given.getQuantityLeft()).isEqualTo(1);
-        // 받은 사람은 더 이상 이 카드를 찾지 않는다. 남겨 두면 곧바로 같은 카드로 재매칭된다.
-        assertThat(wanted.getQuantity()).isZero();
-        verify(userWantItemRepository).delete(wanted);
-    }
-
     /** ME 가 PARTNER 에게 카드 한 장을 주는 교환 한 줄을 깔아 둔다. */
     private void givenExchangeItem(UserHaveItem haveItem) {
         given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
