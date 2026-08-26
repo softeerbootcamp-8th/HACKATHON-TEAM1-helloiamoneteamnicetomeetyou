@@ -182,7 +182,8 @@ class UserWantItemServiceTest {
     @Test
     @DisplayName("내놓기로 한 카드는 찾는 카드로 등록할 수 없다")
     void 내놓은_카드는_찾을_수_없다() {
-        given(userHaveItemRepository.existsByUserIdAndItemId(USER_ID, ITEM_ID)).willReturn(true);
+        given(userHaveItemRepository.existsByUserIdAndItemIdAndQuantityLeftGreaterThan(USER_ID, ITEM_ID, 0))
+                .willReturn(true);
 
         assertThatThrownBy(() -> userWantItemService.register(USER_ID, ITEM_ID, 1))
                 .isInstanceOf(ApplicationException.class)
@@ -190,6 +191,24 @@ class UserWantItemServiceTest {
                 .isEqualTo(ErrorCode.ITEM_ALREADY_IN_HAVE);
 
         verify(userWantItemRepository, never()).save(any(UserWantItem.class));
+    }
+
+    @Test
+    @DisplayName("다 넘겨서 남은 게 없는 카드는 다시 찾는 카드로 등록할 수 있다")
+    void 다_넘긴_카드는_다시_찾을_수_있다() {
+        given(userHaveItemRepository.existsByUserIdAndItemIdAndQuantityLeftGreaterThan(USER_ID, ITEM_ID, 0))
+                .willReturn(false);
+        User user = User.of(USER_ID);
+        Item item = itemInBooth();
+        given(userWantItemRepository.findByUserIdAndItemId(USER_ID, ITEM_ID))
+                .willReturn(Optional.empty());
+        given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+        given(itemRepository.findById(ITEM_ID)).willReturn(Optional.of(item));
+
+        boolean created = userWantItemService.register(USER_ID, ITEM_ID, 1);
+
+        assertThat(created).isTrue();
+        verify(userWantItemRepository).save(any(UserWantItem.class));
     }
 
     @Test
