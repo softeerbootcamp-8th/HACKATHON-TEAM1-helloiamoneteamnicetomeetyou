@@ -15,5 +15,12 @@ public record ExchangeParticipantResponseDto(
         String username,
         List<Integer> slots,
         boolean answered,
+        /**
+         * 이 사람이 "이 시간으로 약속!" 을 눌렀는지.
+         *
+         * <p>전원이 눌러야 {@code confirmedTime} 이 채워진다. 시간 선택 화면의 CTA 가 이걸 보고
+         * "내가 눌러야 하는지" 와 "상대를 기다리는 중인지" 를 가른다.
+         */
+        boolean timeConfirmed,
         boolean arrived) {
 }

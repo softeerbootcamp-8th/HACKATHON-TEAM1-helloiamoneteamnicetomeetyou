@@ -61,7 +61,7 @@ class ExchangeControllerTest {
                 15,
                 3,
                 28,
-                List.of(new ExchangeParticipantResponseDto(ME, "레몬 28", List.of(0, 2), true, false)),
+                List.of(new ExchangeParticipantResponseDto(ME, "레몬 28", List.of(0, 2), true, false, false)),
                 overlapSlot,
                 true,
                 confirmedTime);

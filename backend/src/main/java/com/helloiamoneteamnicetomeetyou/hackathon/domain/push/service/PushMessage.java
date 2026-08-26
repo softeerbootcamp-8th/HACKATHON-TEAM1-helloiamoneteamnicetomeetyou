@@ -45,6 +45,16 @@ public enum PushMessage {
     EXCHANGE_TIME_MISMATCHED(
             SseEventType.EXCHANGE_TIME_MISMATCHED, "겹치는 시간을 못 찾았어요", "시간을 다시 골라 주세요", "/time"),
 
+    /*
+      상대가 확정을 눌렀고 이제 내가 눌러야 약속이 잡힌다. 여기서 앱이 닫혀 있으면 흐름이
+      그대로 멈추기 때문에, 화면 갱신용이 아니라 실제로 불러내야 하는 알림이다.
+    */
+    EXCHANGE_TIME_AGREED(
+            SseEventType.EXCHANGE_TIME_AGREED,
+            "상대가 이 시간에 약속했어요",
+            "확인하고 약속을 확정해 주세요",
+            "/time"),
+
     EXCHANGE_TIME_UPDATED(
             SseEventType.EXCHANGE_TIME_UPDATED, "약속 시간이 정해졌어요!", "새 시간을 확인해 주세요", "/appointment"),
     EXCHANGE_PLACE_UPDATED(
