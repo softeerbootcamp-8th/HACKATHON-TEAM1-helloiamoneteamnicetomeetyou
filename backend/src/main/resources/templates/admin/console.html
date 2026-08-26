@@ -400,9 +400,32 @@
           <div class="box">
             <div class="box-head">
               구역
+              <!--/*
+                약도 자리(X, Y)는 약도 너비·높이에 대한 백분율이다. 비워 두면 50/50 으로
+                들어가는데, 그러면 두 번째 구역부터 첫 핀에 그대로 포개져서 사용자 화면에서
+                고를 수가 없다. 급할 때는 이름만 넣고 넘어가되, 겹쳐 보이면 여기서 고친다.
+              */-->
               <form method="post" th:action="@{'/admin/booths/' + ${booth.id} + '/zones'}" class="inline-form">
                 <input class="input sm" name="name" placeholder="A 구역" required />
                 <input class="input sm" name="location" placeholder="부스 입구 왼쪽" />
+                <input
+                  class="input sm map-pos"
+                  name="mapX"
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="X"
+                  aria-label="약도 가로 위치(%)"
+                />
+                <input
+                  class="input sm map-pos"
+                  name="mapY"
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="Y"
+                  aria-label="약도 세로 위치(%)"
+                />
                 <button class="btn sm" type="submit">추가</button>
               </form>
             </div>
@@ -416,9 +439,31 @@
                 >
                   <input class="input sm" name="name" th:value="${z.name}" required style="flex: 1" />
                   <input class="input sm" name="location" th:value="${z.location}" placeholder="위치" style="flex: 2" />
+                  <input
+                    class="input sm map-pos"
+                    name="mapX"
+                    type="number"
+                    min="0"
+                    max="100"
+                    th:value="${z.mapX}"
+                    aria-label="약도 가로 위치(%)"
+                  />
+                  <input
+                    class="input sm map-pos"
+                    name="mapY"
+                    type="number"
+                    min="0"
+                    max="100"
+                    th:value="${z.mapY}"
+                    aria-label="약도 세로 위치(%)"
+                  />
                   <button class="btn outline sm" type="submit">저장</button>
                 </form>
-                <form method="post" th:action="@{'/admin/booths/' + ${booth.id} + '/zones/' + ${z.id} + '/delete'}">
+                <form
+                  method="post"
+                  th:action="@{'/admin/booths/' + ${booth.id} + '/zones/' + ${z.id} + '/delete'}"
+                  th:data-confirm="'구역 ' + ${z.name} + ' 을(를) 지웁니다. 되돌릴 수 없습니다.'"
+                >
                   <button class="icon-btn danger" type="submit" aria-label="삭제">×</button>
                 </form>
               </div>
@@ -426,6 +471,10 @@
             <div class="empty sm" th:if="${#lists.isEmpty(zones)}">
               구역이 없으면 만날 자리를 고르는 화면이 비어 버립니다.
             </div>
+            <p class="zone-hint" th:if="${!#lists.isEmpty(zones)}">
+              X, Y 는 약도 위 자리입니다. 왼쪽 위가 0, 오른쪽 아래가 100 입니다. 이 구역에서 만나기로 한 약속이 남아
+              있으면 지워지지 않습니다.
+            </p>
           </div>
 
           <div class="box">

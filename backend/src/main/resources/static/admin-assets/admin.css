@@ -460,6 +460,44 @@ h3 {
   flex: 1;
 }
 
+/*
+  약도 위 자리(0~100). 두 자리 숫자만 들어가는 칸이라 이름·위치 칸과 같이 늘어나면
+  한 줄이 다 밀린다. 폭을 고정하고 늘어나지 않게 둔다.
+*/
+/*
+  약도 위 자리(0~100).
+
+  스피너 화살표를 없앤다. 두 자리 숫자가 들어가는 좁은 칸이라 화살표가 자리를 먹으면 값이
+  잘려서 "52" 가 "5" 로 보인다. 화살표로 1씩 올리는 것이 쓸모 있는 값도 아니다.
+*/
+.input.map-pos {
+  flex: 0 0 62px;
+  width: 62px;
+  padding-right: 8px;
+  padding-left: 8px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.input.map-pos::-webkit-outer-spin-button,
+.input.map-pos::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* 목록 아래 붙는 안내. .box 안쪽이라 좌우 여백을 .box-body 와 맞춰야 글이 카드 밖으로 나가 보이지 않는다. */
+.zone-hint {
+  margin: 0;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 /* 약속 화면의 참가자 알약들. */
 .party {
   display: flex;

@@ -47,14 +47,22 @@ public class AdminBoothController {
         return "redirect:/admin?tab=zones&boothId=" + boothId;
     }
 
+    /**
+     * 구역을 추가한다.
+     *
+     * <p>약도 위 자리({@code mapX}, {@code mapY})는 안 넣어도 되게 둔다. 급할 때는 이름만
+     * 넣고 넘어가고, 약도가 겹쳐 보이면 그때 고치는 순서가 부스에서 더 빠르다.
+     */
     @PostMapping("/{boothId}/zones")
     public String createZone(
             @PathVariable Long boothId,
             @RequestParam String name,
             @RequestParam(required = false) String location,
+            @RequestParam(required = false) Integer mapX,
+            @RequestParam(required = false) Integer mapY,
             RedirectAttributes redirectAttributes) {
 
-        adminBoothService.createZone(boothId, name, location);
+        adminBoothService.createZone(boothId, name, location, mapX, mapY);
         redirectAttributes.addFlashAttribute("toast", "구역을 추가했습니다.");
 
         return "redirect:/admin?tab=zones&boothId=" + boothId;
@@ -66,9 +74,11 @@ public class AdminBoothController {
             @PathVariable Long zoneId,
             @RequestParam String name,
             @RequestParam(required = false) String location,
+            @RequestParam(required = false) Integer mapX,
+            @RequestParam(required = false) Integer mapY,
             RedirectAttributes redirectAttributes) {
 
-        adminBoothService.updateZone(zoneId, name, location);
+        adminBoothService.updateZone(zoneId, name, location, mapX, mapY);
         redirectAttributes.addFlashAttribute("toast", "구역을 고쳤습니다.");
 
         return "redirect:/admin?tab=zones&boothId=" + boothId;
