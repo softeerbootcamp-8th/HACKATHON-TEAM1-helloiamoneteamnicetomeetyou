@@ -6,7 +6,6 @@ import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ZoneView;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.entity.Booth;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.repository.BoothRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
-import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.repository.ItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.entity.Zone;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.repository.ZoneRepository;
@@ -30,7 +29,7 @@ public class AdminBoothService {
     private final BoothRepository boothRepository;
     private final ZoneRepository zoneRepository;
     private final ItemRepository itemRepository;
-    private final ExchangeRepository exchangeRepository;
+    private final AdminCleanupService adminCleanupService;
     private final SseConnectionManager sseConnectionManager;
 
     public List<BoothView> findBooths() {
@@ -58,12 +57,12 @@ public class AdminBoothService {
     }
 
     public List<ItemView> findItems(Long boothId) {
-        return itemRepository.findByBoothIdOrderByIdAsc(boothId).stream().map(ItemView::of).toList();
+        return itemRepository.findAllWithBoothByBoothId(boothId).stream().map(ItemView::of).toList();
     }
 
-    /** 카드 고르기 화면이 부스와 상관없이 전체 목록을 필요로 한다. */
+    /** 카드 고르기 화면이 부스와 상관없이 전체 목록을 필요로 한다. 부스 이름을 같이 보여 준다. */
     public List<ItemView> findAllItems() {
-        return itemRepository.findAll().stream().map(ItemView::of).toList();
+        return itemRepository.findAllWithBooth().stream().map(ItemView::of).toList();
     }
 
     @Transactional
@@ -75,6 +74,44 @@ public class AdminBoothService {
     public void updateBooth(Long boothId, String name, String description) {
         findBooth(boothId).update(name, description);
     }
+
+    /**
+     * 부스를 통째로 지운다. 그 안의 카드와 구역까지 같이 사라진다.
+     *
+     * <p><b>마지막 남은 부스는 막는다.</b> 부스가 하나도 없으면 서비스 첫 화면이
+     * "아직 열린 부스가 없습니다" 로 굳어서 아무도 아무것도 못 한다. 부스를 갈아 끼우려면 새
+     * 부스를 먼저 만들고 지우면 된다.
+     *
+     * <p>카드는 {@link AdminCleanupService#deleteItemDeep} 로 딸린 것까지 걷어낸 뒤 지우고,
+     * 구역은 약속에서 자리만 떼고 지운다. 카드 하나하나를 도는 것이 느려 보이지만 부스 하나에
+     * 카드가 열 몇 장이고 부스를 지우는 일은 시연 준비 때 몇 번 있는 일이라, 삭제 규칙을 한 곳에
+     * 두는 편이 낫다고 봤다.
+     */
+    @Transactional
+    public BoothRemoval deleteBooth(Long boothId) {
+        Booth booth = findBooth(boothId);
+        if (boothRepository.count() <= 1) {
+            throw new ApplicationException(ErrorCode.LAST_BOOTH);
+        }
+
+        List<Item> items = itemRepository.findByBoothIdOrderByIdAsc(boothId);
+        int removedExchanges = 0;
+        for (Item item : items) {
+            removedExchanges += adminCleanupService.deleteItemDeep(item.getId());
+        }
+        itemRepository.deleteAll(items);
+
+        List<Zone> zones = zoneRepository.findByBoothIdOrderByIdAsc(boothId);
+        zones.forEach(zone -> adminCleanupService.detachZone(zone.getId()));
+        zoneRepository.deleteAll(zones);
+
+        boothRepository.delete(booth);
+
+        return new BoothRemoval(items.size(), zones.size(), removedExchanges);
+    }
+
+    /** 부스를 지우면서 같이 사라진 것들. 화면이 운영자에게 그대로 읽어 준다. */
+    public record BoothRemoval(int items, int zones, int exchanges) {}
 
     /**
      * 구역을 만든다. 약도 위 자리까지 여기서 받는다.
@@ -103,11 +140,11 @@ public class AdminBoothService {
     }
 
     /**
-     * 구역을 지운다.
+     * 구역을 지운다. 여기서 만나기로 한 약속에서는 자리만 떼어 낸다.
      *
-     * <p><b>약속이 걸려 있으면 먼저 막는다.</b> 그냥 지우면 FK 제약에 걸려 500 이 나가는데,
-     * 운영자가 받는 것은 이유가 안 적힌 오류 화면이라 무엇을 정리해야 하는지 알 수 없다.
-     * 끝난 약속도 그 자리를 기록으로 들고 있어서 여기에 걸린다. 교환을 먼저 정리하고 지운다.
+     * <p>예전에는 약속이 하나라도 걸려 있으면 막았다. 끝난 약속도 그 자리를 기록으로 들고 있어서,
+     * 시연을 한 번 돌리고 나면 구역을 영영 못 지우게 됐다. 지금은 약속에서 자리를 비우고 지운다.
+     * 진행 중이던 약속은 "장소 미정" 이 되고 교환 탭에서 다른 자리로 옮기면 된다.
      */
     @Transactional
     public void deleteZone(Long zoneId) {
@@ -115,10 +152,7 @@ public class AdminBoothService {
             throw new ApplicationException(ErrorCode.ZONE_NOT_FOUND);
         }
 
-        if (exchangeRepository.existsByZoneId(zoneId)) {
-            throw new ApplicationException(ErrorCode.ZONE_IN_USE);
-        }
-
+        adminCleanupService.detachZone(zoneId);
         zoneRepository.deleteById(zoneId);
     }
 
@@ -134,9 +168,26 @@ public class AdminBoothService {
                 .update(name, description, blankToNull(imageUrl));
     }
 
+    /**
+     * 카드를 지운다. 그 카드를 가리키는 것을 전부 걷어낸 뒤에 지운다.
+     *
+     * <p><b>그냥 {@code deleteById} 를 부르면 FK 제약에 걸려 500 이 나갔다.</b> 카드를 붙들고
+     * 있는 표가 다섯(교환 기록, 찔러보기 두 자리, 내놓음, 찾음)인데, 운영자가 받는 것은 이유가
+     * 안 적힌 오류 화면이라 무엇을 정리해야 하는지 알 수 없었다. 정리 순서는
+     * {@link AdminCleanupService} 가 안다.
+     *
+     * @return 이 카드가 오가서 같이 지운 교환 건수. 화면이 운영자에게 알려 준다
+     */
     @Transactional
-    public void deleteItem(Long itemId) {
+    public int deleteItem(Long itemId) {
+        if (!itemRepository.existsById(itemId)) {
+            throw new ApplicationException(ErrorCode.ITEM_NOT_FOUND);
+        }
+
+        int removedExchanges = adminCleanupService.deleteItemDeep(itemId);
         itemRepository.deleteById(itemId);
+
+        return removedExchanges;
     }
 
     /**

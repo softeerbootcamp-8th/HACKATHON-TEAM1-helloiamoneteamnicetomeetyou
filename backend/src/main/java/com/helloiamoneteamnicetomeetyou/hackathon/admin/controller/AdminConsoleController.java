@@ -48,7 +48,7 @@ public class AdminConsoleController {
         model.addAttribute("booths", adminBoothService.findBooths());
 
         switch (tab) {
-            case "items" -> items(itemId, model);
+            case "items" -> items(itemId, boothId, model);
             case "zones" -> zones(boothId, model);
             case "exchanges" -> exchanges(status, model);
             case "pokes" -> model.addAttribute("pokes", adminPokeService.findPokes());
@@ -116,11 +116,30 @@ public class AdminConsoleController {
         model.addAttribute("allZones", adminBoothService.findAllZones());
     }
 
-    private void items(Long itemId, Model model) {
-        var items = adminUserService.findItemDetails();
-        model.addAttribute("items", items);
+    /**
+     * 카드 목록. 부스로 거를 수 있다.
+     *
+     * <p>카드 이름만 늘어놓으면 어느 부스 것인지 알 수 없어서, 부스를 둘 이상 놓고 시연할 때
+     * 방금 만든 카드를 목록에서 찾지 못했다. 줄마다 부스 이름을 붙이고, 부스 하나만 보는 길도
+     * 같이 둔다.
+     *
+     * <p><b>고른 카드가 거른 목록에 없으면 첫 카드로 되돌린다.</b> 그대로 두면 왼쪽에서 아무것도
+     * 켜지지 않은 채 오른쪽만 다른 부스 카드를 펴고 있게 된다.
+     */
+    private void items(Long itemId, Long boothId, Model model) {
+        var all = adminUserService.findItemDetails();
+        var shown = boothId == null
+                ? all
+                : all.stream().filter(view -> boothId.equals(view.item().boothId())).toList();
 
-        Long selected = itemId != null ? itemId : items.stream().findFirst().map(i -> i.item().id()).orElse(null);
+        model.addAttribute("items", shown);
+        model.addAttribute("boothId", boothId);
+
+        boolean keepsSelection = itemId != null
+                && shown.stream().anyMatch(view -> itemId.equals(view.item().id()));
+        Long selected = keepsSelection
+                ? itemId
+                : shown.stream().findFirst().map(i -> i.item().id()).orElse(null);
         if (selected == null) {
             return;
         }
@@ -141,5 +160,8 @@ public class AdminConsoleController {
 
         model.addAttribute("booth", adminBoothService.findBooth(selected));
         model.addAttribute("zones", adminBoothService.findZones(selected));
+        // 이 부스의 카드를 여기서 바로 고친다. 카드 탭으로 넘어가면 어느 것이 이 부스 것인지
+        // 다시 찾아야 한다.
+        model.addAttribute("boothItems", adminBoothService.findItems(selected));
     }
 }

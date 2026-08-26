@@ -3,6 +3,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.admin.controller;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -31,6 +32,26 @@ public class AdminExceptionHandler {
                 request.getMethod(), request.getRequestURI(), e.getErrorType().getMessage());
 
         redirectAttributes.addFlashAttribute("toast", e.getErrorType().getMessage());
+        redirectAttributes.addFlashAttribute("toastTone", "danger");
+
+        return "redirect:" + refererOrHome(request);
+    }
+
+    /**
+     * 아직 안 막아 둔 참조 제약에 걸렸을 때.
+     *
+     * <p>딸린 줄을 지우거나 미리 막아 두는 것이 먼저지만, 표가 늘어날 때마다 빠뜨리는 자리가
+     * 생긴다. 그때 운영자가 받는 것이 스택 트레이스가 박힌 흰 화면이면 부스에서는 손을 놓게
+     * 된다. 무엇에 걸렸는지 한 줄로 알려 주고 하던 자리로 돌려보낸다. 자세한 것은 서버 로그에
+     * 남긴다.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public String handleDataIntegrityViolation(
+            DataIntegrityViolationException e, HttpServletRequest request, RedirectAttributes redirectAttributes) {
+
+        log.error("어드민 화면 참조 제약 위반 - [{}] {}", request.getMethod(), request.getRequestURI(), e);
+
+        redirectAttributes.addFlashAttribute("toast", "다른 데이터가 이걸 쓰고 있어 처리하지 못했습니다.");
         redirectAttributes.addFlashAttribute("toastTone", "danger");
 
         return "redirect:" + refererOrHome(request);
