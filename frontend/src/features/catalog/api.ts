@@ -24,10 +24,19 @@ export type Item = {
   code: string
 }
 
-/** 내가 지금 등록해 둔 카드 한 줄. `reserved` 는 찾는 카드에는 없다. */
+/**
+ * 내가 지금 등록해 둔 카드 한 줄. `registered` 와 `reserved` 는 찾는 카드에는 없다.
+ *
+ * `quantity` 와 `registered` 를 가려 써야 한다. 지금 내줄 수 있는 개수(`quantity`)는 교환에
+ * 예약된 만큼이 빠져 있어서, 등록한 것이 통째로 예약되면 0 이다. 등록 화면을 되살릴 때 그 값을
+ * 쓰면 매칭이 잡힌 사람의 카드가 화면에서 사라진다.
+ */
 export type RegisteredItem = {
   itemId: number
+  /** 지금 새로 내줄 수 있는 개수. 찔러보기 묶음이 이 값을 본다. */
   quantity: number
+  /** 등록해 둔 총 개수. 등록 화면을 되살릴 값은 이쪽이다. 찾는 카드에는 없다. */
+  registered?: number
   reserved?: boolean
 }
 

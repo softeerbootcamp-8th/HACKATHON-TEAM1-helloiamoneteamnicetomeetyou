@@ -95,15 +95,19 @@ public class UserHaveItemService {
     /**
      * 내가 지금 등록해 둔 내놓을 카드 전부.
      *
-     * <p>등록 화면이 제출 직전에 읽어 해제할 카드를 가려낸다. 화면 상태는 새로고침에 사라지므로
-     * 서버가 유일한 기준이다.
+     * <p>등록 화면이 제출 직전에 읽어 해제할 카드를 가려내고, 새로고침 뒤에는 이걸로 고른 것을
+     * 되살린다. 화면 상태는 새로고침에 사라지므로 서버가 유일한 기준이다.
+     *
+     * <p><b>교환에 예약된 카드도 준다.</b> 지금 새로 내줄 몫이 없을 뿐 등록은 살아 있어서,
+     * 빼고 주면 매칭이 잡힌 사람이 새로고침했을 때 내 카드가 하나도 없는 것처럼 보인다.
+     * 지금 내줄 수 있는 개수는 {@code quantity} 에 따로 담겨 나간다.
      */
     public List<HaveItemRegisteredResponseDto> findMine(UUID userId) {
         if (userId == null) {
             throw new ApplicationException(ErrorCode.INVALID_INPUT);
         }
 
-        return userHaveItemRepository.findAllByUserId(userId).stream()
+        return userHaveItemRepository.findRegisteredByUserId(userId).stream()
                 .map(HaveItemRegisteredResponseDto::from)
                 .toList();
     }

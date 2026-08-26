@@ -54,7 +54,7 @@ public class AdminPokeService {
     /** 보낸 사람이 지금 내놓고 있는 카드. 수량이 0 인 것은 이미 다 나간 카드라 뺀다. */
     private List<ItemView> offerableItems(Poke poke) {
         return userHaveItemRepository.findAllByUserId(poke.getFromUser().getId()).stream()
-                .filter(have -> have.getQuantity() != null && have.getQuantity() > 0)
+                .filter(have -> have.getQuantityLeft() != null && have.getQuantityLeft() > 0)
                 .map(UserHaveItem::getItem)
                 .map(ItemView::of)
                 .toList();
