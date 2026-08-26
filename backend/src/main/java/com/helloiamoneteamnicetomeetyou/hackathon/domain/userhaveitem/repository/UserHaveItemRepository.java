@@ -23,6 +23,17 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
             """)
     List<UserHaveItem> findAllByUserId(UUID userId);
 
+    /** 한 부스 안에서 내가 내놓은 카드. 대기장이 부스 단위라 견주는 내 카드도 그 부스 것만 본다. */
+    @Query("""
+            select h from UserHaveItem h
+            join fetch h.item i
+            where h.user.id = :userId
+              and i.booth.id = :boothId
+              and h.quantityLeft > 0
+            order by h.id asc
+            """)
+    List<UserHaveItem> findAllByUserIdAndBoothId(UUID userId, Long boothId);
+
     Optional<UserHaveItem> findByUserIdAndItemId(UUID userId, Long itemId);
 
     /** 찾는 카드 등록이 이 카드를 이미 내놓기로 했는지 확인할 때 쓴다. */

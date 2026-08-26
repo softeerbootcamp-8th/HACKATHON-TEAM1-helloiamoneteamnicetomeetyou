@@ -22,9 +22,9 @@ import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseConnectionManage
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -155,21 +155,46 @@ public class AdminUserService {
      * 사람이 지금 하나 더 필요하다" 가 되는 경우가 더 많다. 그때 만들고 나서 카드를 따로 붙이면
      * 손이 두 번 가고, 그 사이에 관람객이 기다린다.
      *
+     * <p>수량은 고른 카드와 같은 순서로 온다. 화면이 고르지 않은 타일의 수량 칸을 꺼서 보내기
+     * 때문에 두 목록의 길이가 같다. 그래도 어긋난 채로 오면 그 자리는 1 로 본다. 수량이 하나
+     * 틀린 것보다 사용자가 아예 안 만들어지는 쪽이 부스에서 더 곤란하다.
+     *
      * @param haveItemIds 내놓는 카드. 비어 있어도 된다
+     * @param haveQuantities 내놓는 카드의 장수. 비어 있으면 전부 1 장이다
      * @param wantItemIds 찾는 카드. 비어 있어도 된다
+     * @param wantQuantities 찾는 카드의 장수. 비어 있으면 전부 1 장이다
      */
     @Transactional
-    public UUID createDummy(String username, List<Long> haveItemIds, List<Long> wantItemIds) {
+    public UUID createDummy(
+            String username,
+            List<Long> haveItemIds,
+            List<Integer> haveQuantities,
+            List<Long> wantItemIds,
+            List<Integer> wantQuantities) {
+
         UUID userId = createDummy(username);
 
-        if (haveItemIds != null) {
-            haveItemIds.stream().filter(Objects::nonNull).forEach(itemId -> addHaveItem(userId, itemId, 1));
-        }
-        if (wantItemIds != null) {
-            wantItemIds.stream().filter(Objects::nonNull).forEach(itemId -> addWantItem(userId, itemId));
-        }
+        forEachPicked(haveItemIds, haveQuantities, (itemId, quantity) -> addHaveItem(userId, itemId, quantity));
+        forEachPicked(wantItemIds, wantQuantities, (itemId, quantity) -> addWantItem(userId, itemId, quantity));
 
         return userId;
+    }
+
+    /** 고른 카드를 하나씩 훑는다. 짝이 없거나 1 보다 작은 수량은 1 로 본다. */
+    private void forEachPicked(List<Long> itemIds, List<Integer> quantities, BiConsumer<Long, Integer> action) {
+        if (itemIds == null) {
+            return;
+        }
+
+        for (int i = 0; i < itemIds.size(); i++) {
+            Long itemId = itemIds.get(i);
+            if (itemId == null) {
+                continue;
+            }
+
+            Integer quantity = quantities != null && i < quantities.size() ? quantities.get(i) : null;
+            action.accept(itemId, quantity == null || quantity < 1 ? 1 : quantity);
+        }
     }
 
     @Transactional
@@ -227,12 +252,17 @@ public class AdminUserService {
     /**
      * 찾는 카드를 붙인다. 이미 있으면 개수만 덮어쓴다.
      *
-     * <p>{@link #addHaveItem} 과 같은 이유로 사용자 화면과 같은 서비스를 부른다. 어드민에는
-     * 찾는 개수를 넣는 자리가 없어서 1 로 만든다.
+     * <p>{@link #addHaveItem} 과 같은 이유로 사용자 화면과 같은 서비스를 부른다.
      */
     @Transactional
+    public void addWantItem(UUID userId, Long itemId, int quantity) {
+        userWantItemService.register(userId, itemId, quantity);
+    }
+
+    /** 카드 화면처럼 수량을 고를 자리가 없는 곳에서 부른다. */
+    @Transactional
     public void addWantItem(UUID userId, Long itemId) {
-        userWantItemService.register(userId, itemId, 1);
+        addWantItem(userId, itemId, 1);
     }
 
     @Transactional
@@ -246,20 +276,23 @@ public class AdminUserService {
     }
 
     /**
-     * 더미 사용자를 지운다. 그 사람이 들고 있던 카드도 같이 지운다.
+     * 사용자를 지운다. 그 사람이 남긴 카드와 교환, 찔러보기, 알림도 같이 걷어낸다.
      *
-     * <p><b>진짜 참가자는 지우지 않는다.</b> 부스에서 실제로 앱을 쓰고 있는 사람을 목록에서
-     * 지우면 그 사람 화면이 그때부터 아무것도 못 하게 된다. 어드민이 만든 더미만 열어 둔다.
+     * <p><b>더미가 아닌 실제 참가자도 지운다.</b> 예전에는 더미만 열어 뒀는데, 부스에서 잘못
+     * 등록된 사람이나 시연이 끝난 관람객을 치울 방법이 없어서 운영자가 DB 를 직접 열어야 했다.
+     * 지워진 사람의 화면은 그때부터 아무것도 못 하게 되므로, 무엇을 지우는지는 화면이 먼저
+     * 확인받는다.
+     *
+     * <p>등록한 카드만 지우고 있었더니 찔러보기와 교환, 알림, 푸시 구독에 걸려 500 이 나갔다.
+     * 사람을 붙들고 있는 표가 여덟이라, 지우는 순서를 아는 곳을 {@link AdminCleanupService}
+     * 하나로 모아 두고 여기서는 그것만 부른다.
+     *
+     * @return 같이 지운 교환 건수
      */
     @Transactional
-    public int deleteDummy(UUID userId) {
+    public int deleteUser(UUID userId) {
         User user = findUser(userId);
-        if (!user.isAdminManaged()) {
-            throw new ApplicationException(ErrorCode.INVALID_INPUT);
-        }
 
-        // 등록한 카드만 지우고 있었더니 찔러보기와 교환, 알림, 푸시 구독에 걸려 500 이 나갔다.
-        // 사람을 붙들고 있는 표가 여덟이라, 순서를 아는 곳을 AdminCleanupService 하나로 모았다.
         int removedExchanges = adminCleanupService.deleteUserDeep(userId);
         userRepository.delete(user);
 

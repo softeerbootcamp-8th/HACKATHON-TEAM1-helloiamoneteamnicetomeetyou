@@ -30,6 +30,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>등록은 {@link UserHaveItemService} 가 하고 여기는 조회만 한다. 한 클래스에 두지 않은 것은
  * 이 조회가 희망 카드와 부스까지 끌어와서, 등록만 하는 쪽이 필요 없는 의존을 갖게 되기 때문이다.
+ *
+ * <p><b>내 카드도 지금 보고 있는 부스 것만 본다.</b> 남의 카드는 부스로 자르면서 내 희망·보유
+ * 카드는 전부 읽으면, 앞 부스에서 희망 카드를 등록해 둔 사람이 다음 부스에 들어갔을 때 목록이
+ * 통째로 빈다. 카드는 부스 하나에만 속해서 앞 부스 희망 카드와 겹치는 줄이 하나도 없기 때문이다.
  */
 @Service
 @RequiredArgsConstructor
@@ -45,11 +49,12 @@ public class BoothHaveItemService {
     /**
      * 나를 뺀 다른 사용자의 보유 카드를 정렬해 한 페이지 내려준다.
      *
-     * <p>무엇을 남길지는 내가 찾는 카드를 등록했는지에 따라 갈린다 (시안 desc 204:4928).
+     * <p>무엇을 남길지는 <b>이 부스에서</b> 내가 찾는 카드를 등록했는지에 따라 갈린다
+     * (시안 desc 204:4928).
      *
      * <ul>
      *   <li>희망 카드가 있으면 — 그와 맞는 줄만 남긴다
-     *   <li>희망 카드가 없으면 — 내가 이미 가진 카드만 빼고 전부 남긴다. 무엇을 찾는지 아직
+     *   <li>희망 카드가 없으면 — 내가 이 부스에서 이미 가진 카드만 빼고 전부 남긴다. 무엇을 찾는지 아직
      *       모르는 사람에게 빈 화면을 주지 않기 위해서다. 내가 가진 카드는 빼는데, 같은 카드를
      *       받아 봐야 교환이 되지 않기 때문이다
      * </ul>
@@ -78,10 +83,10 @@ public class BoothHaveItemService {
         List<UserHaveItem> rows =
                 userHaveItemRepository.findAllByBoothIdExcludingUser(boothId, userId);
 
-        Set<Long> myWantItemIds = itemIdsOfWants(userId);
+        Set<Long> myWantItemIds = itemIdsOfWants(userId, boothId);
         // 이름 순서를 등록 순서로 고정한다. 화면이 "N Vision 74 · PONY Vision 74" 처럼 이어
         // 붙이는데, 같은 목록이 부를 때마다 순서가 달라지면 바뀐 것처럼 보인다.
-        Map<Long, String> myHaveItemNames = myHaveItemNames(userId);
+        Map<Long, String> myHaveItemNames = myHaveItemNames(userId, boothId);
 
         // 주인들의 희망 카드는 한 번만 읽는다. 이름 목록과 id 집합 두 가지로 쓰이는데,
         // 각각 따로 읽으면 같은 쿼리가 두 번 나간다.
@@ -171,15 +176,15 @@ public class BoothHaveItemService {
         return Set.copyOf(exchangeParticipantRepository.findActivePartnerIds(userId));
     }
 
-    private Set<Long> itemIdsOfWants(UUID userId) {
-        return userWantItemRepository.findAllByUserId(userId).stream()
+    private Set<Long> itemIdsOfWants(UUID userId, Long boothId) {
+        return userWantItemRepository.findAllByUserIdAndBoothId(userId, boothId).stream()
                 .map(want -> want.getItem().getId())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
-    private Map<Long, String> myHaveItemNames(UUID userId) {
+    private Map<Long, String> myHaveItemNames(UUID userId, Long boothId) {
         Map<Long, String> names = new LinkedHashMap<>();
-        userHaveItemRepository.findAllByUserId(userId).stream()
+        userHaveItemRepository.findAllByUserIdAndBoothId(userId, boothId).stream()
                 .filter(have -> have.getQuantityLeft() != null && have.getQuantityLeft() > 0)
                 .forEach(have -> names.putIfAbsent(have.getItem().getId(), have.getItem().getName()));
         return names;

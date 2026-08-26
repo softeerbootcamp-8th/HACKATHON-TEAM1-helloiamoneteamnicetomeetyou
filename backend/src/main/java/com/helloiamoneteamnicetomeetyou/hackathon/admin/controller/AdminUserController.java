@@ -28,19 +28,25 @@ public class AdminUserController {
     private final AdminUserService adminUserService;
 
     /**
-     * 사용자를 만든다. 내놓는 카드와 찾는 카드를 함께 고를 수 있다.
+     * 사용자를 만든다. 내놓는 카드와 찾는 카드를 카드마다 몇 장인지까지 골라서 만든다.
      *
      * <p>카드를 안 고르면 그냥 빈 사용자가 만들어진다. 이름만 먼저 만들어 두고 카드를 뒤에
      * 붙이는 것도 부스에서 실제로 하는 순서다.
+     *
+     * <p>수량은 고른 카드와 같은 순서로 온다. 화면이 안 고른 타일의 수량 칸을 꺼서 보내기
+     * 때문에, 폼에 실려 오는 것은 고른 카드의 수량뿐이다.
      */
     @PostMapping
     public String createDummy(
             @RequestParam String username,
             @RequestParam(required = false) List<Long> haveItemIds,
+            @RequestParam(required = false) List<Integer> haveQuantities,
             @RequestParam(required = false) List<Long> wantItemIds,
+            @RequestParam(required = false) List<Integer> wantQuantities,
             RedirectAttributes redirectAttributes) {
 
-        UUID userId = adminUserService.createDummy(username, haveItemIds, wantItemIds);
+        UUID userId = adminUserService.createDummy(
+                username, haveItemIds, haveQuantities, wantItemIds, wantQuantities);
         redirectAttributes.addFlashAttribute("toast", "%s 을(를) 만들었습니다.".formatted(username));
 
         return CONSOLE + userId;
@@ -120,12 +126,13 @@ public class AdminUserController {
         return CONSOLE + userId;
     }
 
+    /** 사용자를 지운다. 더미든 실제 참가자든 같은 자리에서 지운다. */
     @PostMapping("/{userId}/delete")
-    public String deleteDummy(@PathVariable UUID userId, RedirectAttributes redirectAttributes) {
-        int removedExchanges = adminUserService.deleteDummy(userId);
+    public String deleteUser(@PathVariable UUID userId, RedirectAttributes redirectAttributes) {
+        int removedExchanges = adminUserService.deleteUser(userId);
         redirectAttributes.addFlashAttribute("toast", removedExchanges == 0
-                ? "더미를 지웠습니다."
-                : "더미를 지웠습니다. 이 사람이 낀 교환 " + removedExchanges + "건도 같이 지웠습니다.");
+                ? "사용자를 지웠습니다."
+                : "사용자를 지웠습니다. 이 사람이 낀 교환 " + removedExchanges + "건도 같이 지웠습니다.");
 
         return "redirect:/admin?tab=users";
     }
