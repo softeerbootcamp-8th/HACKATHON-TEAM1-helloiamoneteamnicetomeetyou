@@ -1919,6 +1919,37 @@ button.ex-time-act {
 /* --------------------------------------------------------------------------
    찔러보기 목록
    -------------------------------------------------------------------------- */
+/* --------------------------------------------------------------------------
+   보유 카드의 수량 상태
+   -------------------------------------------------------------------------- */
+.hold-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.hold-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--tile);
+  color: var(--ink-sub);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* 매칭이 잡아 둔 카드. 이 상태에서는 다른 매칭에 다시 잡히지 않는다. */
+.hold-badge.reserved {
+  background: var(--warn-soft);
+  color: var(--warn-text);
+}
+
+/* 다 나간 카드. 등록은 되어 있지만 매칭 후보가 아니다. */
+.hold-badge.out {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+
 .poke-line {
   display: flex;
   align-items: center;

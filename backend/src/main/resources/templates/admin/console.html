@@ -133,7 +133,26 @@
                     <img th:if="${h.item.imageUrl}" th:src="${h.item.imageUrl}" th:alt="${h.item.name}" />
                     <span th:text="${h.item.code}">N74</span>
                   </div>
-                  <div class="grow"><div class="title" th:text="${h.item.name}">카드</div></div>
+                  <!--/*
+                    등록한 개수와 남은 개수가 갈린다. 매칭이 잡은 카드는 예약만 걸리고 실제
+                    개수는 교환이 끝날 때 줄기 때문이다. 둘이 다를 때만 함께 보여 준다 —
+                    늘 "1 / 1" 을 적으면 다른 줄이 눈에 안 띈다.
+                  */-->
+                  <div class="grow">
+                    <div class="title" th:text="${h.item.name}">카드</div>
+                    <div class="meta hold-state">
+                      <span
+                        class="hold-badge"
+                        th:if="${h.status != null}"
+                        th:classappend="${h.statusTone()}"
+                        th:text="${h.statusLabel()}"
+                        >교환 가능</span
+                      >
+                      <span th:if="${h.partlyGone()}">
+                        남은 <b th:text="${h.quantityLeft}">0</b> / 등록 <b th:text="${h.quantity}">0</b>
+                      </span>
+                    </div>
+                  </div>
 
                   <form
                     method="post"
@@ -262,8 +281,12 @@
               <span class="item-body">
                 <b th:text="${i.item.name}">카드</b>
                 <span class="counts">
-                  <span th:classappend="${#lists.isEmpty(i.holders)} ? 'zero'">
-                    내놓음 <b th:text="${#lists.size(i.holders)}">0</b>
+                  <!--/*
+                    사람 수가 아니라 지금 교환에 쓸 수 있는 수를 센다. 셋이 내놨어도 전부
+                    예약됐으면 매칭 후보는 0 이고, 사람 수만 보면 그게 안 보인다.
+                  */-->
+                  <span th:classappend="${i.availableHolders() == 0} ? 'zero'">
+                    내놓음 <b th:text="${i.availableHolders()}">0</b>
                   </span>
                   <span th:classappend="${#lists.isEmpty(i.seekers)} ? 'zero'">
                     찾음 <b th:text="${#lists.size(i.seekers)}">0</b>
@@ -329,13 +352,21 @@
                 </form>
               </div>
               <div class="rows">
-                <a class="row" th:each="u : ${item.holders}" th:href="@{/admin(tab='users', userId=${u.id})}">
+                <a class="row" th:each="h : ${item.holders}" th:href="@{/admin(tab='users', userId=${h.user.id})}">
                   <div class="grow">
-                    <div class="title" th:text="${u.username} ?: u.shortId">이름</div>
-                    <div class="meta mono" th:text="${u.shortId}"></div>
+                    <div class="title" th:text="${h.user.displayName()}">이름</div>
+                    <div class="meta hold-state">
+                      <span
+                        class="hold-badge"
+                        th:classappend="${h.statusTone()}"
+                        th:text="${h.statusLabel()}"
+                        >교환 가능</span
+                      >
+                      <span>남은 <b th:text="${h.quantityLeft}">0</b> / 등록 <b th:text="${h.quantity}">0</b></span>
+                    </div>
                   </div>
-                  <span class="badge brand" th:if="${u.dummy}">더미</span>
-                  <span class="live-dot" th:if="${u.online}"></span>
+                  <span class="badge brand" th:if="${h.user.dummy}">더미</span>
+                  <span class="live-dot" th:if="${h.user.online}"></span>
                 </a>
               </div>
               <div class="empty sm" th:if="${#lists.isEmpty(item.holders)}">

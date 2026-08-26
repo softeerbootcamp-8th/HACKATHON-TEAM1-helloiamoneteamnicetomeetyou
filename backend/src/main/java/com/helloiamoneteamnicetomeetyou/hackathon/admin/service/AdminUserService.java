@@ -2,6 +2,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.admin.service;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.HoldingView;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ItemDetailView;
+import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ItemHolderView;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ItemView;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.UserView;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
@@ -107,8 +108,8 @@ public class AdminUserService {
     }
 
     private ItemDetailView toItemDetail(Long itemId, ItemView item, Set<UUID> connected) {
-        List<UserView> holders = userHaveItemRepository.findAllByItemId(itemId).stream()
-                .map(have -> UserView.of(have.getUser(), List.of(), List.of(), connected.contains(have.getUser().getId())))
+        List<ItemHolderView> holders = userHaveItemRepository.findAllByItemId(itemId).stream()
+                .map(have -> ItemHolderView.of(have, connected))
                 .toList();
 
         List<UserView> seekers = userWantItemRepository.findAllByItemId(itemId).stream()
@@ -125,13 +126,13 @@ public class AdminUserService {
 
     public List<HoldingView> findHaveItems(UUID userId) {
         return userHaveItemRepository.findAllByUserId(userId).stream()
-                .map(have -> new HoldingView(have.getId(), ItemView.of(have.getItem()), have.getQuantity()))
+                .map(HoldingView::of)
                 .toList();
     }
 
     public List<HoldingView> findWantItems(UUID userId) {
         return userWantItemRepository.findAllByUserId(userId).stream()
-                .map(want -> new HoldingView(want.getId(), ItemView.of(want.getItem()), null))
+                .map(HoldingView::of)
                 .toList();
     }
 
