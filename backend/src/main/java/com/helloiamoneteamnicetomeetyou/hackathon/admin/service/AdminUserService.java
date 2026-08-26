@@ -57,6 +57,10 @@ public class AdminUserService {
      *
      * <p>카드를 사람마다 따로 읽으면 사용자 수만큼 쿼리가 나간다. 전부 한 번에 읽어 와서
      * 메모리에서 묶는다. 부스 규모에서는 이쪽이 훨씬 싸다.
+     *
+     * <p><b>접속 중인 사람을 위로 올린다.</b> 나간 사람도 줄이 그대로 남기 때문에, 만든 순서로만
+     * 두면 지금 부스에 서 있는 사람이 떠난 사람들 밑으로 밀린다. 같은 접속 상태끼리는 원래 순서,
+     * 그러니까 최근에 만들어진 순이다.
      */
     public List<UserView> findUsers() {
         Map<UUID, List<ItemView>> have = groupHave();
@@ -69,11 +73,25 @@ public class AdminUserService {
                         have.getOrDefault(user.getId(), List.of()),
                         want.getOrDefault(user.getId(), List.of()),
                         connected.contains(user.getId())))
+                .sorted(Comparator.comparing(UserView::online).reversed())
                 .toList();
     }
 
+    /**
+     * 목록에 그릴 보유 카드. <b>그 사람 화면의 내 카드와 같은 줄만 담는다.</b>
+     *
+     * <p>목록은 카드 얼굴만 그려서 수량과 상태가 화면에 남지 않는다. 그대로 전부 그리면 교환으로
+     * 받기만 한 카드와 다 넘긴 카드까지 내놓는 카드처럼 보여서, 운영자가 보는 것과 관람객이 자기
+     * 화면에서 보는 것이 갈린다. 부스에서 화면을 나란히 놓고 맞춰 볼 수 없으면 목록을 믿을 수 없다.
+     *
+     * <p>기준은 {@link UserHaveItem#isRegistered()} 다. 사용자 화면의 내 카드가 읽는
+     * {@code findRegisteredByUserId} 와 같은 조건이라, 두 화면에 같은 카드가 뜬다.
+     *
+     * <p>쿼리에 조건을 넣지 않은 것은 더미 만들기가 같은 메서드로 전체 행을 읽기 때문이다.
+     */
     private Map<UUID, List<ItemView>> groupHave() {
         return userHaveItemRepository.findAllWithItem().stream()
+                .filter(UserHaveItem::isRegistered)
                 .collect(Collectors.groupingBy(
                         row -> row.getUser().getId(),
                         Collectors.mapping(row -> ItemView.of(row.getItem()), Collectors.toList())));
@@ -125,8 +143,20 @@ public class AdminUserService {
                 .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_FOUND));
     }
 
+    /**
+     * 세부 화면의 내놓는 카드. <b>사용자 화면의 내 카드가 읽는 쿼리를 그대로 쓴다.</b>
+     *
+     * <p>{@code /api/have-items} 가 부르는 {@code findRegisteredByUserId} 라서, 운영자가 보는
+     * 줄과 그 사람이 자기 화면에서 보는 줄이 같다. 전부를 읽던 때에는 다 넘긴 카드와 교환으로
+     * 받기만 한 카드가 {@code 다 나감} 배지를 달고 남아서, 관람객 화면에는 없는 카드를 운영자만
+     * 보고 있었다.
+     *
+     * <p>숨긴 줄을 다시 내놓는 길은 막히지 않는다. 위쪽 추가 폼이 부르는
+     * {@code UserHaveItemService.register} 가 이미 있는 행이면 개수를 그 값으로 덮어써서,
+     * 다 넘긴 카드도 같은 개수로 다시 등록된다.
+     */
     public List<HoldingView> findHaveItems(UUID userId) {
-        return userHaveItemRepository.findAllByUserId(userId).stream()
+        return userHaveItemRepository.findRegisteredByUserId(userId).stream()
                 .map(HoldingView::of)
                 .toList();
     }

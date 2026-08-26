@@ -64,6 +64,10 @@
               실제인지 더미인지는 양쪽 다 붙인다. 예전에는 실제 사용자에게만 붙였는데, 배지가
               없는 줄이 더미인지 아직 안 읽은 줄인지 구분이 안 돼서 매번 상세를 열게 됐다.
               대신 더미 배지는 옅게 둬서, 건드리면 안 되는 실제 사용자가 먼저 눈에 띄게 한다.
+
+              왼쪽 카드는 그 사람 화면의 내 카드와 같은 것만이다. 다 넘겼거나 교환으로 받기만 한
+              카드까지 그리면 운영자가 보는 것과 관람객이 자기 화면에서 보는 것이 갈려서, 부스에서
+              화면을 나란히 놓고 맞춰 볼 수 없다. 주고받은 이력은 상세의 교환 목록에 남는다.
             */-->
             <a
               th:each="u : ${users}"
@@ -75,7 +79,12 @@
                 <b th:text="${u.displayName()}">이름</b>
                 <span class="tag-real" th:unless="${u.dummy}">실제</span>
                 <span class="tag-dummy" th:if="${u.dummy}">더미</span>
-                <span class="live-dot" th:if="${u.online}" title="접속 중"></span>
+                <!--/*
+                  접속 중은 글자로 적는다. 예전에는 줄 끝에 작은 초록 점 하나였는데, 부스에서
+                  목록을 훑을 때 그 점이 눈에 안 들어와서 지금 있는 사람과 나간 사람이 섞여
+                  보였다. 접속 중인 사람은 목록 위로도 올라온다.
+                */-->
+                <span class="tag-live" th:if="${u.online}">접속 중</span>
               </span>
 
               <span class="trade">
@@ -152,8 +161,12 @@
                     <span th:text="${h.item.code}">N74</span>
                   </div>
                   <!--/*
+                    여기 있는 줄은 그 사람 화면의 내 카드와 같다. /api/have-items 가 읽는 쿼리를
+                    그대로 쓰기 때문이다. 다 넘겼거나 교환으로 받기만 한 카드는 관람객 화면에도
+                    없어서 여기서도 뺀다. 다시 내놓으려면 위 추가 폼에서 개수와 함께 넣는다.
+
                     등록한 개수와 남은 개수가 갈린다. 매칭이 잡은 카드는 예약만 걸리고 실제
-                    개수는 교환이 끝날 때 줄기 때문이다. 둘이 다를 때만 함께 보여 준다 —
+                    개수는 교환이 끝날 때 줄기 때문이다. 둘이 다를 때만 함께 보여 준다.
                     늘 "1 / 1" 을 적으면 다른 줄이 눈에 안 띈다.
                   */-->
                   <div class="grow">
@@ -167,7 +180,7 @@
                         >교환 가능</span
                       >
                       <span th:if="${h.partlyGone()}">
-                        남은 <b th:text="${h.quantityLeft}">0</b> / 등록 <b th:text="${h.quantity}">0</b>
+                        남은 <b th:text="${h.quantityLeft}">0</b> / 등록 <b th:text="${h.registered}">0</b>
                       </span>
                     </div>
                   </div>
@@ -178,7 +191,7 @@
                     class="actions"
                   >
                     <button class="icon-btn" type="button" data-step="-1" aria-label="하나 빼기">−</button>
-                    <input class="input qty" name="quantity" type="number" min="1" th:value="${h.quantity}" />
+                    <input class="input qty" name="quantity" type="number" min="1" th:value="${h.registered}" />
                     <button class="icon-btn" type="button" data-step="1" aria-label="하나 더">+</button>
                   </form>
 

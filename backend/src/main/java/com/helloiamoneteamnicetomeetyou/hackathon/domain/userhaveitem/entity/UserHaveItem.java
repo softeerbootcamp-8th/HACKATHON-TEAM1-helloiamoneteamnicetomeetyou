@@ -152,6 +152,20 @@ public class UserHaveItem {
     }
 
     /**
+     * 지금 내놓기로 등록해 둔 몫이 있는가. <b>사용자 화면의 내 카드에 뜨는 줄과 같은 기준이다.</b>
+     *
+     * <p>{@code UserHaveItemRepository.findRegisteredByUserId} 가 JPQL 로 적어 둔 조건과 같다.
+     * 그쪽을 고치면 여기도 같이 고쳐야 한다.
+     *
+     * <p>묶인 몫을 같이 세는 것은 교환에 걸린 카드도 내가 내놓은 카드이기 때문이다. 남은 개수만
+     * 보면 통째로 예약된 카드가 화면에서 사라진다. 반대로 교환으로 받기만 한 카드와 다 넘긴
+     * 카드는 둘 다 0 이라 빠진다.
+     */
+    public boolean isRegistered() {
+        return getRegisteredQuantity() > 0;
+    }
+
+    /**
      * 예약해 둔 거래가 실제로 끝났다. 카드가 손을 떠났으므로 묶여 있던 몫과 보유 개수에서 뺀다.
      *
      * <p>{@code quantityLeft} 는 {@link #reserve} 에서 이미 옮겨 뒀으니 여기서 건드리지 않는다.
