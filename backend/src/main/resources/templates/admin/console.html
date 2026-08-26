@@ -25,6 +25,7 @@
         <a href="/admin?tab=users" th:classappend="${tab == 'users' or tab == 'new-user'} ? 'on'">사용자</a>
         <a href="/admin?tab=items" th:classappend="${tab == 'items'} ? 'on'">카드</a>
         <a href="/admin?tab=zones" th:classappend="${tab == 'zones'} ? 'on'">부스와 구역</a>
+        <a href="/admin?tab=pokes" th:classappend="${tab == 'pokes'} ? 'on'">찔러보기</a>
         <a href="/admin?tab=exchanges" th:classappend="${tab == 'exchanges'} ? 'on'">교환</a>
       </nav>
 
@@ -34,7 +35,7 @@
       <a class="btn ghost sm" href="/admin/logout">로그아웃</a>
     </header>
 
-    <main class="split" th:if="${tab != 'exchanges' and tab != 'new-user'}">
+    <main class="split" th:if="${tab != 'exchanges' and tab != 'new-user' and tab != 'pokes'}">
       <!--/* ===================== 사용자 ===================== */-->
       <th:block th:if="${tab == 'users'}">
         <aside class="pane-list">
@@ -183,8 +184,44 @@
             </div>
           </div>
 
+          <!--/*
+            이 사람을 더미가 찔러본다.
+
+            요청할 카드는 이 사람이 내놓고 있는 것 중에서 고른다. 카드 전체를 늘어놓으면
+            상대가 안 가진 카드를 골라서 거절당하는 일이 생긴다.
+          */-->
+          <div class="box" th:if="${!#lists.isEmpty(haveItems) and !#lists.isEmpty(dummies)}">
+            <div class="box-head">
+              이 사람 찔러보기
+              <span class="hint">더미가 보냅니다. 상대 화면에 알림이 바로 갑니다.</span>
+            </div>
+            <div class="box-body">
+              <form method="post" th:action="@{/admin/pokes}" class="inline-form">
+                <input type="hidden" name="toUserId" th:value="${user.id}" />
+                <select class="input sm" name="fromUserId" required aria-label="보내는 더미">
+                  <option th:each="d : ${dummies}" th:value="${d.id}" th:text="${d.displayName()}"></option>
+                </select>
+                <span class="poke-arrow">→</span>
+                <select class="input sm" name="requestedItemId" required aria-label="요청할 카드">
+                  <option th:each="h : ${haveItems}" th:value="${h.item.id}" th:text="${h.item.name}"></option>
+                </select>
+                <button class="btn brand sm" type="submit">찔러보기</button>
+              </form>
+            </div>
+          </div>
+
           <div class="box">
-            <div class="box-head">이 사람의 교환</div>
+            <div class="box-head">
+              이 사람의 교환
+              <!--/*
+                카드는 맞는데 매칭이 안 붙어 있을 때 쓴다. 카드를 뗐다 붙이지 않아도 된다.
+                진행 중인 교환이 있으면 서버가 그냥 지나가므로 먼저 취소해야 새 상대를 찾는다.
+              */-->
+              <form method="post" th:action="@{/admin/exchanges/rematch}" class="inline-form">
+                <input type="hidden" name="userId" th:value="${user.id}" />
+                <button class="btn outline sm" type="submit">매칭 다시 돌리기</button>
+              </form>
+            </div>
             <div class="rows" th:if="${!#lists.isEmpty(userExchanges)}">
               <div class="row" th:each="ex : ${userExchanges}">
                 <div class="grow">
@@ -632,6 +669,65 @@
       </div>
     </main>
 
+    <!--/* ===================== 찔러보기 ===================== */-->
+    <main class="full" th:if="${tab == 'pokes'}">
+      <div class="page-title">
+        <h1>찔러보기</h1>
+        <span class="hint">더미에게 온 것은 어드민이 대신 답해야 흐름이 이어집니다. 보내는 것은 사용자 탭에서 합니다.</span>
+      </div>
+
+      <div class="box" th:if="${!#lists.isEmpty(pokes)}">
+        <div class="rows">
+          <div class="row" th:each="p : ${pokes}">
+            <span class="poke-line grow">
+              <a th:href="@{/admin(tab='users', userId=${p.fromUserId})}" th:text="${p.fromName}">보낸 사람</a>
+              <span class="poke-arrow">→</span>
+              <a th:href="@{/admin(tab='users', userId=${p.toUserId})}" th:text="${p.toName}">받은 사람</a>
+              <span class="poke-item" th:text="'\'' + ${p.itemName} + '\' 요청'">카드 요청</span>
+              <span class="poke-state" th:classappend="${p.status.name().toLowerCase()}" th:text="${p.statusLabel()}">대기</span>
+            </span>
+
+            <!--/*
+              수락하려면 보낸 사람이 내놓은 카드 중 한 장을 골라야 한다. 그 목록을 여기서 주지
+              않으면 운영자가 카드 전체에서 찍어 맞혀야 한다.
+            */-->
+            <form
+              th:if="${p.acceptable()}"
+              method="post"
+              th:action="@{'/admin/pokes/' + ${p.id} + '/accept'}"
+              class="inline-form"
+            >
+              <select class="input sm" name="chosenItemId" required aria-label="받을 카드">
+                <option th:each="i : ${p.senderItems}" th:value="${i.id}" th:text="${i.name}"></option>
+              </select>
+              <button class="btn brand sm" type="submit">수락</button>
+            </form>
+
+            <form
+              th:if="${p.answerable()}"
+              method="post"
+              th:action="@{'/admin/pokes/' + ${p.id} + '/reject'}"
+            >
+              <button class="btn outline sm" type="submit">거절</button>
+            </form>
+
+            <span class="poke-note" th:if="${p.answerable() and !p.acceptable()}">
+              보낸 사람이 내놓은 카드가 없어 수락할 수 없습니다
+            </span>
+            <span class="poke-note" th:if="${p.status.name() == 'PENDING' and !p.receiverDummy}">본인 화면</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="box" th:if="${#lists.isEmpty(pokes)}">
+        <div class="empty">
+          아직 찔러보기가 없어요.
+          <br />
+          <span class="dim">사용자 탭에서 사람을 고르면 더미가 그 사람을 찔러볼 수 있습니다.</span>
+        </div>
+      </div>
+    </main>
+
     <!--/* ===================== 교환 ===================== */-->
     <main class="full" th:if="${tab == 'exchanges'}">
       <div class="page-title">
@@ -679,6 +775,19 @@
                   <button class="btn outline sm" type="submit">거절</button>
                 </form>
               </th:block>
+
+              <!--/*
+                더미 대신 도착을 누른다. 시각이 정해진 뒤에만 뜬다 — 만날 시각이 없으면
+                서버가 EXCHANGE_TIME_NOT_CONFIRMED 로 거절한다.
+              */-->
+              <form
+                th:if="${p.dummy and ex.timeConfirmed() and !p.arrived}"
+                method="post"
+                th:action="@{'/admin/exchanges/participants/' + ${p.id} + '/arrive'}"
+              >
+                <button class="btn outline sm" type="submit">도착</button>
+              </form>
+              <span class="ex-arrived" th:if="${p.arrived}">도착함</span>
             </div>
           </div>
 
@@ -740,13 +849,38 @@
               </div>
             </th:block>
 
-            <p class="ex-time-note">
-              <span th:if="${ex.overlapSlot != null}">
-                모두 되는 가장 빠른 칸은
-                <b th:text="${ex.slotLabels()[ex.overlapSlot]}">14:15</b> 입니다. 확정은 참가자가 자기 화면에서 누릅니다.
-              </span>
-              <span th:unless="${ex.overlapSlot != null}">아직 전원이 겹치는 칸이 없습니다.</span>
-            </p>
+            <div class="ex-time-note">
+              <span th:if="${ex.overlapSlot == null}">아직 전원이 겹치는 칸이 없습니다.</span>
+              <th:block th:if="${ex.overlapSlot != null}">
+                <span>
+                  모두 되는 가장 빠른 칸은 <b th:text="${ex.slotLabels()[ex.overlapSlot]}">14:15</b> 입니다.
+                </span>
+                <form method="post" th:action="@{'/admin/exchanges/' + ${ex.id} + '/confirm-time'}">
+                  <button class="btn brand sm" type="submit">이 시간으로 확정</button>
+                </form>
+              </th:block>
+            </div>
+          </div>
+
+          <!--/*
+            만날 자리.
+
+            푸터의 완료·취소 옆에 두었더니 한 줄이 꽉 차서 장소와 시각이 세 줄로 접혔다.
+            자리와 시간은 약속을 준비하는 것이고 완료·취소는 닫는 것이라, 하는 일도 다르다.
+          */-->
+          <div class="ex-place" th:if="${ex.status.name() != 'COMPLETED' and ex.status.name() != 'CANCELLED'}">
+            <span class="ex-place-label">자리</span>
+            <form method="post" th:action="@{'/admin/exchanges/' + ${ex.id} + '/place'}" class="inline-form grow">
+              <select class="input sm grow" name="zoneId" required aria-label="만날 자리">
+                <option
+                  th:each="z : ${allZones}"
+                  th:value="${z.id}"
+                  th:text="${z.name}"
+                  th:selected="${ex.zoneName != null and ex.zoneName == z.name}"
+                ></option>
+              </select>
+              <button class="btn outline sm" type="submit">옮기기</button>
+            </form>
           </div>
 
           <footer>

@@ -52,6 +52,11 @@ public class AdminBoothService {
         return zoneRepository.findByBoothIdOrderByIdAsc(boothId).stream().map(ZoneView::of).toList();
     }
 
+    /** 부스를 가리지 않은 구역 전부. 교환의 만날 자리를 옮기는 드롭다운이 쓴다. */
+    public List<ZoneView> findAllZones() {
+        return zoneRepository.findAll().stream().map(ZoneView::of).toList();
+    }
+
     public List<ItemView> findItems(Long boothId) {
         return itemRepository.findByBoothIdOrderByIdAsc(boothId).stream().map(ItemView::of).toList();
     }

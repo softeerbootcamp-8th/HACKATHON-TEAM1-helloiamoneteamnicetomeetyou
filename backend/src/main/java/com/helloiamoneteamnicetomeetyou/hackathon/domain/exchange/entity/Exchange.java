@@ -128,6 +128,18 @@ public class Exchange {
         this.identityNumber = number;
     }
 
+    /**
+     * 만날 자리를 옮긴다.
+     *
+     * <p>{@link #prepareAppointment} 는 이미 준비된 교환을 건드리지 않기 때문에 자리를 바꾸는
+     * 길이 따로 필요하다. 부스에서 원래 자리가 붐비거나 막혔을 때 운영자가 옮겨 주는 자리다.
+     *
+     * <p>시간은 건드리지 않는다. 자리만 바뀌는 것이라 이미 고른 칸이 무효가 될 이유가 없다.
+     */
+    public void moveTo(Zone zone) {
+        this.zone = zone;
+    }
+
     /** 아직 끝나지 않은 교환. 식별자가 이 교환들 사이에서 겹치면 안 된다. */
     public boolean isActive() {
         return status == ExchangeStatus.PENDING || status == ExchangeStatus.IN_PROGRESS;

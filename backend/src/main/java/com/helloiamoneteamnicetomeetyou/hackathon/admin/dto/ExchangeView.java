@@ -37,6 +37,11 @@ public record ExchangeView(
      * 눌러 봐야 안 되는 격자를 띄워 두면 운영자가 무엇이 잘못됐는지 화면에서 알 수 없다.
      * 끝나거나 취소된 교환도 마찬가지다.
      */
+    /** 만날 시각이 정해졌는지. 도착 표시는 이 뒤에만 할 수 있다. */
+    public boolean timeConfirmed() {
+        return exchangeTime != null;
+    }
+
     public boolean timeGridOpen() {
         return slotBaseTime != null
                 && exchangeTime == null

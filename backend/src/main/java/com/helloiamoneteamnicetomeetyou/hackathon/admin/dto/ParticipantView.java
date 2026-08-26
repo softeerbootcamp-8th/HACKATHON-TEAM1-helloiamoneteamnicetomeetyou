@@ -20,6 +20,7 @@ public record ParticipantView(
         String username,
         ParticipantStatus status,
         boolean dummy,
+        boolean arrived,
         List<Integer> slots) {
 
     public String statusLabel() {
