@@ -96,8 +96,6 @@ export type State = {
   activeAppointmentId: number | null
   /** 실시간 알림을 구독하려면 부스 id 가 있어야 한다. 앱을 열 때 서버에서 읽는다. */
   boothId: number | null
-  /** 이 부스의 교환 장소들. 약도 핀이 이 순서를 쓴다. */
-  zones: Zone[]
   notifications: AppNotification[]
   /** 교환으로 얻은 카드 */
   collection: number[]

@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 행사 데이터를 넣는다. 부스 하나, 그 안의 교환 장소 셋, 포토카드 일곱 종이다.
+ * 행사 데이터를 넣는다. 부스 하나, 그 안의 지정 교환장소 하나, 포토카드 일곱 종이다.
  *
  * <p>서버가 뜰 때마다 도는 코드라 이미 있는 것은 건드리지 않는다. <b>다만 "부스가 있으면 전부
  * 건너뛴다" 처럼 뭉뚱그려 보면 안 된다.</b> 부스만 있고 구역이 없는 DB 를 만나면 아무것도 넣지
@@ -35,15 +35,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class InitialDataSeeder implements ApplicationRunner {
 
     /**
-     * 교환 장소와 약도 위 자리다. 뒤의 두 숫자가 약도 너비·높이에 대한 백분율이다.
+     * 지정 교환장소와 약도 위 자리다. 뒤의 두 숫자가 약도 너비·높이에 대한 백분율이다.
+     *
+     * <p><b>한 곳만 넣는다.</b> 만나는 자리는 팝업 운영자가 정해 둔 한 곳이고, 사용자 화면은
+     * 그 자리를 고르는 것이 아니라 확인한다. 부스의 첫 구역이 그 자리가 된다.
      *
      * <p>행사장 약도 이미지가 아직 없어서 자리는 우리가 임의로 정했다. 다만 그 값이 화면에
-     * 박혀 있으면 구역을 늘릴 때마다 프론트를 고쳐야 해서, DB 에 넣고 응답으로 내려보낸다.
+     * 박혀 있으면 자리를 옮길 때마다 프론트를 고쳐야 해서, DB 에 넣고 응답으로 내려보낸다.
      */
-    private static final List<Object[]> ZONES = List.of(
-            new Object[]{"중앙 포토존 앞", "행사 중앙 포토존", 52, 44},
-            new Object[]{"에스컬레이터", "1층 에스컬레이터 앞", 25, 68},
-            new Object[]{"라운지", "휴게 라운지", 82, 60});
+    // 원소가 하나라 List.of 가 배열을 가변인자로 펼친다. 타입을 못 박아 그걸 막는다.
+    private static final List<Object[]> ZONES = List.<Object[]>of(
+            new Object[]{"중앙 포토존 앞", "행사 중앙 포토존", 52, 44});
 
     /** 카드 그림이 올라가 있는 스토리지. 파일 이름은 영문 카드 이름을 밑줄로 이은 것이다. */
     private static final String IMAGE_BASE =

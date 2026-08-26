@@ -4,7 +4,6 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeAc
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeParticipantActionRequestDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.TimeSlotUpdateRequestDto;
-import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ZoneUpdateRequestDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service.ExchangeService;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.response.CommonResponse;
 import java.util.UUID;
@@ -21,6 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 교환 약속의 장소와 시간.
+ *
+ * <p><b>만날 자리를 바꾸는 길은 여기 없다.</b> 자리는 팝업 운영자가 미리 정해 둔 한 곳이고, 사용자
+ * 화면은 그 자리를 확인만 한다. 옮겨야 하면 어드민 콘솔에서 옮긴다.
  *
  * <p>모든 요청이 {@code userId} 를 실어 보낸다. 로그인이 없어서 이게 신원이고, 서버는 그 사람이
  * 이 교환의 참가자인지만 확인한다. 남의 UUID 를 실어 보내면 그 사람인 척할 수 있다는 한계는
@@ -93,18 +95,6 @@ public class ExchangeController {
                 exchangeService.updateTimeSlots(exchangeId, request.userId(), request.slots());
 
         return ResponseEntity.ok(CommonResponse.ok(exchange, "시간을 저장했습니다."));
-    }
-
-    /** 만날 자리를 바꾼다. 참가자 전원에게 실시간으로 알린다. */
-    @PutMapping("/{exchangeId}/zone")
-    public ResponseEntity<CommonResponse<ExchangeResponseDto>> updateZone(
-            @PathVariable Long exchangeId,
-            @RequestBody ZoneUpdateRequestDto request) {
-
-        ExchangeResponseDto exchange =
-                exchangeService.updateZone(exchangeId, request.userId(), request.zoneId());
-
-        return ResponseEntity.ok(CommonResponse.ok(exchange, "교환 장소를 바꿨습니다."));
     }
 
     /** "시간 조율 요청하기". 참가자 전원의 선택을 비우고 격자를 지금 기준으로 다시 잡는다. */

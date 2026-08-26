@@ -8,6 +8,10 @@
  */
 import { api, apiData } from './api'
 
+/**
+ * 만나는 자리 하나. 팝업 운영자가 미리 정해 둔 곳이고, 화면은 고르지 않고 확인만 한다.
+ * 교환마다 어느 자리인지는 서버가 `Exchange.zone` 으로 알려준다.
+ */
 export type Zone = {
   id: number
   name: string
@@ -67,10 +71,6 @@ export type Exchange = {
   confirmedTime: string | null
 }
 
-export function fetchZones(boothId: number): Promise<Zone[]> {
-  return apiData<Zone[]>(`/api/booths/${boothId}/zones`)
-}
-
 /**
  * 내가 지금 잡고 있는 약속. 없으면 null 이다.
  *
@@ -100,23 +100,6 @@ export function updateTimeSlots(
   return apiData<Exchange>(`/api/exchanges/${exchangeId}/time-slots`, {
     method: 'PUT',
     body: JSON.stringify({ userId, slots }),
-  })
-}
-
-/**
- * 만날 자리를 바꾼다.
- *
- * 이름이나 좌표가 아니라 `zoneId` 만 보낸다. 구역은 어드민이 고치는 값이라, 화면이 목록을
- * 받아 둔 사이에 이름이 바뀌었으면 옛 값을 되돌려 저장하게 된다.
- */
-export function updateExchangeZone(
-  exchangeId: number,
-  userId: string,
-  zoneId: number,
-): Promise<Exchange> {
-  return apiData<Exchange>(`/api/exchanges/${exchangeId}/zone`, {
-    method: 'PUT',
-    body: JSON.stringify({ userId, zoneId }),
   })
 }
 
