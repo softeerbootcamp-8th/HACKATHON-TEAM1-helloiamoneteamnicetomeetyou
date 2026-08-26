@@ -616,11 +616,12 @@ export function Home() {
               whileTap={{ scale: 0.98 }}
               className="mt-2 flex w-full cursor-grab touch-pan-y items-center gap-3 rounded-2xl bg-white p-3.5 text-left shadow-[0_4px_18px_rgba(0,0,0,0.10)] active:cursor-grabbing"
             >
-              {/* 시안에서 이 자리는 단색 사각형이다. 안에 아이콘을 넣지 않는다. */}
-              <span
+              <img
+                src="/logo.svg"
+                alt=""
                 aria-hidden
                 className={cn(
-                  'size-9 shrink-0 rounded-xl bg-alarm',
+                  'size-9 shrink-0 rounded-xl',
                   banner.type === 'POKE_ACCEPTED' && 'anim-pop',
                 )}
               />
