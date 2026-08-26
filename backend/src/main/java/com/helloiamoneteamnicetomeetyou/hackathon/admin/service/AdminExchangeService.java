@@ -3,6 +3,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.admin.service;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ExchangeView;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ParticipantView;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.TimeSlotGrid;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeEventDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service.ExchangeService;
@@ -289,7 +290,7 @@ public class AdminExchangeService {
      * 같아서, 어드민으로 한 것과 사용자가 한 것이 화면에서 구분되지 않는다.
      */
     private void notifyParticipants(Exchange exchange, SseEventType type) {
-        Map<String, Object> data = Map.of("exchangeId", exchange.getId());
+        ExchangeEventDto data = new ExchangeEventDto(exchange.getId());
 
         exchangeParticipantRepository.findAllByExchangeId(exchange.getId())
                 .forEach(participant -> sseEventPublisher.toUser(participant.getUser().getId(), type, data));

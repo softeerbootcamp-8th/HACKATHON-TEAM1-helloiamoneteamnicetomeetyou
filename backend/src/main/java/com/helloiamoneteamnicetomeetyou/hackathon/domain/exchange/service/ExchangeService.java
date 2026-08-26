@@ -2,6 +2,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.dto.ZoneResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.TimeSlotGrid;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeEventDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeParticipantResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
@@ -190,7 +191,8 @@ public class ExchangeService {
         for (ExchangeParticipant participant : participants) {
             UUID participantId = participant.getUser().getId();
             if (!participantId.equals(userId)) {
-                sseEventPublisher.toUser(participantId, SseEventType.MATCH_REJECTED, Map.of("exchangeId", exchangeId));
+                sseEventPublisher.toUser(
+                        participantId, SseEventType.MATCH_REJECTED, new ExchangeEventDto(exchangeId));
             }
             eventPublisher.publishEvent(new MatchTriggerEvent(participantId));
         }
@@ -610,7 +612,7 @@ public class ExchangeService {
      * 있으면 잠금화면 푸시까지 간다. 그런 이벤트는 {@link #notifyOthers} 를 쓴다.
      */
     private void notifyParticipants(Long exchangeId, List<UUID> userIds, SseEventType type) {
-        Map<String, Object> data = Map.of("exchangeId", exchangeId);
+        ExchangeEventDto data = new ExchangeEventDto(exchangeId);
 
         userIds.forEach(userId -> sseEventPublisher.toUser(userId, type, data));
     }
@@ -622,7 +624,7 @@ public class ExchangeService {
      * 최신 상태를 이미 받으니 알릴 것이 없다. {@code reject()} 도 같은 방식으로 본인을 뺀다.
      */
     private void notifyOthers(Long exchangeId, UUID actorId, SseEventType type) {
-        Map<String, Object> data = Map.of("exchangeId", exchangeId);
+        ExchangeEventDto data = new ExchangeEventDto(exchangeId);
 
         participantIds(exchangeId).stream()
                 .filter(userId -> !userId.equals(actorId))
