@@ -1,5 +1,5 @@
 import type { Exchange, Zone } from '@/lib/exchange'
-import { ALL_WAITING, itemById } from '@/mocks/data'
+import { ALL_WAITING, itemById, type WaitingUser } from '@/mocks/data'
 
 import { toAppointment } from './appointment'
 import type { ExchangePair, MatchResult } from './matching'
@@ -42,6 +42,22 @@ export type Action =
   | { type: 'enter-home' }
   | { type: 'server-match-arrived'; match: ActiveMatch }
   | { type: 'server-match-rejected'; exchangeId: number }
+  | {
+      /**
+       * 서버에서 찔러보기가 성사됐다. 시안 `7. 찔러보기 성사` 를 세우는 자리다.
+       *
+       * 카드 id 는 목업 id 로 옮겨서 넘긴다. 서버 id 를 그대로 두면 카드 그림을 찾는
+       * `itemById` 가 어느 쪽 id 인지 알 수 없다.
+       */
+      type: 'server-poke-matched'
+      exchangeId: number
+      /** 내가 상대에게 주는 카드 */
+      giveItemId: string
+      /** 내가 상대에게 받는 카드 */
+      receiveItemId: string
+      partnerUserId: string
+      partnerName?: string
+    }
   | { type: 'open-match' }
   | { type: 'decline-match' }
   | { type: 'send-poke'; targetUserId: string }
@@ -93,6 +109,27 @@ function setQty(list: State['have'], itemId: string, qty: number): State['have']
   if (qty <= 0) return list.filter((s) => s.itemId !== itemId)
   if (!list.some((s) => s.itemId === itemId)) return [...list, { itemId, qty }]
   return list.map((s) => (s.itemId === itemId ? { ...s, qty } : s))
+}
+
+/**
+ * 서버에서 온 상대를 목업 사용자 모양으로 맞춘다.
+ *
+ * 목업 목록에 있으면 그것을 쓰고, 없으면 최소한만 채워 만든다. 매칭 결과가 상대에게서
+ * 실제로 쓰는 값은 이름뿐이고, 나머지 필드는 자동 매칭 거절 경로에서만 읽는데
+ * 찔러보기 성사에는 거절이 없다.
+ */
+function partnerOf(userId: string, name: string | undefined, itemId: string): WaitingUser {
+  const known = ALL_WAITING.find((u) => u.userId === userId)
+  if (known) return known
+
+  return {
+    id: userId,
+    userId,
+    nickname: name ?? '상대',
+    itemId,
+    needsItemIds: [],
+    online: true,
+  }
 }
 
 function partnersOf(match: MatchResult): string[] {
@@ -189,6 +226,30 @@ export function reducer(state: State, action: Action): State {
         autoMatching: false,
         notifications: notify(state, 'match', '내가 원하는 굿즈로 교환할 수 있어요!', NOTICE_BODY),
       }
+    }
+
+    /**
+     * 서버 찔러보기 성사. 수락한 쪽은 응답을 받자마자, 보낸 쪽은 보낸 목록이 `ACCEPTED` 로
+     * 바뀐 것을 보고 부른다.
+     *
+     * <b>`exchangeId` 가 있어야 `교환 장소 확인하기` 가 서버 교환을 수락하러 간다.</b>
+     * 목업 찔러보기는 서버에 아무것도 없어서 그 자리가 `null` 이다.
+     */
+    case 'server-poke-matched': {
+      // 같은 교환을 이미 세워 뒀으면 그대로 둔다. 목록을 다시 읽을 때마다 새 객체를
+      // 만들면 화면이 매번 처음부터 다시 그려진다.
+      if (state.match?.exchangeId === action.exchangeId) return state
+
+      const match: ActiveMatch = {
+        kind: 'ONE_TO_ONE',
+        partner: partnerOf(action.partnerUserId, action.partnerName, action.receiveItemId),
+        pairs: [{ giveItemId: action.giveItemId, receiveItemId: action.receiveItemId }],
+        giveItemId: action.giveItemId,
+        receiveItemId: action.receiveItemId,
+        origin: 'poke',
+        exchangeId: action.exchangeId,
+      }
+      return { ...state, match, autoMatching: false }
     }
 
     /**

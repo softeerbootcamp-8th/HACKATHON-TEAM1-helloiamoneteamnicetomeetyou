@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { Toast } from '@/components/ui/Toast'
 import { useCatalog } from '@/features/catalog/useCatalog'
 import { fromServerMatch, type ServerMatchSuggested } from '@/features/matching/from-server-match'
+import { usePokeSync } from '@/features/poke/use-poke-sync'
 import { useBoothEvents } from '@/lib/use-booth-events'
 import { pageVariants, pageVariantsWide, springPage, springPageWide } from '@/lib/motion'
 import { useStore } from '@/store/useStore'
@@ -25,6 +26,9 @@ export function AppShell() {
   const { state, dispatch } = useStore()
   const { state: catalog, userId } = useCatalog()
   const index = routeIndex(location.pathname)
+
+  // 서버 찔러보기의 결과를 스토어로 옮긴다. 성사 화면과 거절 토스트가 여기에 달려 있다.
+  usePokeSync()
 
   /**
    * 실제 매칭 알림. 카탈로그가 준비돼야(부스 id 와 카드 이름 매핑이 있어야) 구독하고
