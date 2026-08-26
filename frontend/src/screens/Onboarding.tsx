@@ -207,7 +207,10 @@ function BrandCard() {
           </div>
         </div>
 
-        <p className="mt-2.5 -rotate-5 text-center text-[16px] font-bold text-[#4e5146]">NearLy</p>
+        {/* 시안에서 이름이 카드 한가운데가 아니라 오른쪽으로 조금 밀려 있다 (159:2032). */}
+        <p className="mt-2.5 translate-x-[7px] -rotate-5 text-center text-[16px] font-bold text-[#4e5146]">
+          NearLy
+        </p>
       </div>
     </div>
   )
