@@ -77,9 +77,79 @@ function parseEventData(raw: string): unknown {
     return raw
   }
 }
+/** 한 구독자. `openBoothEventStream` 호출 하나에 대응한다. */
+type Subscriber = {
+  handlers: SseEventHandlers
+  onStatusChange?: (status: SseStatus) => void
+}
+
+/** 부스와 사용자가 같은 구독자들이 함께 쓰는 연결 하나. */
+type SharedStream = {
+  source: EventSource
+  subscribers: Set<Subscriber>
+  status: SseStatus
+}
 
 /**
- * `EventSource` 를 열고 이벤트 이름별 리스너를 건다. 반환하는 함수를 부르면 연결을 닫는다.
+ * 열려 있는 연결. 키는 `${boothId}:${userId}` 다.
+ *
+ * 연결을 여기 모아 두는 이유는 구독 지점이 여럿이기 때문이다. 지금은 네 곳
+ * (`PokeProvider`, `NotificationProvider`, `StoreProvider`, `AppShell`)이 각자
+ * 자기 이벤트만 구독하는데, 그 수만큼 연결이 열리면 브라우저의 오리진당 동시 연결
+ * 한도(6)를 금방 넘긴다. 남은 자리가 없으면 SSE 가 아니라 **일반 API 요청이 밀린다.**
+ */
+const streams = new Map<string, SharedStream>()
+
+function streamKey(boothId: number, userId: string): string {
+  return `${boothId}:${userId}`
+}
+
+/**
+ * 연결을 새로 만들고 이벤트 이름 전부에 리스너를 건다.
+ *
+ * 구독자가 그 이벤트를 원하는지는 받은 뒤에 각자 판단한다. 붙을 때의 핸들러 키만 리스너로
+ * 걸면, 나중에 붙은 구독자가 원하는 이벤트는 리스너가 없어서 영영 오지 않는다.
+ */
+function createStream(key: string, boothId: number, userId: string): SharedStream {
+  const source = new EventSource(boothEventStreamUrl(boothId, userId))
+  const stream: SharedStream = { source, subscribers: new Set(), status: 'connecting' }
+
+  const publishStatus = (status: SseStatus) => {
+    stream.status = status
+    for (const subscriber of stream.subscribers) {
+      subscriber.onStatusChange?.(status)
+    }
+  }
+
+  source.onopen = () => publishStatus('open')
+
+  // EventSource 는 연결이 끊기면 스스로 다시 붙는다. 그래서 error 가 곧 실패는 아니고,
+  // readyState 가 CLOSED 일 때만 재시도를 포기한 것이다(주소가 틀렸거나 서버가 4xx 를 준 경우).
+  source.onerror = () => {
+    publishStatus(source.readyState === EventSource.CLOSED ? 'error' : 'connecting')
+  }
+
+  for (const type of SSE_EVENT_TYPES) {
+    source.addEventListener(type, (event) => {
+      const data = parseEventData((event as MessageEvent<string>).data)
+
+      // 순회 중에 구독자가 빠질 수 있어서(핸들러가 정리 함수를 부르는 경우) 사본을 돈다.
+      for (const subscriber of [...stream.subscribers]) {
+        subscriber.handlers[type]?.(data)
+      }
+    })
+  }
+
+  streams.set(key, stream)
+
+  return stream
+}
+
+/**
+ * 부스 이벤트를 구독한다. 반환하는 함수를 부르면 구독을 끊는다.
+ *
+ * **같은 `boothId` 와 `userId` 로 여러 번 불러도 연결은 하나다.** 먼저 부른 쪽이 연 연결에
+ * 얹히고, 마지막 구독자가 떠날 때 닫힌다.
  *
  * React 밖에서도 쓸 수 있게 훅과 분리해 뒀다. 화면에서는 `useBoothEvents` 를 쓰면 된다.
  */
@@ -89,25 +159,27 @@ export function openBoothEventStream(
   handlers: SseEventHandlers,
   onStatusChange?: (status: SseStatus) => void,
 ): () => void {
-  const source = new EventSource(boothEventStreamUrl(boothId, userId))
+  const key = streamKey(boothId, userId)
+  const stream = streams.get(key) ?? createStream(key, boothId, userId)
 
-  onStatusChange?.('connecting')
-  source.onopen = () => onStatusChange?.('open')
+  const subscriber: Subscriber = { handlers, onStatusChange }
+  stream.subscribers.add(subscriber)
 
-  // EventSource 는 연결이 끊기면 스스로 다시 붙는다. 그래서 error 가 곧 실패는 아니고,
-  // readyState 가 CLOSED 일 때만 재시도를 포기한 것이다(주소가 틀렸거나 서버가 4xx 를 준 경우).
-  source.onerror = () => {
-    onStatusChange?.(source.readyState === EventSource.CLOSED ? 'error' : 'connecting')
+  // 이미 열려 있는 연결에 얹히면 onopen 을 다시 받지 못한다. 지금 상태를 여기서 한 번
+  // 알려주지 않으면 늦게 붙은 구독자만 영영 'connecting' 으로 남는다.
+  onStatusChange?.(stream.status)
+
+  return () => {
+    stream.subscribers.delete(subscriber)
+
+    if (stream.subscribers.size > 0) return
+
+    // 아무도 안 보는 연결은 닫는다. 열어 둔 채로 두면 서버가 타임아웃(30분)까지 들고 있다.
+    stream.source.close()
+
+    // 같은 키로 이미 새 연결이 만들어졌다면 그것을 지우지 않는다.
+    if (streams.get(key) === stream) {
+      streams.delete(key)
+    }
   }
-
-  for (const type of SSE_EVENT_TYPES) {
-    const handler = handlers[type]
-    if (!handler) continue
-
-    source.addEventListener(type, (event) => {
-      handler(parseEventData((event as MessageEvent<string>).data))
-    })
-  }
-
-  return () => source.close()
 }
