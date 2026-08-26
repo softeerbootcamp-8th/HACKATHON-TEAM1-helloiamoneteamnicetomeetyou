@@ -11,6 +11,7 @@ import { unknownItem } from '@/features/catalog/useItem'
 import { useCatalog } from '@/features/catalog/useCatalog'
 import type { BoothHaveItem } from '@/features/poke/api'
 import { usePoke } from '@/features/poke/usePoke'
+import { messageOf } from '@/lib/api'
 import { springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
 import { byPresence } from '@/store/top-card'
@@ -51,9 +52,14 @@ type OfferedCard = { item: Item; qty: number }
 function ConfirmView({ target }: { target: BoothHaveItem }) {
   const navigate = useNavigate()
   const { dispatch } = useStore()
-  const { send, myOfferable, loaded, refresh } = usePoke()
+  const { send, myOfferable, loaded, refresh, clearError } = usePoke()
   const { state: catalog } = useCatalog()
   const [submitting, setSubmitting] = useState(false)
+  /*
+    보내지 못한 이유. 홈 화면의 토스트에 맡기면 여기 남아 있는 동안에는 아무것도 안 뜬다.
+    실패하면 되돌아가지 않는 화면이라 그 자리가 영영 오지 않는다.
+  */
+  const [failed, setFailed] = useState<string | null>(null)
 
   /*
     들어올 때 묶음을 다시 읽는다.
@@ -98,6 +104,7 @@ function ConfirmView({ target }: { target: BoothHaveItem }) {
   const submit = async () => {
     if (submitting || !canSend) return
     setSubmitting(true)
+    setFailed(null)
     try {
       await send(target.ownerId, target.item.id)
       dispatch({
@@ -105,9 +112,11 @@ function ConfirmView({ target }: { target: BoothHaveItem }) {
         message: `${target.item.name} 찔러보기를 보냈어요\n답변 기다리는 중..`,
       })
       navigate('/home')
-    } catch {
-      // 사유는 PokeProvider 가 들고 있고 홈 화면이 띄운다. 되돌아가지 않는다.
-      // 실패한 김에 묶음도 다시 읽히므로(`run` 의 catch), 화면은 갱신된 값으로 다시 그려진다.
+    } catch (err) {
+      // 여기서 띄우므로 provider 가 들고 있는 사유는 지운다. 실패한 김에 묶음도 다시
+      // 읽히므로(`run` 의 catch), 화면은 갱신된 값으로 다시 그려진다.
+      setFailed(messageOf(err))
+      clearError()
       setSubmitting(false)
     }
   }
@@ -157,6 +166,11 @@ function ConfirmView({ target }: { target: BoothHaveItem }) {
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
+        {failed && (
+          <p className="mb-2 text-center text-[12px] text-rose-500" role="alert">
+            {failed}
+          </p>
+        )}
         {loaded && kinds === 0 ? (
           // 죽은 버튼을 남기지 않는다. 보낼 수 없는 이유가 "내놓은 카드가 없다" 하나뿐이라,
           // 그 자리를 고치러 가는 길을 버튼에 그대로 둔다.
