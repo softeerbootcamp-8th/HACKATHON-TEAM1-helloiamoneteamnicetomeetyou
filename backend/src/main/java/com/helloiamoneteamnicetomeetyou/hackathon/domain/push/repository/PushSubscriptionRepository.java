@@ -12,5 +12,8 @@ public interface PushSubscriptionRepository extends JpaRepository<PushSubscripti
 
     List<PushSubscription> findAllByUserId(UUID userId);
 
+    /** 사용자를 지울 때 그 기기의 구독도 같이 지운다. */
+    void deleteByUserId(UUID userId);
+
     void deleteByEndpoint(String endpoint);
 }

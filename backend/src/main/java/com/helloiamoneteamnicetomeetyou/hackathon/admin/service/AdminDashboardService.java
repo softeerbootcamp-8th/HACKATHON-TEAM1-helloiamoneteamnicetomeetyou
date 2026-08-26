@@ -38,7 +38,7 @@ public class AdminDashboardService {
         Map<Long, Long> holders = toCountMap(userHaveItemRepository.countHoldersByItem());
         Map<Long, Long> seekers = toCountMap(userWantItemRepository.countSeekersByItem());
 
-        return itemRepository.findAll().stream()
+        return itemRepository.findAllWithBooth().stream()
                 .map(item -> new ItemDemandView(
                         ItemView.of(item),
                         holders.getOrDefault(item.getId(), 0L),

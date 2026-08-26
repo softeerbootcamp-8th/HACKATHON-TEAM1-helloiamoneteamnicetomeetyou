@@ -5,9 +5,24 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.Exchange
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ExchangeRepository extends JpaRepository<Exchange, Long> {
+
+    /**
+     * 지워질 구역에서 약속을 떼어 낸다.
+     *
+     * <p>{@code zone} 은 비어 있어도 되는 자리다. 교환을 통째로 지우는 것보다 자리만 비우는 편이
+     * 잃는 것이 적어서, 구역을 지울 때는 이쪽을 쓴다. 진행 중이던 약속은 "장소 미정" 으로
+     * 돌아가고 운영자가 다른 자리로 옮겨 주면 된다.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("update Exchange e set e.zone = null where e.zone.id = :zoneId")
+    void detachZone(@Param("zoneId") Long zoneId);
+
+    void deleteByIdIn(List<Long> exchangeIds);
 
     /**
      * 이 구역에서 만나기로 한 약속이 있는지.

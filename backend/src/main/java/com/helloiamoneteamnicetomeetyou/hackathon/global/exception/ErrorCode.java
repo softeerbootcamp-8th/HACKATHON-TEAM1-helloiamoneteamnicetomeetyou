@@ -25,7 +25,6 @@ public enum ErrorCode implements ErrorType {
     // Booth / Zone
     BOOTH_NOT_FOUND(HttpStatus.NOT_FOUND, 3000, "부스를 찾을 수 없습니다."),
     ZONE_NOT_FOUND(HttpStatus.NOT_FOUND, 3001, "교환 장소를 찾을 수 없습니다."),
-    ZONE_IN_USE(HttpStatus.CONFLICT, 3002, "이 구역에서 만나기로 한 약속이 있어 지울 수 없습니다."),
 
     // Exchange
     EXCHANGE_NOT_FOUND(HttpStatus.NOT_FOUND, 4000, "교환을 찾을 수 없습니다."),

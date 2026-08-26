@@ -131,8 +131,8 @@ public class AdminBoothController {
             @PathVariable Long itemId,
             RedirectAttributes redirectAttributes) {
 
-        adminBoothService.deleteItem(itemId);
-        redirectAttributes.addFlashAttribute("toast", "카드를 지웠습니다.");
+        int removedExchanges = adminBoothService.deleteItem(itemId);
+        redirectAttributes.addFlashAttribute("toast", AdminItemController.deletedMessage(removedExchanges));
 
         return "redirect:/admin?tab=zones&boothId=" + boothId;
     }
