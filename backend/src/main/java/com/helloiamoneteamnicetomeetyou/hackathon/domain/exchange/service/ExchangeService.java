@@ -196,29 +196,6 @@ public class ExchangeService {
     }
 
     /**
-     * 성사된 교환의 카드를 양쪽에서 덜어낸다.
-     *
-     * <p>주는 쪽은 {@code quantityLeft} 가 줄고 다 나가면 {@code OUT} 이 된다. 받는 쪽은 찾는
-     * 개수가 줄고 0 이 되면 희망 목록에서 아예 빠진다.
-     */
-    private void consumeItems(Long exchangeId) {
-        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
-            Long itemId = item.getItem().getId();
-            int quantity = item.getQuantity();
-
-            userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), itemId)
-                    .ifPresent(have -> have.completeExchange(quantity));
-
-            userWantItemRepository.findByUserIdAndItemId(item.getToUser().getId(), itemId)
-                    .ifPresent(want -> {
-                        if (want.decrease(quantity)) {
-                            userWantItemRepository.delete(want);
-                        }
-                    });
-        }
-    }
-
-    /**
      * 약속 화면이 보는 교환 하나.
      *
      * <p>아직 아무도 수락하지 않은 교환은 만날 자리가 없어서 약속으로 읽을 수 없다. 그때
@@ -399,10 +376,9 @@ public class ExchangeService {
     /**
      * 만나서 교환을 끝냈다. 참가자 누구든 누를 수 있고, 먼저 누른 한 번만 반영된다.
      *
-     * <p>여기서 카드가 실제로 오간 것으로 친다. 주는 쪽은 보유 수량이 그만큼 줄고, 받는 쪽은
-     * 찾는 수량이 그만큼 준다. 둘 다 하지 않으면 교환이 끝나자마자 같은 카드로 다시 매칭된다.
-     * <p>이 시점에 카드 수량을 실제로 옮긴다. 무엇을 주고받는지는 매칭이 정한 {@link ExchangeItem}
-     * 을 그대로 따른다.
+     * <p>이 시점에 카드 수량을 실제로 옮긴다. 주는 쪽은 보유 수량이 그만큼 줄고, 받는 쪽은 그
+     * 카드를 얻고 찾는 수량에서 뺀다. 무엇을 주고받는지는 매칭이 정한 {@link ExchangeItem} 을
+     * 그대로 따른다.
      */
     @Transactional
     public ExchangeResponseDto complete(Long exchangeId, UUID userId) {
@@ -410,7 +386,6 @@ public class ExchangeService {
         getParticipant(exchangeId, userId);
 
         exchange.complete();
-        consumeItems(exchangeId);
 
         for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
             giveAway(item);
