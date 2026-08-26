@@ -30,6 +30,27 @@ public interface ExchangeParticipantRepository extends JpaRepository<ExchangePar
               AND ep.exchange.status IN ('PENDING', 'IN_PROGRESS')
             """)
     boolean existsActiveExchange(@Param("userId") UUID userId);
+
+    /**
+     * 나와 지금 같은 교환에 묶여 있는 사람들.
+     *
+     * <p>전체리스트의 "매칭됨" 배지가 이 값을 쓴다. 자동 매칭이 성사됐든 찔러보기가 수락됐든
+     * 결과는 똑같이 {@code PENDING}·{@code IN_PROGRESS} 인 교환 한 건이라, 두 경우를 따로
+     * 셀 필요가 없다.
+     *
+     * <p><b>화면이 판단하게 두지 않는다.</b> 알림을 놓치거나 새로고침하면 화면이 들고 있던
+     * 매칭 상태가 사라져서, 이미 매칭된 상대가 "교환 가능" 으로 되돌아간다.
+     */
+    @Query("""
+            select ep.user.id from ExchangeParticipant ep
+            where ep.user.id <> :userId
+              and ep.exchange.status in ('PENDING', 'IN_PROGRESS')
+              and ep.exchange.id in (
+                  select mine.exchange.id from ExchangeParticipant mine
+                  where mine.user.id = :userId
+              )
+            """)
+    List<UUID> findActivePartnerIds(@Param("userId") UUID userId);
     /**
      * 참가자와 그 사용자를 한 번에 읽는다.
      *
