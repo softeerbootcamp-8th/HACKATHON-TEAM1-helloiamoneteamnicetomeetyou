@@ -320,20 +320,21 @@ export function Home() {
             )
           })}
 
-          {/* 카드를 펼치면 뒤가 흐려진다. 아무 데나 누르면 다시 접힌다. */}
-          <AnimatePresence>
-            {fanOpen && (
-              <motion.button
-                type="button"
-                aria-label="내 카드 접기"
-                onClick={() => setFanOpen(false)}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 z-10 bg-neutral-100/70 backdrop-blur-[1px]"
-              />
-            )}
-          </AnimatePresence>
+          {/*
+            펼친 동안 아무 데나 누르면 다시 접힌다. 보이지 않는 판이다.
+
+            <b>색을 깔지 않는다.</b> 전에는 여기에 옅은 회색과 blur 를 줘서 뒤를 흐렸는데,
+            이 판이 레이더 무대(정사각형)에만 걸쳐 있어서 화면을 덮지 못하고 카드 뒤에 회색
+            네모 한 장이 떠 있는 것처럼 보였다. 시안(225:24680)에도 흐린 판이 없다.
+          */}
+          {fanOpen && (
+            <button
+              type="button"
+              aria-label="내 카드 접기"
+              onClick={() => setFanOpen(false)}
+              className="absolute inset-0 z-10"
+            />
+          )}
 
           {/*
             펼친 동안에는 이 층이 클릭을 받지 않는다. 카드든 카드 사이 빈 곳이든 누르면
