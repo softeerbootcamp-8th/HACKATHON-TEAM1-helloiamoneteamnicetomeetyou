@@ -119,6 +119,42 @@ class ExchangeServiceTest {
         given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of());
     }
 
+    /**
+     * 매칭은 제안만 하고 잠그지 않는다(MatchingService). 실제로 잠그는 건 여기, 수락해서
+     * PENDING → IN_PROGRESS 로 넘어가는 순간이다. 제안 단계에서 먼저 잠그면, 수락 안 하고
+     * 흘려보낼 수도 있는 카드가 그동안 다른 사람에게는 안 보이게 된다.
+     */
+    @Test
+    @DisplayName("수락하면 오가는 카드를 잠근다")
+    void 수락하면_오가는_카드를_잠근다() throws Exception {
+        Item item = withId(Item.of(exchange.getZone().getBooth(), "카드", null), ITEM_ID);
+        UserHaveItem meHave = UserHaveItem.of(me, item, 3);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(userHaveItemRepository.findByUserIdAndItemId(ME, ITEM_ID)).willReturn(Optional.of(meHave));
+        given(zoneRepository.findByBoothIdOrderByIdAsc(BOOTH_ID)).willReturn(List.of(exchange.getZone()));
+
+        exchangeService.accept(EXCHANGE_ID, ME);
+
+        assertThat(meHave.getQuantityLeft()).isEqualTo(2);
+        assertThat(meHave.isReserved()).isTrue();
+    }
+
+    @Test
+    @DisplayName("이미 진행 중이면 수락해도 다시 잠그지 않는다")
+    void 이미_진행중이면_다시_잠그지_않는다() throws Exception {
+        exchange.startProgress();
+        Item item = withId(Item.of(exchange.getZone().getBooth(), "카드", null), ITEM_ID);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(zoneRepository.findByBoothIdOrderByIdAsc(BOOTH_ID)).willReturn(List.of(exchange.getZone()));
+
+        exchangeService.accept(EXCHANGE_ID, ME);
+
+        // findByExchangeId 는 boothIdOf 가 어차피 부른다. 잠갔는지는 이걸로 확인한다.
+        verify(userHaveItemRepository, never()).findByUserIdAndItemId(ME, ITEM_ID);
+    }
+
     @Test
     @DisplayName("교환을 만들면 서버가 격자 시작점을 정한다")
     void 교환을_만들면_격자_시작점을_정한다() {

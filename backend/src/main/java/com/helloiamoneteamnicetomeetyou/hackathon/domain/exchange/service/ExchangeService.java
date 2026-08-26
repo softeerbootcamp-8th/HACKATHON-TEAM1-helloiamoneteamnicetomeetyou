@@ -133,6 +133,11 @@ public class ExchangeService {
      * <p>상대가 아직 수락 전이어도 바로 IN_PROGRESS 로 옮긴다. 지금 화면 흐름은 양쪽이 서로의
      * 수락을 기다리지 않고 각자 장소·시간 화면으로 들어가 맞춰 보는 방식이라, "둘 다 눌러야
      * 진행 중" 같은 조건을 걸 이유가 없다.
+     *
+     * <p><b>오가는 카드는 여기서 처음 잠근다.</b> 제안만 됐을 뿐 누구도 수락하지 않은 상태에서
+     * 먼저 잠가 버리면, 정작 수락 안 하고 넘어갈 수도 있는 카드가 그동안 다른 사람에게는
+     * 안 보인다. {@code PENDING → IN_PROGRESS} 로 넘어가는 이 순간(교환당 한 번뿐이다)이 실제로
+     * "이 거래를 하기로 했다" 는 시점이라 여기서 잠근다.
      */
     @Transactional
     public void accept(Long exchangeId, UUID userId) {
@@ -141,11 +146,20 @@ public class ExchangeService {
 
         if (exchange.getStatus() == ExchangeStatus.PENDING) {
             exchange.startProgress();
+            reserveExchangeItems(exchangeId);
         }
 
         // 매칭은 만날 자리도 시간도 모른 채 교환을 만든다. 약속 화면이 필요한 것은 여기서 붙는다.
         // 먼저 수락한 사람이 정하고, 늦게 수락한 사람은 같은 값을 그대로 본다.
         prepareAppointment(exchange, boothIdOf(exchange));
+    }
+
+    /** 이 교환이 오가기로 한 카드를 전부 잠근다. {@link #accept} 가 딱 한 번만 부른다. */
+    private void reserveExchangeItems(Long exchangeId) {
+        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
+            userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
+                    .ifPresent(hi -> hi.reserve(item.getQuantity()));
+        }
     }
 
     /**

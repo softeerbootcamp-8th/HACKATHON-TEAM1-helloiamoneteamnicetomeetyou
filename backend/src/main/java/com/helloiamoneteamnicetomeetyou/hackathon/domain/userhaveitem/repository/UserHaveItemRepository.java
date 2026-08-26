@@ -12,10 +12,12 @@ import org.springframework.data.repository.query.Param;
 
 public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long> {
 
+    /** 지금 새로 내줄 수 있는({@code quantityLeft > 0}) 것만 남긴다 — 다 나간 카드는 목록에서 빠진다. */
     @Query("""
             select h from UserHaveItem h
             join fetch h.item
             where h.user.id = :userId
+              and h.quantityLeft > 0
             order by h.id asc
             """)
     List<UserHaveItem> findAllByUserId(UUID userId);

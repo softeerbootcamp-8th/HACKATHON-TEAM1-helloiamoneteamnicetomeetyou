@@ -117,7 +117,11 @@ public class MatchingService {
 
     /**
      * 1대1 Exchange를 저장한다. give/receive는 이미 확정된 { itemId → qty }다.
-     * 매칭 시점에는 status를 RESERVED로 변경만 한다. quantityLeft 감소는 거래 완료 시점에 처리한다.
+     *
+     * <p><b>여기서는 카드를 잠그지 않는다.</b> 아직 제안일 뿐 누구도 수락하지 않았다. 후보 쿼리가
+     * 이미 {@code PENDING}/{@code IN_PROGRESS} 교환에 참가자로 걸린 사람을 통째로 빼기 때문에,
+     * 같은 카드가 다른 제안에 동시에 걸릴 일은 없다 — 잠그는 건 실제로 수락해서 진행 중으로
+     * 넘어가는 {@link ExchangeService#accept} 의 몫이다.
      */
     private Optional<Exchange> createExchange(
             User myUser,
@@ -143,12 +147,10 @@ public class MatchingService {
         give.forEach((itemId, qty) -> {
             UserHaveItem hi = myMap.get(itemId);
             items.add(ExchangeItem.create(exchange, myUser, hi.getItem(), bestUser, qty));
-            hi.reserve(qty);
         });
         receive.forEach((itemId, qty) -> {
             UserHaveItem hi = bestMap.get(itemId);
             items.add(ExchangeItem.create(exchange, bestUser, hi.getItem(), myUser, qty));
-            hi.reserve(qty);
         });
         exchangeItemRepository.saveAll(items);
         notifyParticipants(exchange, items, List.of(myUser, bestUser));
@@ -262,7 +264,9 @@ public class MatchingService {
 
     /**
      * 3인 Exchange를 저장한다. 교환할 아이템 ID는 이미 결정된 상태로 받는다.
-     * 매칭 시점에 quantityLeft 를 곧바로 줄인다. 완료 시점에는 상태만 정리한다.
+     *
+     * <p>1대1과 같은 이유로 여기서는 잠그지 않는다. {@link ExchangeService#accept} 가 수락된
+     * 뒤에 잠근다.
      */
     private Optional<Exchange> createThreeWayExchange(
             User myUser,
@@ -297,10 +301,6 @@ public class MatchingService {
                 ExchangeItem.create(exchange, userC,  cHaveItem.getItem(),  myUser, 1)
         );
         exchangeItemRepository.saveAll(items);
-
-        myHaveItem.reserve(1);
-        bHaveItem.reserve(1);
-        cHaveItem.reserve(1);
 
         notifyParticipants(exchange, items, List.of(myUser, userB, userC));
         return Optional.of(exchange);
