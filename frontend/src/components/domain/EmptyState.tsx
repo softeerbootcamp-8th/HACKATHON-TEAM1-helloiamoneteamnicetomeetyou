@@ -20,7 +20,8 @@ export function EmptyState({
   description?: string
   icon?: ReactNode
   actionLabel?: string
-  onAction: () => void
+  /** 없으면 버튼 자리를 통째로 뺀다. 기다리는 중이라 누를 것이 없는 화면이 쓴다. */
+  onAction?: () => void
 }) {
   return (
     <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
@@ -60,11 +61,13 @@ export function EmptyState({
         )}
       </div>
 
-      <div className="shrink-0 px-6 pt-4 pb-8">
-        <Button variant="brand" onClick={onAction}>
-          {actionLabel}
-        </Button>
-      </div>
+      {onAction && (
+        <div className="shrink-0 px-6 pt-4 pb-8">
+          <Button variant="brand" onClick={onAction}>
+            {actionLabel}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

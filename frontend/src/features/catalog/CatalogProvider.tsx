@@ -1,12 +1,10 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { messageOf } from '@/lib/api'
-import { ALL_ITEMS, myUsername } from '@/mocks/data'
-import { getDeviceId } from '@/store/identity'
+import { getDeviceId, myUsername } from '@/store/identity'
 
 import { fetchBoothItems, fetchBooths, registerUser, type ServerBooth } from './api'
 import { CatalogContext, type CatalogState } from './CatalogContext'
-import { matchByName } from './match-by-name'
 import { forgetBoothId, readSavedBoothId, saveBoothId } from './saved-booth'
 
 /**
@@ -15,10 +13,11 @@ import { forgetBoothId, readSavedBoothId, saveBoothId } from './saved-booth'
  * 하는 일 세 가지다.
  * 1. 이 기기를 서버에 등록한다 (`POST /api/users`). 안 하면 카드 등록이 전부 막힌다
  * 2. 부스 목록을 받아 붙을 부스를 정한다. 부스는 어드민에서 만들어 id 가 고정이 아니다
- * 3. 그 부스의 카드를 받아 목업 카드와 이름으로 잇는다
+ * 3. 그 부스의 카드를 받아 둔다. 등록 화면부터 매칭 결과까지 전부 이 목록을 그린다
  *
- * 셋 중 하나라도 안 되면 카드 등록만 막히고 나머지 화면(매칭, 레이더, 찔러보기)은 목업으로
- * 계속 돈다. 그쪽 API 가 아직 없어서, 여기서 앱 전체를 세우면 볼 수 있는 것도 못 보게 된다.
+ * 셋 중 하나라도 안 되면 카드를 그릴 수 없어서 등록 화면이 사유를 띄우고 멈춘다. 전에는
+ * 목업 카드로 떨어졌는데, 서버에 없는 카드를 고르게 두면 등록도 매칭도 안 되는 채로 흐름만
+ * 계속 타서 무엇이 잘못됐는지 알 수 없게 된다.
  *
  * **부스 목록과 카드 목록을 두 effect 로 나눠 둔다.** 부스를 바꿀 때 다시 받아야 하는 것은
  * 카드뿐이다. 한 덩어리로 두면 부스를 고를 때마다 부스 목록까지 다시 받게 된다.
@@ -106,14 +105,15 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        const { serverIdOf, mockIdOf, mockItemOf, unmatched } = matchByName(ALL_ITEMS, serverItems)
+        // 목록을 한 번 훑어 색인해 둔다. 카드를 그리는 자리마다 배열을 다시 뒤지면
+        // 레이더와 목록이 매 렌더마다 카드 수만큼 선형 탐색을 돈다.
+        const byId = new Map(serverItems.map((item) => [item.id, item]))
+
         setState({
           status: 'ready',
           boothId: target.id,
-          serverIdOf,
-          mockIdOf,
-          mockItemOf,
-          unmatched,
+          items: serverItems,
+          itemById: (itemId) => byId.get(itemId),
         })
       } catch (error) {
         if (signal.aborted) return

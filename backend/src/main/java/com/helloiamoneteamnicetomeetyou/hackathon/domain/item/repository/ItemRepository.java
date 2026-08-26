@@ -11,6 +11,18 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
 
     List<Item> findByBoothIdOrderByIdAsc(Long boothId);
 
+    /**
+     * 어드민 화면이 쓰는 목록. <b>부스를 같이 읽는다.</b>
+     *
+     * <p>카드가 어느 부스 것인지 화면에 붙이는데, {@code booth} 가 LAZY 라 그냥 전체 조회를
+     * 쓰면 카드 수만큼 부스 쿼리가 더 나간다.
+     */
+    @Query("SELECT i FROM Item i JOIN FETCH i.booth ORDER BY i.booth.id ASC, i.id ASC")
+    List<Item> findAllWithBooth();
+
+    @Query("SELECT i FROM Item i JOIN FETCH i.booth WHERE i.booth.id = :boothId ORDER BY i.id ASC")
+    List<Item> findAllWithBoothByBoothId(@Param("boothId") Long boothId);
+
     long countByBoothId(Long boothId);
 
     /**

@@ -1,10 +1,11 @@
 import { motion } from 'motion/react'
 
+import { EmptyState } from '@/components/domain/EmptyState'
 import { GoodsCard } from '@/components/domain/GoodsCard'
 import { Button } from '@/components/ui/Button'
 import { TopBar } from '@/components/ui/TopBar'
+import { useCatalog } from '@/features/catalog/useCatalog'
 import { staggerChild, staggerParent } from '@/lib/motion'
-import { GOODS } from '@/mocks/data'
 import type { Selection } from '@/store/types'
 
 type Props = {
@@ -14,7 +15,7 @@ type Props = {
   /** Needs 는 아무것도 안 골라도 넘어갈 수 있다. */
   allowEmpty: boolean
   /** 고를 수 없는 아이템. 내놓기로 한 굿즈를 다시 찾을 수는 없다. */
-  disabledItemIds?: string[]
+  disabledItemIds?: number[]
   selections: Selection[]
   /** 서버에 보내는 중. 두 번 눌려 두 번 등록되는 것을 막는다. */
   submitting?: boolean
@@ -23,9 +24,9 @@ type Props = {
   /** 서버 준비 상태 안내. 아직 등록할 수 없을 때 이유를 알려 준다. */
   notice?: string
   onBack: () => void
-  onToggle: (itemId: string) => void
-  onChangeQty: (itemId: string, qty: number) => void
-  onClear: (itemId: string) => void
+  onToggle: (itemId: number) => void
+  onChangeQty: (itemId: number, qty: number) => void
+  onClear: (itemId: number) => void
   onSubmit: () => void
 }
 
@@ -49,8 +50,28 @@ export function SelectScreen({
   onClear,
   onSubmit,
 }: Props) {
+  const { state: catalog, reload } = useCatalog()
   const total = selections.reduce((sum, s) => sum + s.qty, 0)
   const disabled = submitting || (!allowEmpty && total === 0)
+
+  /*
+    카드는 서버가 정한다. 목록을 못 받았으면 고를 것이 없으므로 사유만 보여주고 멈춘다.
+    전에는 목업 카드 9장을 그렸는데, 서버에 없는 카드를 고르게 두면 등록도 매칭도 되지 않은
+    채로 다음 화면까지 넘어가서 무엇이 잘못됐는지 알 수가 없었다.
+  */
+  if (catalog.status !== 'ready') {
+    return (
+      <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
+        <TopBar title={title} onBack={onBack} />
+        <EmptyState
+          title={catalog.status === 'loading' ? '카드를 불러오는 중이에요' : '카드를 볼 수 없어요'}
+          description={notice ?? ''}
+          actionLabel={catalog.status === 'loading' ? undefined : '다시 시도'}
+          onAction={catalog.status === 'loading' ? undefined : reload}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
@@ -72,36 +93,33 @@ export function SelectScreen({
           </motion.p>
         </div>
 
-        {GOODS.map((goods) => (
-          <section key={goods.id} className="mt-6">
-            <h3 className="text-[15px] font-bold text-ink">{goods.name}</h3>
-            <motion.div
-              variants={staggerParent}
-              initial="hidden"
-              animate="show"
-              className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 md:gap-4"
-            >
-              {goods.items.map((item) => {
-                const picked = selections.find((s) => s.itemId === item.id)
-                const blocked = disabledItemIds.includes(item.id)
-                return (
-                  <motion.div key={item.id} variants={staggerChild}>
-                    <GoodsCard
-                      item={item}
-                      selected={Boolean(picked)}
-                      disabled={blocked}
-                      qty={picked?.qty}
-                      onClick={() => onToggle(item.id)}
-                      onIncrease={() => onChangeQty(item.id, (picked?.qty ?? 0) + 1)}
-                      onDecrease={() => onChangeQty(item.id, (picked?.qty ?? 1) - 1)}
-                      onLongPress={() => onClear(item.id)}
-                    />
-                  </motion.div>
-                )
-              })}
-            </motion.div>
-          </section>
-        ))}
+        <section className="mt-6">
+          <motion.div
+            variants={staggerParent}
+            initial="hidden"
+            animate="show"
+            className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 md:gap-4"
+          >
+            {catalog.items.map((item) => {
+              const picked = selections.find((s) => s.itemId === item.id)
+              const blocked = disabledItemIds.includes(item.id)
+              return (
+                <motion.div key={item.id} variants={staggerChild}>
+                  <GoodsCard
+                    item={item}
+                    selected={Boolean(picked)}
+                    disabled={blocked}
+                    qty={picked?.qty}
+                    onClick={() => onToggle(item.id)}
+                    onIncrease={() => onChangeQty(item.id, (picked?.qty ?? 0) + 1)}
+                    onDecrease={() => onChangeQty(item.id, (picked?.qty ?? 1) - 1)}
+                    onLongPress={() => onClear(item.id)}
+                  />
+                </motion.div>
+              )
+            })}
+          </motion.div>
+        </section>
 
         <div className="h-6" />
       </div>

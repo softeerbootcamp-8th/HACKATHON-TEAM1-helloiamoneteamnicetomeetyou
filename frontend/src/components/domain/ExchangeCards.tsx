@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { ItemCard } from '@/components/domain/GoodsCard'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
-import { itemById } from '@/mocks/data'
+import { unknownItem, useItem } from '@/features/catalog/useItem'
 import type { ExchangePair } from '@/store/matching'
 
 /**
@@ -17,13 +17,13 @@ export function ExchangeCard({
   badge,
   compact = false,
 }: {
-  itemId: string
+  itemId: number
   label?: string
   badge?: ReactNode
   /** 카드가 여러 장 쌓이는 자리. 화면을 넘기지 않게 줄인다. */
   compact?: boolean
 }) {
-  const item = itemById(itemId)
+  const item = useItem(itemId) ?? unknownItem(itemId)
   return (
     <div className="text-center">
       {label && <p className="mb-3 text-[12px] font-bold text-ink">{label}</p>}
@@ -118,11 +118,11 @@ export function ThreeWayView({
   giverBadge,
   receiverBadge,
 }: {
-  myItemId: string
+  myItemId: number
   giverNickname: string
-  giverItemId: string
+  giverItemId: number
   receiverNickname: string
-  receiverItemId: string
+  receiverItemId: number
   myBadge?: ReactNode
   giverBadge?: ReactNode
   receiverBadge?: ReactNode

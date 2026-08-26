@@ -3,23 +3,20 @@ import { motion } from 'motion/react'
 import { CARD_SHELL, ItemCardBody } from '@/components/domain/GoodsCard'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
-import type { Item } from '@/mocks/data'
+import type { Item } from '@/features/catalog/api'
 
 type Props = {
   /**
    * 끌어다 놓기의 표적이다. `hitTest` 가 `data-radar-user` 로 이 값을 읽어 누구 위에 있는지
    * 판단하고, 그대로 찔러보기 대상이 된다.
    *
-   * 목업은 대기자 id(`u3`), 서버는 보유 등록 줄 id(`haveItemId`)를 넣는다. 어느 쪽이든
+   * 보유 등록 줄 id(`haveItemId`)를 문자열로 넣는다. DOM 데이터 속성으로 오가는 값이라
    * 이 컴포넌트는 문자열로만 다룬다.
    */
   targetId: string
-  /**
-   * 이 사람이 내놓은 카드. 목업에 짝이 없는 서버 카드면 없다.
-   * 그림은 목업에만 있어서, 없을 때는 빈 타일을 세우고 이름만 보여준다.
-   */
+  /** 이 사람이 내놓은 카드. 부스 목록에 없는 카드면 없다. */
   item: Item | undefined
-  /** 읽어 주는 이름. 목업은 닉네임, 서버는 사람 이름이 아직 없어 카드 이름을 쓴다. */
+  /** 읽어 주는 이름. 사람 이름이 아직 없어 카드 이름을 쓴다. */
   label: string
   /** 지금 내 카드 묶음이 이 사람 위에 올라와 있는지 */
   hovered: boolean

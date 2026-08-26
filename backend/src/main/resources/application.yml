@@ -11,6 +11,21 @@
 spring:
   application:
     name: helloiamoneteamnicetomeetyou
+  # 어드민 화면이 쓰는 css 와 js 주소에 내용 해시를 붙인다 (`admin-<md5>.css`).
+  #
+  # 스프링은 이 경로에 Cache-Control 을 안 붙이는데, 그러면 브라우저가 Last-Modified 를 보고
+  # 제 나름대로 유효기간을 잡는다. 그 바람에 배포 뒤에도 운영자 화면에는 옛 css 가 걸려 있어서,
+  # 시간 격자를 새로 넣었는데 격자 CSS 가 없는 파일이 적용돼 글자만 줄줄이 나왔다.
+  # 내용이 바뀌면 주소가 바뀌므로, 배포할 때마다 강력 새로고침을 부탁할 일이 없어진다.
+  #
+  # 템플릿이 `th:href="@{/admin-assets/...}"` 로 걸려 있어야 이 주소가 만들어진다.
+  web:
+    resources:
+      chain:
+        strategy:
+          content:
+            enabled: true
+            paths: /admin-assets/**
   datasource:
     url: jdbc:mysql://localhost:3306/hackathon?sslMode=DISABLED&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
     username: ${DB_USERNAME:hackathon}

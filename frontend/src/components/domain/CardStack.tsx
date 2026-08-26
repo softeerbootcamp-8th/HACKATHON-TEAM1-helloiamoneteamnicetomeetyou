@@ -3,11 +3,11 @@ import { motion } from 'motion/react'
 import { CARD_SHELL, ItemCardBody } from '@/components/domain/GoodsCard'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
-import { itemById } from '@/mocks/data'
+import { useItem } from '@/features/catalog/useItem'
 
 type Props = {
   /** 맨 위에 보이는 카드. 아직 고른 카드가 없으면 `null` 이고 빈 묶음을 그린다 */
-  topItemId: string | null
+  topItemId: number | null
   /** 뒤에 몇 장이 더 겹쳐 있는지 */
   count: number
   className?: string
@@ -22,7 +22,7 @@ type Props = {
 export function CardStack({ topItemId, count, className, lifted = false }: Props) {
   // 고른 카드가 없으면 아무 카드나 세우지 않는다. 가지고 있지도 않은 카드를 내놓을 것처럼
   // 보이면 사용자가 그대로 끌어다 놓는다.
-  const item = topItemId ? itemById(topItemId) : null
+  const item = useItem(topItemId) ?? null
   const behind = item ? Math.min(Math.max(count - 1, 0), 2) : 0
 
   return (
