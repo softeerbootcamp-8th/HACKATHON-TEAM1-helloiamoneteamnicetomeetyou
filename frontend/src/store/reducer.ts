@@ -166,8 +166,15 @@ export function reducer(state: State, action: Action): State {
       return { ...state, needs: state.needs.filter((s) => s.itemId !== action.itemId) }
 
     case 'enter-home': {
-      // 약속이 있으면 자동 매칭을 돌리지 않는다.
-      const canMatch = state.appointments.length === 0 && !state.match && state.needs.length > 0
+      /*
+        시안 desc 165:3500 1번 — 태그를 가르는 것은 <b>진행 중인 약속이 있는지 하나</b>다.
+        찾는 카드를 아직 등록하지 않은 사용자도 이 화면의 정상 상태라서(desc 165:3500 2번의
+        "Wanted 등록 안 한 사용자" 경로) 그 사람에게도 태그가 떠야 한다.
+
+        `!state.match` 는 남긴다. 매칭이 잡히면 자동 매칭은 실제로 멈춘 것이고, 그 자리는
+        매칭 배너가 대신 쓴다.
+      */
+      const canMatch = state.appointments.length === 0 && !state.match
       return { ...state, autoMatching: canMatch, setupDone: true }
     }
 
@@ -195,7 +202,7 @@ export function reducer(state: State, action: Action): State {
       return {
         ...state,
         match: null,
-        autoMatching: state.appointments.length === 0 && state.needs.length > 0,
+        autoMatching: state.appointments.length === 0,
         notifications: notify(state, 'match-rejected', '상대가 교환을 거절했어요', NOTICE_BODY),
         toast: '상대가 거절해서 다시 상대를 찾을게요.',
       }
@@ -211,7 +218,7 @@ export function reducer(state: State, action: Action): State {
         ...state,
         match: null,
         declined,
-        autoMatching: state.appointments.length === 0 && state.needs.length > 0,
+        autoMatching: state.appointments.length === 0,
         toast: '교환을 거절했어요. 다시 상대를 찾을게요.',
       }
     }
@@ -347,7 +354,7 @@ export function reducer(state: State, action: Action): State {
           appointments,
           activeAppointmentId:
             state.activeAppointmentId === exchange.exchangeId ? null : state.activeAppointmentId,
-          autoMatching: appointments.length === 0 && state.needs.length > 0,
+          autoMatching: appointments.length === 0,
           toast: previous ? '교환이 취소됐어요' : state.toast,
         }
       }
@@ -407,8 +414,8 @@ export function reducer(state: State, action: Action): State {
         activeAppointmentId: null,
         outgoingPoke: null,
         declined: [],
-        // 성사 이후 Needs 가 남아 있고 다른 약속이 없으면 자동 매칭을 다시 돌린다.
-        autoMatching: appointments.length === 0 && (next.needs ?? state.needs).length > 0,
+        // 성사 이후 다른 약속이 없으면 자동 매칭을 다시 돌린다.
+        autoMatching: appointments.length === 0,
       }
     }
 
@@ -422,7 +429,7 @@ export function reducer(state: State, action: Action): State {
         activeAppointmentId: null,
         match: null,
         outgoingPoke: null,
-        autoMatching: appointments.length === 0 && state.needs.length > 0,
+        autoMatching: appointments.length === 0,
         toast: '약속을 취소했어요',
       }
     }

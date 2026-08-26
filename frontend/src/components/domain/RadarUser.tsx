@@ -14,8 +14,11 @@ type Props = {
    * 이 컴포넌트는 문자열로만 다룬다.
    */
   targetId: string
-  /** 이 사람이 내놓은 카드 */
-  item: Item
+  /**
+   * 이 사람이 내놓은 카드. 목업에 짝이 없는 서버 카드면 없다.
+   * 그림은 목업에만 있어서, 없을 때는 빈 타일을 세우고 이름만 보여준다.
+   */
+  item: Item | undefined
   /** 읽어 주는 이름. 목업은 닉네임, 서버는 사람 이름이 아직 없어 카드 이름을 쓴다. */
   label: string
   /** 지금 내 카드 묶음이 이 사람 위에 올라와 있는지 */
@@ -91,7 +94,23 @@ export function RadarUser({
           pending && 'opacity-45 grayscale',
         )}
       >
-        <ItemCardBody item={item} size="sm" />
+        {item ? (
+          <ItemCardBody item={item} size="sm" />
+        ) : (
+          /*
+            카드 그림을 못 그린다고 통째로 빼면 레이더가 비어 보인다. 전체리스트가 이름만
+            적힌 타일로 자리를 지키는 것과 같은 처리다. 높이는 `ItemCardBody` 와 맞춰 둔다.
+          */
+          <>
+            <span
+              aria-hidden
+              className="flex h-[70px] w-full items-center justify-center rounded-xl bg-tile ring-1 ring-line md:h-[78px]"
+            />
+            <p className="mt-2 flex h-[26px] items-center justify-center text-center text-[10px] leading-tight font-bold text-ink">
+              <span className="line-clamp-2">{label}</span>
+            </p>
+          </>
+        )}
 
         {pending && (
           <span className="absolute inset-0 flex items-center justify-center text-[15px] font-bold text-neutral-500">
