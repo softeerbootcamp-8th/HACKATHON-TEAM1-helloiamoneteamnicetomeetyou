@@ -289,16 +289,34 @@ export function reducer(state: State, action: Action): State {
       const { exchange, myUserId } = action
       const previous = state.appointments.find((a) => a.exchangeId === exchange.exchangeId)
 
-      // 끝났거나 취소된 약속은 목록에서 뺀다. 그대로 두면 오지 않을 약속을 계속 보여주게 된다.
+      /*
+        이 교환의 매칭 화면을 아직 들고 있으면 같이 치운다.
+
+        <b>수락 전에 교환이 없어지는 길이 있다.</b> 어드민이 막힌 교환을 끊으면
+        `EXCHANGE_CANCELLED` 만 오고 `MATCH_REJECTED` 는 안 오는데, 여기서 `match` 를 안 비우면
+        없어진 교환의 매칭 화면이 그대로 남는다. 그러면 `server-match-arrived` 가드에 걸려서
+        <b>그 사람은 다음 매칭 제안도 못 받는다.</b> 어드민 취소가 시연 중에 막힌 사람을 푸는
+        수단이라 특히 곤란하다.
+
+        <b>끝나거나 취소된 교환일 때만 비운다.</b> 아직 살아 있는 교환까지 비우면, 찔러보기가
+        성사되고 곧바로 들어오는 `EXCHANGE_CREATED` 동기화가 방금 세운 성사 화면을 지운다.
+      */
+      const staleMatch =
+        (exchange.status === 'CANCELLED' || exchange.status === 'COMPLETED') &&
+        state.match?.exchangeId === exchange.exchangeId
+      const matchAfterSync = staleMatch ? null : state.match
+
+      // 취소된 약속은 목록에서 뺀다. 그대로 두면 오지 않을 약속을 계속 보여주게 된다.
       if (exchange.status === 'CANCELLED') {
         const appointments = state.appointments.filter((a) => a.exchangeId !== exchange.exchangeId)
         return {
           ...state,
+          match: matchAfterSync,
           appointments,
           activeAppointmentId:
             state.activeAppointmentId === exchange.exchangeId ? null : state.activeAppointmentId,
           autoMatching: liveAppointments(appointments).length === 0,
-          toast: previous ? '교환이 취소됐어요' : state.toast,
+          toast: previous || staleMatch ? '교환이 취소됐어요' : state.toast,
         }
       }
 
@@ -312,7 +330,7 @@ export function reducer(state: State, action: Action): State {
 
       return {
         ...state,
-        match: action.match ? null : state.match,
+        match: action.match ? null : matchAfterSync,
         appointments,
         activeAppointmentId: action.activate ? next.exchangeId : state.activeAppointmentId,
         autoMatching: false,

@@ -155,6 +155,13 @@ public class MatchingService {
         Map<Long, UserHaveItem> bestMap = indexByItemId(
                 userHaveItemRepository.findByUserIdAndItemIds(bestId, receive.keySet()));
 
+        if (!myMap.keySet().containsAll(give.keySet())
+                || !bestMap.keySet().containsAll(receive.keySet())) {
+            log.info("고른 카드가 그새 다른 교환에 묶여 1대1 교환을 만들지 않는다: myUserId={}, bestId={}",
+                    myUser.getId(), bestId);
+            return Optional.empty();
+        }
+
         Exchange exchange = exchangeRepository.save(Exchange.create(ExchangeType.ONE_TO_ONE));
         exchangeParticipantRepository.saveAll(List.of(
                 ExchangeParticipant.create(exchange, myUser),
@@ -222,27 +229,37 @@ public class MatchingService {
         Map<UUID, Map<UUID, Map<Long, Integer>>> bToC = buildBToC(boothId, theirs.keySet(), mine.keySet());
         if (bToC.isEmpty()) return Optional.empty();
 
-        // B는 want를 먼저 등록한 순서(earliestReg 최솟값)로 선정, C는 첫 번째
-        UUID bId = bToC.keySet().stream()
-                .min(Comparator.comparingLong(id -> earliestReg.getOrDefault(id, Long.MAX_VALUE)))
-                .orElseThrow();
-        UUID cId = bToC.get(bId).keySet().iterator().next();
+        // B 는 want 를 먼저 등록한 순서(earliestReg 최솟값)로 본다.
+        List<UUID> bIds = bToC.keySet().stream()
+                .sorted(Comparator.comparingLong(id -> earliestReg.getOrDefault(id, Long.MAX_VALUE)))
+                .toList();
 
-        // 각 방향에서 교환할 아이템 1개씩 결정
-        Long aToBItemId = theirs.get(bId).keySet().iterator().next();
-        Long bToCItemId = bToC.get(bId).get(cId).keySet().iterator().next();
+        for (UUID bId : bIds) {
+            // 각 방향에서 교환할 아이템 1개씩 결정
+            Long aToBItemId = theirs.get(bId).keySet().iterator().next();
 
-        // 내가 내놓은 카드를 사이클을 한 바퀴 돌아 도로 받으면 교환이 아니다. 다른 카드를 찾고,
-        // 없으면 이 조합은 포기한다. 1대1 쪽 dropSelfDefeating 과 같은 이유다.
-        Long cToAItemId = mine.get(cId).keySet().stream()
-                .filter(itemId -> !itemId.equals(aToBItemId))
-                .findFirst()
-                .orElse(null);
-        if (cToAItemId == null) return Optional.empty();
+            for (UUID cId : bToC.get(bId).keySet()) {
+                // 내가 내놓은 카드를 사이클을 한 바퀴 돌아 도로 받으면 교환이 아니다. C 가 줄 수
+                // 있는 다른 카드를 찾고, 없으면 이 조합만 건너뛴다. 1대1 쪽 dropSelfDefeating 과
+                // 같은 이유다.
+                //
+                // <b>예전에는 여기서 부스를 통째로 포기했다.</b> 첫 (B, C) 조합 하나만 보고
+                // 돌려보내서, 다른 조합으로는 사이클이 되는데도 3인 교환이 안 잡혔다. 같은 사람들이
+                // 두 번째 교환을 할 때처럼 카드가 한 바퀴 돌아 있으면 첫 조합이 걸리기 쉽다.
+                Long cToAItemId = mine.get(cId).keySet().stream()
+                        .filter(itemId -> !itemId.equals(aToBItemId))
+                        .findFirst()
+                        .orElse(null);
+                if (cToAItemId == null) continue;
 
-        return createThreeWayExchange(
-                myUser, bId, cId, aToBItemId, bToCItemId, cToAItemId
-        );
+                Long bToCItemId = bToC.get(bId).get(cId).keySet().iterator().next();
+
+                return createThreeWayExchange(
+                        myUser, bId, cId, aToBItemId, bToCItemId, cToAItemId
+                );
+            }
+        }
+        return Optional.empty();
     }
 
     /** 두 후보 맵에 등장하는 카드가 각각 어느 부스 것인지 한 번에 읽는다. */
@@ -298,12 +315,15 @@ public class MatchingService {
         User userB = userRepository.findById(bId).orElseThrow();
         User userC = userRepository.findById(cId).orElseThrow();
 
-        UserHaveItem myHaveItem = userHaveItemRepository
-                .findByUserIdAndItemIds(myUser.getId(), Set.of(aToBItemId)).get(0);
-        UserHaveItem bHaveItem = userHaveItemRepository
-                .findByUserIdAndItemIds(bId, Set.of(bToCItemId)).get(0);
-        UserHaveItem cHaveItem = userHaveItemRepository
-                .findByUserIdAndItemIds(cId, Set.of(cToAItemId)).get(0);
+        UserHaveItem myHaveItem = findHaveItem(myUser.getId(), aToBItemId);
+        UserHaveItem bHaveItem  = findHaveItem(bId, bToCItemId);
+        UserHaveItem cHaveItem  = findHaveItem(cId, cToAItemId);
+
+        if (myHaveItem == null || bHaveItem == null || cHaveItem == null) {
+            log.info("사이클 중 한 카드가 그새 다른 교환에 묶여 3인 교환을 만들지 않는다: "
+                    + "myUserId={}, bId={}, cId={}", myUser.getId(), bId, cId);
+            return Optional.empty();
+        }
 
         Exchange exchange = exchangeRepository.save(Exchange.create(ExchangeType.MULTI_WAY));
         exchangeParticipantRepository.saveAll(List.of(
@@ -439,6 +459,20 @@ public class MatchingService {
             remaining -= take;
         }
         return result;
+    }
+
+    /**
+     * 매칭이 고른 카드의 보유 행을 읽는다. 없으면 {@code null} 이다.
+     *
+     * <p><b>후보를 고른 뒤 여기까지 오는 사이에 사라질 수 있다.</b> 이 트랜잭션은
+     * {@code READ_COMMITTED} 라서 그동안 다른 사람이 수락해 그 카드를 전부 예약해 버렸으면
+     * {@code quantityLeft > 0} 조건에 걸려 한 건도 안 나온다. 그대로 꺼내 쓰면 매칭 스레드가
+     * {@code IndexOutOfBounds} 나 {@code NullPointerException} 으로 죽는다.
+     */
+    private UserHaveItem findHaveItem(UUID userId, Long itemId) {
+        return userHaveItemRepository.findByUserIdAndItemIds(userId, Set.of(itemId)).stream()
+                .findFirst()
+                .orElse(null);
     }
 
     private Map<Long, UserHaveItem> indexByItemId(List<UserHaveItem> items) {
