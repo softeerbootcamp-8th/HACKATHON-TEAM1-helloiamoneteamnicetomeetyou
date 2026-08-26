@@ -73,8 +73,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const { mockIdOf } = catalog
     const controller = new AbortController()
 
+    // qty 가 0 이하인 Selection 은 이 앱에서 존재하지 않는 상태다 (setQty/bump 가 0 이하면
+    // 아예 목록에서 뺀다). 지금 새로 낼 게 없는(quantity_left = 0, 예약되었거나 다 나간)
+    // 카드까지 그대로 넣으면 "가지고 있다는데 수량이 0" 으로 화면이 그 규칙을 어기게 된다.
     const toSelections = (rows: RegisteredItem[]): Selection[] =>
       rows
+        .filter((row) => row.quantity > 0)
         .map((row) => ({ itemId: mockIdOf(row.itemId), qty: row.quantity }))
         .filter((s): s is Selection => s.itemId !== undefined)
 
