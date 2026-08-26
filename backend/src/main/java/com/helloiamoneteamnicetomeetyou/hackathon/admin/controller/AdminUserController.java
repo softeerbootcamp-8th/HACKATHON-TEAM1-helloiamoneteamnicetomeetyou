@@ -126,12 +126,13 @@ public class AdminUserController {
         return CONSOLE + userId;
     }
 
+    /** 사용자를 지운다. 더미든 실제 참가자든 같은 자리에서 지운다. */
     @PostMapping("/{userId}/delete")
-    public String deleteDummy(@PathVariable UUID userId, RedirectAttributes redirectAttributes) {
-        int removedExchanges = adminUserService.deleteDummy(userId);
+    public String deleteUser(@PathVariable UUID userId, RedirectAttributes redirectAttributes) {
+        int removedExchanges = adminUserService.deleteUser(userId);
         redirectAttributes.addFlashAttribute("toast", removedExchanges == 0
-                ? "더미를 지웠습니다."
-                : "더미를 지웠습니다. 이 사람이 낀 교환 " + removedExchanges + "건도 같이 지웠습니다.");
+                ? "사용자를 지웠습니다."
+                : "사용자를 지웠습니다. 이 사람이 낀 교환 " + removedExchanges + "건도 같이 지웠습니다.");
 
         return "redirect:/admin?tab=users";
     }

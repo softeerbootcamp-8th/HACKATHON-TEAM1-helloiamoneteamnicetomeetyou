@@ -276,20 +276,23 @@ public class AdminUserService {
     }
 
     /**
-     * 더미 사용자를 지운다. 그 사람이 들고 있던 카드도 같이 지운다.
+     * 사용자를 지운다. 그 사람이 남긴 카드와 교환, 찔러보기, 알림도 같이 걷어낸다.
      *
-     * <p><b>진짜 참가자는 지우지 않는다.</b> 부스에서 실제로 앱을 쓰고 있는 사람을 목록에서
-     * 지우면 그 사람 화면이 그때부터 아무것도 못 하게 된다. 어드민이 만든 더미만 열어 둔다.
+     * <p><b>더미가 아닌 실제 참가자도 지운다.</b> 예전에는 더미만 열어 뒀는데, 부스에서 잘못
+     * 등록된 사람이나 시연이 끝난 관람객을 치울 방법이 없어서 운영자가 DB 를 직접 열어야 했다.
+     * 지워진 사람의 화면은 그때부터 아무것도 못 하게 되므로, 무엇을 지우는지는 화면이 먼저
+     * 확인받는다.
+     *
+     * <p>등록한 카드만 지우고 있었더니 찔러보기와 교환, 알림, 푸시 구독에 걸려 500 이 나갔다.
+     * 사람을 붙들고 있는 표가 여덟이라, 지우는 순서를 아는 곳을 {@link AdminCleanupService}
+     * 하나로 모아 두고 여기서는 그것만 부른다.
+     *
+     * @return 같이 지운 교환 건수
      */
     @Transactional
-    public int deleteDummy(UUID userId) {
+    public int deleteUser(UUID userId) {
         User user = findUser(userId);
-        if (!user.isAdminManaged()) {
-            throw new ApplicationException(ErrorCode.INVALID_INPUT);
-        }
 
-        // 등록한 카드만 지우고 있었더니 찔러보기와 교환, 알림, 푸시 구독에 걸려 500 이 나갔다.
-        // 사람을 붙들고 있는 표가 여덟이라, 순서를 아는 곳을 AdminCleanupService 하나로 모았다.
         int removedExchanges = adminCleanupService.deleteUserDeep(userId);
         userRepository.delete(user);
 

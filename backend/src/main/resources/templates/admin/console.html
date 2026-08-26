@@ -116,11 +116,17 @@
             <span class="badge brand" th:if="${user.adminManaged}">더미</span>
             <span class="badge" th:unless="${user.adminManaged}">실제 사용자</span>
 
+            <!--/*
+              실제 참가자도 지운다. 부스에서 잘못 등록된 사람을 치울 방법이 어드민에 없어서
+              운영자가 DB 를 직접 열어야 했다. 다만 지워진 사람의 화면은 그때부터 아무것도
+              못 하게 되므로, 더미와 같은 문구로 묻지 않고 그 사실을 확인 문구에 적는다.
+            */-->
             <form
-              th:if="${user.adminManaged}"
               method="post"
               th:action="@{'/admin/users/' + ${user.id} + '/delete'}"
-              th:data-confirm="'이 더미를 지웁니다. 이 사람이 낀 교환과 찔러보기, 등록한 카드, 알림도 같이 지워집니다.'"
+              th:data-confirm="${user.adminManaged}
+                ? '이 더미를 지웁니다. 이 사람이 낀 교환과 찔러보기, 등록한 카드, 알림도 같이 지워집니다.'
+                : '실제 참가자 ' + ${user.username ?: '이름 없음'} + ' 을(를) 지웁니다. 이 사람이 낀 교환과 찔러보기, 등록한 카드, 알림도 같이 지워지고, 지금 앱을 쓰고 있다면 그 화면은 아무것도 할 수 없게 됩니다.'"
             >
               <button class="btn danger sm" type="submit">삭제</button>
             </form>
