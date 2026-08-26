@@ -13,6 +13,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.repository.ItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.dto.HaveItemRegisteredResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
@@ -20,6 +21,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationEx
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventPublisher;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventType;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -222,6 +224,26 @@ class UserHaveItemServiceTest {
                 .isEqualTo(ErrorCode.HAVE_ITEM_RESERVED);
 
         verify(userHaveItemRepository, never()).delete(any(UserHaveItem.class));
+    }
+
+    @Test
+    @DisplayName("등록한 것이 통째로 예약돼도 내 등록 목록에는 남는다")
+    void 예약된_카드도_등록_목록에_남는다() {
+        Item item = Mockito.mock(Item.class);
+        given(item.getId()).willReturn(ITEM_ID);
+        UserHaveItem reserved = UserHaveItem.of(User.of(USER_ID), item, 2);
+        reserved.reserve(2);
+        given(userHaveItemRepository.findRegisteredByUserId(USER_ID))
+                .willReturn(List.of(reserved));
+
+        List<HaveItemRegisteredResponseDto> mine = userHaveItemService.findMine(USER_ID);
+
+        // 지금 새로 내줄 몫은 없지만(quantity 0) 등록해 둔 2장은 그대로 알려 준다. 이 값으로
+        // 화면을 되살리지 않으면 매칭이 잡힌 사람이 새로고침했을 때 내 카드가 사라진다.
+        assertThat(mine).hasSize(1);
+        assertThat(mine.getFirst().quantity()).isZero();
+        assertThat(mine.getFirst().registered()).isEqualTo(2);
+        assertThat(mine.getFirst().reserved()).isTrue();
     }
 
     @Test

@@ -430,15 +430,26 @@ public class ExchangeService {
         }
 
         exchange.complete();
-
-        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
-            giveAway(item);
-            receive(item);
-        }
+        settleItems(exchangeId);
 
         notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_COMPLETED);
 
         return toResponse(exchange);
+    }
+
+    /**
+     * 이 교환이 오가기로 한 카드를 실제로 옮긴다.
+     *
+     * <p>참가자가 끝냈을 때와 어드민이 닫았을 때가 함께 쓴다. 어드민 쪽에서 이걸 부르지 않으면
+     * 잠가 둔 카드가 풀리지도 넘어가지도 않은 채 남아 그 사람은 다시 매칭되지 않는다.
+     *
+     * <p><b>끝난 교환에 두 번 부르면 안 된다.</b> 부르는 쪽이 상태를 먼저 보고 한 번만 부른다.
+     */
+    public void settleItems(Long exchangeId) {
+        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
+            giveAway(item);
+            receive(item);
+        }
     }
 
     /**

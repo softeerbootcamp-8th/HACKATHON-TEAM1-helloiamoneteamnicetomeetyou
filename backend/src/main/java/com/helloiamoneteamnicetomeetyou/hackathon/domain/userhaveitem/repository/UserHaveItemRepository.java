@@ -23,6 +23,27 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
             """)
     List<UserHaveItem> findAllByUserId(UUID userId);
 
+    /**
+     * 내가 지금 등록해 둔 내놓을 카드. 등록 화면을 되살릴 때 쓴다.
+     *
+     * <p><b>{@link #findAllByUserId} 와 거르는 기준이 다르다.</b> 저쪽은 "지금 새로 내줄 수
+     * 있는가"({@code quantityLeft > 0})를 보기 때문에, 등록해 둔 것이 통째로 교환에 예약되면
+     * 목록에서 빠진다. 그 목록으로 화면을 되살리면 매칭이 잡힌 사람이 새로고침했을 때 내 카드가
+     * 하나도 없는 것처럼 보인다. 등록은 살아 있으므로 여기서는 남긴다.
+     *
+     * <p>내놓기로 한 몫이 하나도 없는 줄은 뺀다. 다 넘긴 줄과 교환으로 받기만 한 줄이 여기
+     * 해당하는데, 둘 다 사용자가 등록한 카드가 아니다. 받은 카드는 등록 화면에서 직접 등록해야
+     * 교환에 쓰인다.
+     */
+    @Query("""
+            select h from UserHaveItem h
+            join fetch h.item
+            where h.user.id = :userId
+              and (h.quantityLeft > 0 or h.reservedQuantity > 0)
+            order by h.id asc
+            """)
+    List<UserHaveItem> findRegisteredByUserId(@Param("userId") UUID userId);
+
     /** 한 부스 안에서 내가 내놓은 카드. 대기장이 부스 단위라 견주는 내 카드도 그 부스 것만 본다. */
     @Query("""
             select h from UserHaveItem h

@@ -80,13 +80,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ])
         if (signal.aborted) return
 
-        // qty 가 0 이하인 Selection 은 이 앱에서 존재하지 않는 상태다 (setQty/bump 가 0 이하면
-        // 아예 목록에서 뺀다). 지금 새로 낼 게 없는(quantity_left = 0, 예약되었거나 다 나간)
-        // 카드까지 그대로 넣으면 "가지고 있다는데 수량이 0" 으로 화면이 그 규칙을 어기게 된다.
+        /*
+          내놓을 카드는 등록해 둔 개수(`registered`)로 되살린다. `quantity` 는 지금 새로 내줄 수
+          있는 개수라 교환에 예약된 만큼이 빠져 있어서, 등록한 것이 통째로 예약되면 0 이 되고
+          매칭이 잡힌 사람이 새로고침하면 내 카드가 하나도 없는 것처럼 보인다. 찾는 카드에는
+          예약이 없어서 `registered` 가 오지 않고, 그때는 `quantity` 가 곧 등록한 개수다.
+
+          qty 가 0 이하인 Selection 은 이 앱에서 존재하지 않는 상태다 (setQty/bump 가 0 이하면
+          아예 목록에서 뺀다). 그래서 0 인 줄은 여기서 떨어뜨린다.
+        */
         const inThisBooth = (rows: RegisteredItem[]) =>
           rows
-            .filter((row) => row.quantity > 0 && itemById(row.itemId) !== undefined)
-            .map((row) => ({ itemId: row.itemId, qty: row.quantity }))
+            .map((row) => ({ itemId: row.itemId, qty: row.registered ?? row.quantity }))
+            .filter((row) => row.qty > 0 && itemById(row.itemId) !== undefined)
 
         dispatch({
           type: 'registrations-loaded',
