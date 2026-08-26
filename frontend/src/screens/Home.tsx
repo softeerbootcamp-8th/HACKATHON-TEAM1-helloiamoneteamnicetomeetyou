@@ -10,6 +10,7 @@ import { PushOptInBanner } from '@/components/domain/PushOptInBanner'
 import { RadarRings } from '@/components/domain/Radar'
 import { RadarUser } from '@/components/domain/RadarUser'
 import { BellIcon } from '@/components/ui/icons'
+import { fetchMyHaveItems, fetchMyWantItems, type RegisteredItem } from '@/features/catalog/api'
 import { useCatalog } from '@/features/catalog/useCatalog'
 import { useNotification } from '@/features/notification/useNotification'
 import type { BoothHaveItem } from '@/features/poke/api'
@@ -21,6 +22,7 @@ import { usePush, type PushState } from '@/lib/use-push'
 import { itemById, type Item } from '@/mocks/data'
 import { appointmentStatus, sortedAppointments } from '@/store/appointment-status'
 import { getDeviceId } from '@/store/identity'
+import { persistSetupDone } from '@/store/setup-status'
 import {
   radarUsers,
   sortedWaitingList,
@@ -28,6 +30,7 @@ import {
   wantedFromMe,
   type WaitingStatus,
 } from '@/store/matching'
+import type { Selection } from '@/store/types'
 import { useStore } from '@/store/useStore'
 
 /**
@@ -82,14 +85,62 @@ export function Home() {
   const [fanOpen, setFanOpen] = useState(false)
   const bannerDragRef = useRef(false)
   const radarRef = useRef<HTMLDivElement>(null)
+  // 서버에서 내 카드를 받아 채우는 것을 한 번만 시도했는지.
+  const hydratedRef = useRef(false)
   // 끌었는지 기억해 둔다. 끌고 난 뒤 따라오는 click 을 걸러내는 데 쓴다.
   const draggedRef = useRef(false)
 
   useEffect(() => {
     dispatch({ type: 'enter-home' })
+    // 이 기기가 홈까지 와 봤다는 것을 기억해 둔다. 다음에 들어오면 온보딩을 건너뛴다.
+    persistSetupDone()
     // 홈에 들어올 때 한 번만 자동 매칭을 켠다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /**
+   * 온보딩을 건너뛰고 곧바로 홈에 온 사람의 카드를 서버에서 받아 채운다.
+   *
+   * `state.have`, `state.needs` 는 /have, /needs 화면을 거쳐야만 채워지는데, 이미 등록을
+   * 마친 기기는 그 화면을 건너뛰고 여기로 바로 온다. 그대로 두면 서버에는 카드가 있는데
+   * 화면에는 하나도 없는 것처럼 보인다.
+   *
+   * <b>한 번만 받는다.</b> 정말로 아무것도 등록 안 한 사람은 받아 와도 계속 길이가 0이라,
+   * 길이만 보고 다시 받을지 정하면 매 렌더마다 다시 불러 무한 요청이 된다.
+   */
+  useEffect(() => {
+    if (catalog.status !== 'ready') return
+    if (hydratedRef.current) return
+    if (state.have.length > 0 || state.needs.length > 0) return
+    hydratedRef.current = true
+
+    const { mockIdOf } = catalog
+    const controller = new AbortController()
+
+    const toSelections = (rows: RegisteredItem[]): Selection[] =>
+      rows
+        .map((row) => ({ itemId: mockIdOf(row.itemId), qty: row.quantity }))
+        .filter((s): s is Selection => s.itemId !== undefined)
+
+    void (async () => {
+      try {
+        const [have, needs] = await Promise.all([
+          fetchMyHaveItems(getDeviceId(), controller.signal),
+          fetchMyWantItems(getDeviceId(), controller.signal),
+        ])
+        if (controller.signal.aborted) return
+        dispatch({
+          type: 'have-needs-hydrated',
+          have: toSelections(have),
+          needs: toSelections(needs),
+        })
+      } catch {
+        // 못 받아도 화면은 뜬다. /have 로 가서 고치면 그때 다시 맞는다.
+      }
+    })()
+
+    return () => controller.abort()
+  }, [catalog, state.have.length, state.needs.length, dispatch])
 
   /**
    * 홈에 들어올 때마다 목록을 다시 읽는다.

@@ -3,7 +3,8 @@ import { ALL_WAITING, itemById } from '@/mocks/data'
 
 import { toAppointment } from './appointment'
 import type { ExchangePair, MatchResult } from './matching'
-import type { ActiveMatch, Appointment, IncomingPoke, State } from './types'
+import { getPersistedSetupDone } from './setup-status'
+import type { ActiveMatch, Appointment, IncomingPoke, Selection, State } from './types'
 
 /**
  * 알림 문구는 시안의 `교환 대기장소 알림 정리` 를 그대로 옮긴 것이다.
@@ -15,7 +16,8 @@ export const initialState: State = {
   onboarded: false,
   boothId: null,
   zones: [],
-  setupDone: false,
+  // 기기가 전에 홈까지 가 본 적이 있으면 온보딩을 다시 보여주지 않는다.
+  setupDone: getPersistedSetupDone(),
   have: [],
   needs: [],
   autoMatching: false,
@@ -39,6 +41,7 @@ export type Action =
   | { type: 'set-need-qty'; itemId: string; qty: number }
   | { type: 'clear-have'; itemId: string }
   | { type: 'clear-need'; itemId: string }
+  | { type: 'have-needs-hydrated'; have: Selection[]; needs: Selection[] }
   | { type: 'enter-home' }
   | { type: 'server-match-arrived'; match: ActiveMatch }
   | { type: 'server-match-rejected'; exchangeId: number }
@@ -164,6 +167,17 @@ export function reducer(state: State, action: Action): State {
       return { ...state, needs: setQty(state.needs, action.itemId, action.qty) }
     case 'clear-need':
       return { ...state, needs: state.needs.filter((s) => s.itemId !== action.itemId) }
+
+    /**
+     * 온보딩을 건너뛰고 곧바로 홈으로 온 사람의 카드를 서버에서 받아 채운다.
+     *
+     * `/have`, `/needs` 를 거쳐야만 `state.have`, `state.needs` 가 채워지는데, 이미 등록을
+     * 마친 기기는 그 화면을 안 거치고 홈으로 바로 온다. 그대로 두면 서버에는 카드가 있는데
+     * 화면에는 하나도 없는 것처럼 보인다. 이미 뭔가 골라 둔 상태(예: 막 /have 에서 돌아온 것)
+     * 를 덮어쓰지 않도록 홈이 부를 때 한 번만 쓴다.
+     */
+    case 'have-needs-hydrated':
+      return { ...state, have: action.have, needs: action.needs }
 
     case 'enter-home': {
       /*

@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Navigate, useNavigate } from 'react-router'
 
 import { BoothPicker } from '@/components/domain/BoothPicker'
 import { CardStack } from '@/components/domain/CardStack'
@@ -26,6 +26,16 @@ export function Onboarding() {
   const [pickerOpen, setPickerOpen] = useState(false)
 
   const boothName = booth?.name ?? FALLBACK_BOOTH_NAME
+
+  /**
+   * 이 기기가 전에 홈까지 가 본 적이 있으면 온보딩을 다시 보여주지 않는다.
+   *
+   * 홈에서도 카드는 얼마든지 고칠 수 있어서, 매번 부스 고르기부터 다시 시키는 것은 방문객을
+   * 세워 두고 필요 없는 화면을 하나 더 거치게 하는 것이다. `/` 로 주소를 바로 쳐도 마찬가지다.
+   */
+  if (state.setupDone) {
+    return <Navigate to="/home" replace />
+  }
 
   /**
    * 부스를 바꿀 수 있는 것은 여기, 그리고 카드를 등록하기 전까지다.
