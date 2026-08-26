@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.entity.Booth;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service.ExchangeLock;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service.ExchangeService;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
@@ -83,6 +84,9 @@ class PokeServiceTest {
 
     @Mock
     private ExchangeService exchangeService;
+
+    @Mock
+    private ExchangeLock exchangeLock;
 
     @Mock
     private ExchangeItemRepository exchangeItemRepository;
@@ -264,6 +268,30 @@ class PokeServiceTest {
     }
 
     @Test
+    @DisplayName("이미 다른 교환에 묶여 있으면 수락해도 교환을 새로 만들지 않는다")
+    void 이미_교환에_묶여_있으면_막는다() {
+        // 대기장이 자동 매칭된 상대의 카드도 계속 보여 줘서, 이미 짝이 잡힌 두 사람이 서로를
+        // 찔러보고 수락하는 일이 실제로 있었다. 그때 같은 두 사람에게 교환이 두 건 잡혔다.
+        Poke poke = Poke.of(sender, receiver, requestedItem);
+        given(pokeRepository.findByIdWithUsers(POKE_ID)).willReturn(Optional.of(poke));
+        given(userHaveItemRepository.findAllByUserId(SENDER)).willReturn(List.of(senderHasOffered));
+        given(userHaveItemRepository.findByUserIdAndItemId(RECEIVER, REQUESTED_ITEM_ID))
+                .willReturn(Optional.of(receiverHasRequested));
+        given(exchangeLock.acquire(anyList())).willReturn(false);
+
+        assertThatThrownBy(() ->
+                pokeService.answer(POKE_ID, RECEIVER, PokeStatus.ACCEPTED, OFFERED_ITEM_ID))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(PokeServiceTest::errorTypeOf)
+                .isEqualTo(ErrorCode.POKE_ALREADY_MATCHED);
+
+        verify(exchangeService, never()).createExchange(any(), any(), any());
+        verify(exchangeItemRepository, never()).saveAll(anyList());
+        // 거절로 바꾸면 후보 쿼리의 거절 이력 필터가 이 카드 조합을 영구히 제외한다.
+        assertThat(poke.getStatus()).isEqualTo(PokeStatus.PENDING);
+    }
+
+    @Test
     @DisplayName("거절하면 교환을 만들지 않고 보낸 사람에게 알린다")
     void 거절하면_교환을_만들지_않는다() {
         Poke poke = Poke.of(sender, receiver, requestedItem);
@@ -441,6 +469,7 @@ class PokeServiceTest {
         given(userHaveItemRepository.findAllByUserId(SENDER)).willReturn(List.of(senderHasOffered));
         given(userHaveItemRepository.findByUserIdAndItemId(RECEIVER, REQUESTED_ITEM_ID))
                 .willReturn(Optional.of(receiverHasRequested));
+        given(exchangeLock.acquire(anyList())).willReturn(true);
         given(exchangeService.createExchange(any(), any(), any())).willReturn(exchange);
     }
 
