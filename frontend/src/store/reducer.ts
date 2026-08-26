@@ -1,6 +1,7 @@
 import type { Exchange } from '@/lib/exchange'
 
 import { toAppointment } from './appointment'
+import { liveAppointments } from './appointment-status'
 import { pairsOf } from './matching'
 import type { ExchangePair, MatchPartner } from './matching'
 import { getPersistedSetupDone } from './setup-status'
@@ -199,15 +200,20 @@ export function reducer(state: State, action: Action): State {
         `!state.match` 는 남긴다. 매칭이 잡히면 자동 매칭은 실제로 멈춘 것이고, 그 자리는
         매칭 배너가 대신 쓴다.
       */
-      const canMatch = state.appointments.length === 0 && !state.match
+      const canMatch = liveAppointments(state.appointments).length === 0 && !state.match
       return { ...state, autoMatching: canMatch, setupDone: true }
     }
 
     /**
      * 서버가 SSE 로 실제 매칭을 알려온 것. 이미 화면에 매칭이나 약속이 떠 있으면 덮어쓰지 않는다.
+     *
+     * <b>끝난 약속은 세지 않는다.</b> 셋이 교환하면 "만났어요" 는 한 명만 누르고 나머지는
+     * `EXCHANGE_COMPLETED` 를 보고 완료 화면으로 따라가는데, 그 순간 다른 화면에 있던 사람은
+     * 완료 화면을 안 거쳐서 끝난 약속을 계속 들고 있는다. 그 길이까지 세면 그 사람만 두 번째
+     * 매칭 제안이 여기서 버려진다.
      */
     case 'server-match-arrived': {
-      if (state.match || state.appointments.length > 0) return state
+      if (state.match || liveAppointments(state.appointments).length > 0) return state
       return {
         ...state,
         match: action.match,
@@ -250,7 +256,7 @@ export function reducer(state: State, action: Action): State {
       return {
         ...state,
         match: null,
-        autoMatching: state.appointments.length === 0,
+        autoMatching: liveAppointments(state.appointments).length === 0,
         notifications: notify(state, 'match-rejected', '상대가 이번엔 패스했어요', NOTICE_BODY),
         toast: '상대가 패스했어요. 새 상대를 찾아드릴게요',
       }
@@ -264,7 +270,7 @@ export function reducer(state: State, action: Action): State {
       return {
         ...state,
         match: null,
-        autoMatching: state.appointments.length === 0,
+        autoMatching: liveAppointments(state.appointments).length === 0,
         toast: '이번 교환은 패스했어요. 새 상대를 찾아드릴게요',
       }
     }
@@ -283,16 +289,34 @@ export function reducer(state: State, action: Action): State {
       const { exchange, myUserId } = action
       const previous = state.appointments.find((a) => a.exchangeId === exchange.exchangeId)
 
-      // 끝났거나 취소된 약속은 목록에서 뺀다. 그대로 두면 오지 않을 약속을 계속 보여주게 된다.
+      /*
+        이 교환의 매칭 화면을 아직 들고 있으면 같이 치운다.
+
+        <b>수락 전에 교환이 없어지는 길이 있다.</b> 어드민이 막힌 교환을 끊으면
+        `EXCHANGE_CANCELLED` 만 오고 `MATCH_REJECTED` 는 안 오는데, 여기서 `match` 를 안 비우면
+        없어진 교환의 매칭 화면이 그대로 남는다. 그러면 `server-match-arrived` 가드에 걸려서
+        <b>그 사람은 다음 매칭 제안도 못 받는다.</b> 어드민 취소가 시연 중에 막힌 사람을 푸는
+        수단이라 특히 곤란하다.
+
+        <b>끝나거나 취소된 교환일 때만 비운다.</b> 아직 살아 있는 교환까지 비우면, 찔러보기가
+        성사되고 곧바로 들어오는 `EXCHANGE_CREATED` 동기화가 방금 세운 성사 화면을 지운다.
+      */
+      const staleMatch =
+        (exchange.status === 'CANCELLED' || exchange.status === 'COMPLETED') &&
+        state.match?.exchangeId === exchange.exchangeId
+      const matchAfterSync = staleMatch ? null : state.match
+
+      // 취소된 약속은 목록에서 뺀다. 그대로 두면 오지 않을 약속을 계속 보여주게 된다.
       if (exchange.status === 'CANCELLED') {
         const appointments = state.appointments.filter((a) => a.exchangeId !== exchange.exchangeId)
         return {
           ...state,
+          match: matchAfterSync,
           appointments,
           activeAppointmentId:
             state.activeAppointmentId === exchange.exchangeId ? null : state.activeAppointmentId,
-          autoMatching: appointments.length === 0,
-          toast: previous ? '교환이 취소됐어요' : state.toast,
+          autoMatching: liveAppointments(appointments).length === 0,
+          toast: previous || staleMatch ? '교환이 취소됐어요' : state.toast,
         }
       }
 
@@ -306,7 +330,7 @@ export function reducer(state: State, action: Action): State {
 
       return {
         ...state,
-        match: action.match ? null : state.match,
+        match: action.match ? null : matchAfterSync,
         appointments,
         activeAppointmentId: action.activate ? next.exchangeId : state.activeAppointmentId,
         autoMatching: false,
@@ -345,7 +369,7 @@ export function reducer(state: State, action: Action): State {
         appointments,
         activeAppointmentId: null,
         // 성사 이후 다른 약속이 없으면 자동 매칭을 다시 돌린다.
-        autoMatching: appointments.length === 0,
+        autoMatching: liveAppointments(appointments).length === 0,
       }
     }
 
@@ -358,7 +382,7 @@ export function reducer(state: State, action: Action): State {
         appointments,
         activeAppointmentId: null,
         match: null,
-        autoMatching: appointments.length === 0,
+        autoMatching: liveAppointments(appointments).length === 0,
         toast: '약속을 취소했어요',
       }
     }

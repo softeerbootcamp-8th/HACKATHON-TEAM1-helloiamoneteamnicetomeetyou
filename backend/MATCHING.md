@@ -199,7 +199,9 @@ quantityLeft 감소 (dirty checking으로 자동 반영):
 // 쿼리 C: B(∈ toThem) → C(∈ toMe) 방향으로 줄 수 있는 아이템 탐색
 Map<Long, Map<Long, Map<Long, Integer>>> bToC = buildBToC(toThem.keySet(), toMe.keySet());
 
-// 사이클이 있으면 첫 번째 쌍 사용 (bToC에 있는 쌍은 전부 유효)
+// B 를 want 등록이 빠른 순으로 훑으면서, 사이클이 실제로 성립하는 첫 (B, C) 를 쓴다.
+// C 가 나에게 줄 카드가 내가 B 에게 주는 카드뿐이면(한 바퀴 돌아 도로 받는 꼴) 그 조합만
+// 건너뛰고 다음 조합을 본다. 예전에는 첫 조합 하나만 보고 부스를 통째로 포기했다.
 Long bId = ...;
 Long cId = ...;
 
