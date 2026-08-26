@@ -12,6 +12,8 @@ type Props = {
   title: string
   heading: string
   ctaLabel: string
+  /** 선택 개수 뒤에 붙는 말. 내놓기는 "건넬 수 있어요", 찾기는 "담았어요" 다. */
+  countSuffix: string
   /** Needs 는 아무것도 안 골라도 넘어갈 수 있다. */
   allowEmpty: boolean
   /** 고를 수 없는 아이템. 내놓기로 한 굿즈를 다시 찾을 수는 없다. */
@@ -38,6 +40,7 @@ export function SelectScreen({
   title,
   heading,
   ctaLabel,
+  countSuffix,
   allowEmpty,
   disabledItemIds = [],
   selections,
@@ -78,18 +81,18 @@ export function SelectScreen({
       <TopBar title={title} onBack={onBack} />
 
       <div className="flex-1 overflow-y-auto px-5 no-scrollbar">
-        <div className="flex items-start justify-between pt-3">
+        <div className="flex items-start justify-between gap-3 pt-3">
           <div>
             <h2 className="text-[17px] font-bold text-ink">{heading}</h2>
-            <p className="mt-1 text-[12px] text-neutral-400">여러장 선택할 수 있어요</p>
+            <p className="mt-1 text-[12px] text-neutral-400">여러 장도 OK!</p>
           </div>
           <motion.p
             key={total}
             initial={{ scale: 0.85, opacity: 0.5 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="pt-1 text-[13px] font-semibold text-neutral-500"
+            className="shrink-0 pt-1 text-[13px] font-semibold text-neutral-500"
           >
-            {total}개 선택됨
+            {total}장 {countSuffix}
           </motion.p>
         </div>
 

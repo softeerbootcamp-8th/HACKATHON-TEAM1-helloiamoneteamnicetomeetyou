@@ -13,9 +13,10 @@ export function HaveSelect() {
 
   return (
     <SelectScreen
-      title="내가 내놓을 굿즈"
-      heading="교환할 굿즈를 선택하세요"
+      title="내가 건넬 굿즈"
+      heading="상대에게 건넬 굿즈를 골라주세요"
       ctaLabel="다음"
+      countSuffix="건넬 수 있어요"
       allowEmpty={false}
       selections={state.have}
       notice={catalogNotice(catalog)}

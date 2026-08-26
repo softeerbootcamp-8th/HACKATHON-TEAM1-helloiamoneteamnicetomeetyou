@@ -51,19 +51,19 @@ export function appointmentStatus(
     return {
       id: appointment.exchangeId,
       to: '/appointment',
-      title: `${appointment.confirmedLabel}에 만나요`,
-      sub: '모두 되는 가장 빠른 시간',
+      title: `${appointment.confirmedLabel}에 만나요!`,
+      sub: '다 같이 만날 수 있는 가장 빠른 시간',
     }
   }
   if (appointment.mySlots.length === 0) {
     return {
       id: appointment.exchangeId,
       to: '/time',
-      title: '가능한 시간을 입력해주세요',
+      title: '만날 수 있는 시간을 알려주세요',
       sub: pair,
     }
   }
-  return { id: appointment.exchangeId, to: '/time', title: '시간 조율 중이에요', sub: pair }
+  return { id: appointment.exchangeId, to: '/time', title: '시간을 맞추는 중이에요', sub: pair }
 }
 
 /**

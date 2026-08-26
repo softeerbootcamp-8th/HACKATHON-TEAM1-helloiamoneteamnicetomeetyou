@@ -99,10 +99,10 @@ function ReceivedView({
     <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
       <div className="flex-1 overflow-y-auto px-6 pt-6 no-scrollbar">
         <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink">
-          상대가 교환을 요청했어요
+          누가 나를 찔러봤어요! 👀
         </h1>
         <p className="mt-2 text-[13px] text-neutral-400">
-          상대의 카드 묶음에서 원하는 1장을 선택할 수 있어요
+          상대 카드 중 원하는 1장을 고를 수 있어요
         </p>
 
         <section className="mt-7">
@@ -111,7 +111,7 @@ function ReceivedView({
         </section>
 
         <section className="mt-8">
-          <h2 className="text-[13px] font-bold text-ink">상대의 카드 묶음 (1장 선택)</h2>
+          <h2 className="text-[13px] font-bold text-ink">상대 카드 (1장 골라요)</h2>
           <motion.div
             variants={staggerParent}
             initial="hidden"
@@ -133,9 +133,9 @@ function ReceivedView({
 
       <div className="shrink-0 px-6 pt-4 pb-8">
         <Button disabled={chosen === null || submitting} onClick={submitAccept}>
-          {submitting ? '보내는 중...' : '이 카드로 진행하기'}
+          {submitting ? '보내는 중...' : '이 카드로 교환할래요'}
         </Button>
-        <TextButton onClick={() => setRejectOpen(true)}>거절하기</TextButton>
+        <TextButton onClick={() => setRejectOpen(true)}>다음에요</TextButton>
       </div>
 
       <RejectDialog open={rejectOpen} onKeep={() => setRejectOpen(false)} onReject={submitReject} />

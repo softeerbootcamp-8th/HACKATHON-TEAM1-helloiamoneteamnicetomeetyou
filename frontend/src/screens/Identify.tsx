@@ -164,9 +164,10 @@ export function Identify() {
           </motion.h1>
           <p className="mt-3 text-center text-[14px] leading-[1.55] text-white/70">
             같은 화면을 든 사람이
-            <br />내 교환 상대예요.
+            <br />
+            나와 교환할 상대예요
           </p>
-          <p className="mt-4 text-[13px] text-white/45">휴대폰 화면을 들어 서로를 찾아보세요.</p>
+          <p className="mt-4 text-[13px] text-white/45">화면을 높이 들어 서로를 찾아봐요</p>
         </div>
 
         <div className="shrink-0 space-y-2.5 px-6 pb-8">
@@ -177,7 +178,7 @@ export function Identify() {
             onClick={() => void goComplete()}
             className="h-[54px] w-full rounded-full bg-white text-[16px] font-bold text-ink disabled:opacity-60"
           >
-            만났어요
+            만났어요!
           </motion.button>
           <motion.button
             type="button"

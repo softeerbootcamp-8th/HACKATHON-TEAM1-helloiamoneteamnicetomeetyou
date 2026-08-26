@@ -30,18 +30,25 @@ export type IdentityMark = {
   name: string
   /** 그림 주소. 파일 이름과 버전이 곧 내용이라 캐시에 그대로 얹힌다. */
   src: string
+  /**
+   * 글자 옆에 붙는 이모지. 약속 화면의 "‘레몬’ 찾기 🍋" 자리가 쓴다.
+   *
+   * 표시마다 따로 든다. 레몬 이모지를 고정으로 박으면 포도를 든 사람 화면에
+   * "‘포도’ 찾기 🍋" 이 떠서, 화면을 들고 서로를 찾는 순간에 엉뚱한 과일을 보게 된다.
+   */
+  emoji: string
 }
 
-function mark(name: string, file: string): IdentityMark {
-  return { name, src: `${IMAGE_BASE}/${file}.webp?v=${IMAGE_VERSION}` }
+function mark(name: string, file: string, emoji: string): IdentityMark {
+  return { name, src: `${IMAGE_BASE}/${file}.webp?v=${IMAGE_VERSION}`, emoji }
 }
 
 export const IDENTITY_MARKS: IdentityMark[] = [
-  mark('레몬', 'lemon'),
-  mark('포도', 'grape'),
-  mark('체리', 'cherry'),
-  mark('수박', 'watermelon'),
-  mark('복숭아', 'peach'),
+  mark('레몬', 'lemon', '🍋'),
+  mark('포도', 'grape', '🍇'),
+  mark('체리', 'cherry', '🍒'),
+  mark('수박', 'watermelon', '🍉'),
+  mark('복숭아', 'peach', '🍑'),
 ]
 
 /** 표에 없는 번호가 와도 화면이 비지 않게 첫 표시로 되돌린다. */

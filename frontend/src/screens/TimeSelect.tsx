@@ -154,9 +154,8 @@ export function TimeSelect() {
       <div className="flex-1 overflow-y-auto px-6 no-scrollbar">
         <h1 className="text-[26px] font-extrabold tracking-[-0.02em] text-ink">언제 만날까요?</h1>
         <p className="mt-3 text-[13px] leading-[1.6] text-neutral-400">
-          가능한 시간을 모두 눌러주세요.
-          <br />
-          모두 겹치는 가장 빠른 시간으로 정해져요.
+          가능한 시간을 모두 골라주세요
+          <br />다 같이 만날 수 있는 가장 빠른 시간으로 정해져요
         </p>
 
         <div className="mt-8 overflow-x-auto no-scrollbar">
@@ -227,9 +226,11 @@ export function TimeSelect() {
                 </span>
                 <div>
                   <p className="text-[16px] font-bold text-ink">
-                    {appt.confirmedLabel ?? slotTimeLabel(baseTime, overlap ?? 0)}에 만나요
+                    {appt.confirmedLabel ?? slotTimeLabel(baseTime, overlap ?? 0)}에 만나요!
                   </p>
-                  <p className="text-[12px] text-neutral-500">모두가 만날 수 있는 가장 빠른 시간</p>
+                  <p className="text-[12px] text-neutral-500">
+                    다 같이 만날 수 있는 가장 빠른 시간
+                  </p>
                 </div>
               </motion.div>
             )}
@@ -243,11 +244,11 @@ export function TimeSelect() {
           넣었는데 겹치는 시간이 없으면 조율을 요청하고, 겹치면 그 자리에서 확정한다.
           내가 시간을 안 골랐어도 상대가 골랐으면 조율 요청은 보낼 수 있다.
         */}
-        {!answered && <Button disabled>아직 상대방을 기다려야 해요</Button>}
+        {!answered && <Button disabled>상대의 시간을 기다리는 중이에요</Button>}
 
         {answered && matched && (
           <Button variant="brand" disabled={busy} onClick={() => void confirmTime()}>
-            {confirmed ? '약속 보러 가기' : '약속 확정하기'}
+            {confirmed ? '약속 보러 가기' : '이 시간으로 약속!'}
           </Button>
         )}
 
@@ -265,11 +266,11 @@ export function TimeSelect() {
               })
             }}
           >
-            시간 조율 요청하기
+            다른 시간 물어보기
           </Button>
         )}
 
-        <TextButton onClick={() => navigate('/home')}>홈으로 가서 기다리기</TextButton>
+        <TextButton onClick={() => navigate('/home')}>대기존 구경하며 기다리기</TextButton>
       </div>
 
       <RejectDialog

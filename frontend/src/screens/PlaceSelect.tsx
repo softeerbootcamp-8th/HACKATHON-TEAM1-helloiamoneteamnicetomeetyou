@@ -62,9 +62,7 @@ export function PlaceSelect() {
       <TopBar onBack={() => navigate('/home')} onClose={() => setRejectOpen(true)} />
 
       <div className="flex-1 overflow-y-auto px-6 no-scrollbar">
-        <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink">
-          교환 장소를 정해주세요
-        </h1>
+        <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink">어디서 만날까요?</h1>
         <p className="mt-2 text-[13px] text-neutral-400">핀을 누르면 만날 자리가 바뀌어요</p>
 
         <div className="relative mt-6 h-[230px] overflow-hidden rounded-2xl bg-neutral-100">
@@ -131,7 +129,7 @@ export function PlaceSelect() {
           </span>
           <div>
             <p className="text-[15px] font-bold text-ink">
-              {here?.name ?? '교환 장소를 불러오는 중'}
+              {here?.name ?? '만날 자리를 불러오는 중'}
             </p>
             <p className="text-[12px] text-neutral-400">{here?.location ?? ''}</p>
           </div>
@@ -139,7 +137,7 @@ export function PlaceSelect() {
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
-        <Button onClick={() => navigate('/time')}>시간 선택하기</Button>
+        <Button onClick={() => navigate('/time')}>시간 정하러 가기</Button>
       </div>
 
       <RejectDialog
