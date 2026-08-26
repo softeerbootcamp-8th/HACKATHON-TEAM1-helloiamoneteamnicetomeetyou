@@ -736,6 +736,44 @@
       </div>
 
       <!--/*
+        아직 짝이 없는 대기 관람객을 채운다. 부스를 열 때 제일 먼저 누르는 버튼이라 위에 둔다.
+
+        아래의 매칭 케이스와 헷갈리면 안 된다. 케이스로 만든 더미는 이미 짝이 있어서 관람객의
+        후보에서 통째로 빠지고, 그러면 첫 관람객이 카드를 넣어도 상대가 하나도 안 뜬다.
+
+        인원을 입력받지 않는 것은 카드 종류마다 몇 명이 서 있어야 어떤 조합이 들어와도 매칭이
+        붙는지가 계산으로 정해지는 값이라서다. 부스에서 운영자가 고를 일이 아니다.
+      */-->
+      <div class="box">
+        <div class="box-head">부스 열기</div>
+        <div class="box-body">
+          <form method="post" th:action="@{/admin/seed/waiting}">
+            <p class="policy" style="margin-top: 0">
+              카드마다 <b>아직 짝이 없는 대기 관람객</b>을 세웁니다. 관람객이 어떤 카드를 내놓고
+              어떤 카드를 찾든 매칭이 하나는 붙도록 희망 카드를 나눠 배분합니다.
+            </p>
+            <p class="policy">
+              모자란 자리만 채우므로 <b>여러 번 눌러도 됩니다.</b> 매칭이 성사돼 대기자가
+              빠지면 다시 눌러 보충하세요.
+            </p>
+
+            <div class="form-row" style="margin-top: 14px">
+              <div class="field">
+                <label for="waiting-booth">부스</label>
+                <select class="input" id="waiting-booth" name="boothId" required>
+                  <option th:each="b : ${booths}" th:value="${b.id}" th:text="${b.name}"></option>
+                </select>
+              </div>
+              <div class="field" style="flex: 0 0 auto; min-width: 0">
+                <label>&nbsp;</label>
+                <button class="btn brand" type="submit">대기 관람객 채우기</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!--/*
         매칭 케이스를 통째로 만든다.
 
         서비스가 지원하는 고리가 3인까지라 여기서도 2인과 3인만 만든다. 4인 고리를 만들면
