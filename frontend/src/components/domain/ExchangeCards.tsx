@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { ItemCard } from '@/components/domain/GoodsCard'
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
-import { itemById, MY_IDENTITY } from '@/mocks/data'
+import { itemById } from '@/mocks/data'
 import type { ExchangePair } from '@/store/matching'
 
 /**
@@ -130,12 +130,7 @@ export function ThreeWayView({
   return (
     <div className="mt-8 md:mt-0">
       <div className="flex justify-center">
-        <ExchangeCard
-          compact
-          itemId={myItemId}
-          label={`나 (${MY_IDENTITY.fruit} ${MY_IDENTITY.number})`}
-          badge={myBadge}
-        />
+        <ExchangeCard compact itemId={myItemId} label="나" badge={myBadge} />
       </div>
 
       <div className="mt-3 flex items-center justify-center gap-24 text-[18px] text-brand md:mt-1">
