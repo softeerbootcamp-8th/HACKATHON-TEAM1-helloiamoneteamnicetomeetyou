@@ -25,6 +25,7 @@ public enum ErrorCode implements ErrorType {
     // Booth / Zone
     BOOTH_NOT_FOUND(HttpStatus.NOT_FOUND, 3000, "부스를 찾을 수 없습니다."),
     ZONE_NOT_FOUND(HttpStatus.NOT_FOUND, 3001, "교환 장소를 찾을 수 없습니다."),
+    ZONE_IN_USE(HttpStatus.CONFLICT, 3002, "이 구역에서 만나기로 한 약속이 있어 지울 수 없습니다."),
 
     // Exchange
     EXCHANGE_NOT_FOUND(HttpStatus.NOT_FOUND, 4000, "교환을 찾을 수 없습니다."),
@@ -52,6 +53,9 @@ public enum ErrorCode implements ErrorType {
     // Item / UserHaveItem / UserWantItem
     ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, 5000, "카드를 찾을 수 없습니다."),
     INVALID_QUANTITY(HttpStatus.BAD_REQUEST, 5001, "수량은 1개 이상이어야 합니다."),
+    ITEM_ALREADY_IN_HAVE(HttpStatus.BAD_REQUEST, 5002, "내놓기로 한 카드는 찾는 카드로 등록할 수 없습니다."),
+    ITEM_ALREADY_IN_WANT(HttpStatus.BAD_REQUEST, 5003, "찾는 카드로 등록한 카드는 내놓을 수 없습니다."),
+    HAVE_ITEM_RESERVED(HttpStatus.CONFLICT, 5004, "교환에 예약된 카드는 등록을 해제할 수 없습니다."),
 
     // Notification
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, 6000, "알림을 찾을 수 없습니다."),

@@ -10,6 +10,8 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -31,6 +33,7 @@ public class NotificationEventDispatcher {
     private final UserRepository userRepository;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onSseEvent(SseEvent event) {
         // 부스 전체에 뿌리는 이벤트는 개인 알림함에 쌓을 대상이 없다.
         if (event.userId() == null) {
@@ -43,6 +46,9 @@ public class NotificationEventDispatcher {
         }
 
         try {
+            // getReferenceById 와 save 를 같은 트랜잭션(영속성 컨텍스트)에서 실행한다. 원래
+            // 트랜잭션은 이미 커밋되어 열려 있지 않으므로, 새로 하나 열지 않으면 두 호출이
+            // 서로 다른 영속성 컨텍스트에서 실행돼 recipient 참조가 어느 세션에도 속하지 않는다.
             User recipient = userRepository.getReferenceById(event.userId());
             notificationRepository.save(Notification.of(
                     recipient, event.type(), message.get().getTitle(), message.get().getBody()));

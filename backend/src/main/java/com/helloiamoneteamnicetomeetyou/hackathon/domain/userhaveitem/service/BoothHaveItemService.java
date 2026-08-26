@@ -1,6 +1,7 @@
 package com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.service;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.repository.BoothRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.repository.ExchangeParticipantRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.dto.BoothHaveItemResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,21 +38,28 @@ public class BoothHaveItemService {
 
     private final UserHaveItemRepository userHaveItemRepository;
     private final UserWantItemRepository userWantItemRepository;
+    private final ExchangeParticipantRepository exchangeParticipantRepository;
     private final UserRepository userRepository;
     private final BoothRepository boothRepository;
 
     /**
      * 나를 뺀 다른 사용자의 보유 카드를 정렬해 한 페이지 내려준다.
      *
-     * <p><b>내 희망 카드와 맞는 것만 준다.</b> 시안이 그렇게 정해 뒀다
-     * (desc 204:4928 "사용자의 wanted와 일치 &amp; 시스템에 등록된 모든 아이템 표시").
-     * 이슈 #28 본문은 "필터가 아니라 정렬" 이었는데, 화면 쪽 규칙이 더 구체적이라 시안을 따랐다.
+     * <p>무엇을 남길지는 내가 찾는 카드를 등록했는지에 따라 갈린다 (시안 desc 204:4928).
      *
-     * <p>희망 카드를 등록하지 않은 사람에게는 빈 목록이 간다. 화면이 그 상태를 안내로 덮는다.
+     * <ul>
+     *   <li>희망 카드가 있으면 — 그와 맞는 줄만 남긴다
+     *   <li>희망 카드가 없으면 — 내가 이미 가진 카드만 빼고 전부 남긴다. 무엇을 찾는지 아직
+     *       모르는 사람에게 빈 화면을 주지 않기 위해서다. 내가 가진 카드는 빼는데, 같은 카드를
+     *       받아 봐야 교환이 되지 않기 때문이다
+     * </ul>
      *
-     * <p>순서는 교환이 바로 성립하는 것(줄 수 있는 카드가 있음) → {@code haveItemId}
-     * 오름차순이다. <b>마지막 기준이 없으면 안 된다.</b> 앞 기준이 같은 행끼리 순서가 매번
-     * 달라져서, 페이지를 넘길 때 같은 줄이 두 번 나오거나 빠진다.
+     * <p>순서는 <b>내가 찾는 카드를 등록한 순서</b> → {@code haveItemId} 오름차순이다. 가장 먼저
+     * 찾겠다고 적은 카드가 목록 맨 위에 온다. 희망 카드를 등록하지 않았으면 순위가 전부 같아져서
+     * {@code haveItemId} 오름차순, 즉 먼저 등록된 순으로 떨어진다 (시안 desc 165:3500 5번).
+     *
+     * <p><b>마지막 기준이 없으면 안 된다.</b> 앞 기준이 같은 행끼리 순서가 매번 달라져서,
+     * 페이지를 넘길 때 같은 줄이 두 번 나오거나 빠진다.
      */
     public PageResponse<BoothHaveItemResponseDto> findByBooth(
             Long boothId, UUID userId, int page, int size) {
@@ -80,24 +89,57 @@ public class BoothHaveItemService {
         Map<UUID, List<String>> wantNamesByOwner = wantNamesByOwner(ownerWants);
         Map<UUID, Set<Long>> wantItemIdsByOwner = wantItemIdsByOwner(ownerWants);
 
+        Set<UUID> matchedOwnerIds = matchedOwnerIds(userId);
+        Predicate<UserHaveItem> keep = keepRule(myWantItemIds, myHaveItemNames.keySet());
+        Map<Long, Integer> wantRank = wantRank(myWantItemIds);
+
         List<BoothHaveItemResponseDto> sorted = rows.stream()
-                // 내 희망 카드만 남긴다. wanted 필드는 걸러진 뒤라 늘 true 지만, 화면이
-                // 그것으로 배지를 가르기 때문에 응답에서 빼지 않는다.
-                .filter(row -> myWantItemIds.contains(row.getItem().getId()))
-                .map(row -> toDto(row, myWantItemIds, myHaveItemNames,
+                .filter(keep)
+                .map(row -> toDto(row, myWantItemIds, myHaveItemNames, matchedOwnerIds,
                         wantNamesByOwner, wantItemIdsByOwner))
                 .sorted(Comparator
-                        .comparing(BoothHaveItemResponseDto::exchangeable).reversed()
+                        .comparingInt((BoothHaveItemResponseDto dto) ->
+                                wantRank.getOrDefault(dto.item().id(), Integer.MAX_VALUE))
                         .thenComparing(BoothHaveItemResponseDto::haveItemId))
                 .toList();
 
         return PageRequestValues.slice(sorted, page, size);
     }
 
+    /**
+     * 목록에 남길 줄을 고르는 규칙.
+     *
+     * <p>희망 카드를 등록했으면 그와 맞는 것만, 아직 등록하지 않았으면 내가 가진 카드와
+     * 겹치지 않는 것만 남긴다.
+     */
+    private Predicate<UserHaveItem> keepRule(Set<Long> myWantItemIds, Set<Long> myHaveItemIds) {
+        if (myWantItemIds.isEmpty()) {
+            return row -> !myHaveItemIds.contains(row.getItem().getId());
+        }
+        return row -> myWantItemIds.contains(row.getItem().getId());
+    }
+
+    /**
+     * 내가 찾는 카드의 등록 순위. 목록을 이 순서로 세운다.
+     *
+     * <p>{@code myWantItemIds} 가 {@link LinkedHashSet} 이고 그 원본 쿼리가 {@code id} 오름차순
+     * 이라, 담긴 순서가 곧 내가 등록한 순서다. 여기서 다시 정렬하지 않는다.
+     *
+     * <p>목록에 없는 카드는 부르는 쪽이 {@link Integer#MAX_VALUE} 로 받아 맨 뒤로 간다.
+     */
+    private Map<Long, Integer> wantRank(Set<Long> myWantItemIds) {
+        Map<Long, Integer> rank = new LinkedHashMap<>();
+        for (Long itemId : myWantItemIds) {
+            rank.put(itemId, rank.size());
+        }
+        return rank;
+    }
+
     private BoothHaveItemResponseDto toDto(
             UserHaveItem row,
             Set<Long> myWantItemIds,
             Map<Long, String> myHaveItemNames,
+            Set<UUID> matchedOwnerIds,
             Map<UUID, List<String>> wantNamesByOwner,
             Map<UUID, Set<Long>> wantItemIdsByOwner) {
 
@@ -114,8 +156,19 @@ public class BoothHaveItemService {
         return BoothHaveItemResponseDto.of(
                 row,
                 myWantItemIds.contains(row.getItem().getId()),
+                matchedOwnerIds.contains(ownerId),
                 givableItemNames,
                 wantNamesByOwner.getOrDefault(ownerId, List.of()));
+    }
+
+    /**
+     * 지금 나와 같은 교환에 묶여 있는 사람들. 그 줄은 "매칭됨" 으로 나간다.
+     *
+     * <p>사람 수가 아니라 교환 한 건에 딸린 참가자라 많아야 둘이다. 목록 크기와 무관하게
+     * 쿼리는 한 번이다.
+     */
+    private Set<UUID> matchedOwnerIds(UUID userId) {
+        return Set.copyOf(exchangeParticipantRepository.findActivePartnerIds(userId));
     }
 
     private Set<Long> itemIdsOfWants(UUID userId) {

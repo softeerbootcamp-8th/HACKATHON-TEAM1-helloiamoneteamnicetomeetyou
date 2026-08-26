@@ -11,7 +11,7 @@ import { TopBar } from '@/components/ui/TopBar'
 import { arriveAtExchange } from '@/lib/exchange'
 import { springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
-import { identityMarkAt } from '@/store/identity-mark'
+import { identityMarkAt, objectParticle, usePrefetchMark } from '@/store/identity-mark'
 import { useCancelAppointment } from '@/store/use-cancel-appointment'
 import { getDeviceId } from '@/store/identity'
 import { activeAppointment } from '@/store/reducer'
@@ -29,6 +29,8 @@ export function Appointment() {
   const [busy, setBusy] = useState(false)
   const cancelAppointment = useCancelAppointment()
   const appt = useLastDefined(activeAppointment(state))
+  // hook 은 early return 위에 있어야 한다. 아래 빈 화면으로 빠질 때 호출 수가 달라지면 터진다.
+  usePrefetchMark(appt?.identityMark ?? null)
 
   if (!appt || (appt.stage !== 'confirmed' && appt.stage !== 'arrived')) {
     return (
@@ -134,7 +136,8 @@ export function Appointment() {
 
       <div className="shrink-0 px-6 pt-4 pb-8">
         <Button disabled={busy} onClick={() => void goIdentify()}>
-          ‘{identityMarkAt(appt.identityMark).name}’을 찾아볼까요
+          ‘{identityMarkAt(appt.identityMark).name}’
+          {objectParticle(identityMarkAt(appt.identityMark).name)} 찾아볼까요
         </Button>
         <TextButton onClick={() => setCancelOpen(true)}>약속 취소하기</TextButton>
       </div>

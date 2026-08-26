@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.booth.entity.Booth;
@@ -16,16 +17,33 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeRe
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.repository.ExchangeParticipantRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangetimeslot.entity.ExchangeTimeSlot;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangetimeslot.repository.ExchangeTimeSlotRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.ItemStatus;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.entity.UserWantItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.entity.Zone;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.repository.ZoneRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.event.MatchTriggerEvent;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.entity.UserWantItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventPublisher;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventType;
 import java.lang.reflect.Field;
@@ -50,6 +68,7 @@ class ExchangeServiceTest {
 
     private static final Long EXCHANGE_ID = 1L;
     private static final Long BOOTH_ID = 1L;
+    private static final Long ITEM_ID = 10L;
     private static final UUID ME = UUID.fromString("11111111-1111-4111-8111-111111111111");
     private static final UUID PARTNER = UUID.fromString("22222222-2222-4222-8222-222222222222");
     private static final UUID OUTSIDER = UUID.fromString("33333333-3333-4333-8333-333333333333");
@@ -66,7 +85,15 @@ class ExchangeServiceTest {
     @Mock
     private ZoneRepository zoneRepository;
     @Mock
+    private ExchangeItemRepository exchangeItemRepository;
+    @Mock
+    private UserHaveItemRepository userHaveItemRepository;
+    @Mock
+    private UserWantItemRepository userWantItemRepository;
+    @Mock
     private SseEventPublisher sseEventPublisher;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ExchangeService exchangeService;
@@ -148,14 +175,64 @@ class ExchangeServiceTest {
                 .isEqualTo(ErrorCode.INVALID_EXCHANGE_PARTICIPANTS);
     }
 
+    /*
+      아래 알림 테스트는 시안(204:5026)의 노출 조건을 지킨다. 조건이 전부 "상대 사용자가 ...한
+      경우" 라서, 누른 사람에게 이벤트가 가면 자기가 방금 한 행동이 자기 알림함에 쌓이고 앱이
+      닫혀 있으면 잠금화면 푸시까지 간다.
+    */
+
     @Test
-    @DisplayName("시간을 저장하면 참가자 전원에게 알린다")
-    void 시간을_저장하면_전원에게_알린다() {
+    @DisplayName("시간을 저장했을 때 겹치는 칸이 없으면 상대에게만 매칭 실패를 알린다")
+    void 시간을_저장하면_겹치지_않으면_상대에게만_실패를_알린다() {
         exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(2, 0, 2));
 
         verify(timeSlotRepository).deleteAllByExchangeIdAndUserId(EXCHANGE_ID, ME);
-        verify(sseEventPublisher).toUser(eq(ME), eq(SseEventType.EXCHANGE_TIME_UPDATED), any());
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_MISMATCHED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+    }
+
+    @Test
+    @DisplayName("시간을 저장했을 때 겹치는 칸이 있으면 상대에게 매칭 성공을 알린다")
+    void 시간을_저장하면_겹치면_상대에게_성공을_알린다() {
+        given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of(
+                ExchangeTimeSlot.of(exchange, me, 1),
+                ExchangeTimeSlot.of(exchange, partner, 1)));
+
+        exchangeService.updateTimeSlots(EXCHANGE_ID, ME, List.of(1));
+
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_MATCHED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+    }
+
+    @Test
+    @DisplayName("시간 조율을 요청하면 상대에게만 알린다")
+    void 시간_조율을_요청하면_상대에게만_알린다() {
+        exchangeService.resetTimeSlots(EXCHANGE_ID, ME);
+
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_REQUESTED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+    }
+
+    @Test
+    @DisplayName("시간을 확정하면 상대에게만 알린다")
+    void 시간을_확정하면_상대에게만_알린다() {
+        given(timeSlotRepository.findAllByExchangeId(EXCHANGE_ID)).willReturn(List.of(
+                ExchangeTimeSlot.of(exchange, me, 1),
+                ExchangeTimeSlot.of(exchange, partner, 1)));
+
+        exchangeService.confirmTime(EXCHANGE_ID, ME);
+
         verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_UPDATED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
+    }
+
+    @Test
+    @DisplayName("약속을 취소하면 취소한 사람에게는 알리지 않는다")
+    void 약속을_취소하면_취소한_사람에게는_알리지_않는다() {
+        exchangeService.cancel(EXCHANGE_ID, ME);
+
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_CANCELLED), any());
+        verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
     }
 
     @Test
@@ -167,6 +244,67 @@ class ExchangeServiceTest {
                 .isEqualTo(ErrorCode.NOT_EXCHANGE_PARTICIPANT);
 
         verify(timeSlotRepository, never()).deleteAllByExchangeIdAndUserId(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("자리를 옮기면 저장하고 참가자 전원에게 알린다")
+    void 자리를_옮기면_전원에게_알린다() throws Exception {
+        Booth booth = exchange.getZone().getBooth();
+        Zone lounge = withId(Zone.of(booth, "라운지", "2층 라운지"), 2L);
+        given(zoneRepository.findById(2L)).willReturn(Optional.of(lounge));
+
+        exchangeService.updateZone(EXCHANGE_ID, ME, 2L);
+
+        assertThat(exchange.getZone()).isEqualTo(lounge);
+        verify(sseEventPublisher).toUser(eq(ME), eq(SseEventType.EXCHANGE_PLACE_UPDATED), any());
+        verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_PLACE_UPDATED), any());
+    }
+
+    @Test
+    @DisplayName("참가자가 아니면 자리를 옮길 수 없다")
+    void 참가자가_아니면_자리를_못_옮긴다() {
+        assertThatThrownBy(() -> exchangeService.updateZone(EXCHANGE_ID, OUTSIDER, 2L))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(e -> ((ApplicationException) e).getErrorType())
+                .isEqualTo(ErrorCode.NOT_EXCHANGE_PARTICIPANT);
+    }
+
+    @Test
+    @DisplayName("다른 부스의 자리로는 옮길 수 없다")
+    void 다른_부스의_자리로는_못_옮긴다() throws Exception {
+        Booth otherBooth = withId(Booth.of("다른 팝업", null), 99L);
+        Zone otherZone = withId(Zone.of(otherBooth, "남의 부스 자리", "저쪽"), 3L);
+        given(zoneRepository.findById(3L)).willReturn(Optional.of(otherZone));
+
+        assertThatThrownBy(() -> exchangeService.updateZone(EXCHANGE_ID, ME, 3L))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(e -> ((ApplicationException) e).getErrorType())
+                .isEqualTo(ErrorCode.ZONE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("없는 자리로는 옮길 수 없다")
+    void 없는_자리로는_못_옮긴다() {
+        given(zoneRepository.findById(404L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> exchangeService.updateZone(EXCHANGE_ID, ME, 404L))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(e -> ((ApplicationException) e).getErrorType())
+                .isEqualTo(ErrorCode.ZONE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("아직 수락하지 않아 자리가 없는 교환은 옮길 수 없다")
+    void 자리가_없는_교환은_못_옮긴다() throws Exception {
+        Exchange pending = withId(Exchange.create(ExchangeType.ONE_TO_ONE), 77L);
+        given(exchangeRepository.findById(77L)).willReturn(Optional.of(pending));
+        given(participantRepository.findAllByExchangeId(77L))
+                .willReturn(List.of(ExchangeParticipant.accepted(pending, me)));
+
+        assertThatThrownBy(() -> exchangeService.updateZone(77L, ME, 2L))
+                .isInstanceOf(ApplicationException.class)
+                .extracting(e -> ((ApplicationException) e).getErrorType())
+                .isEqualTo(ErrorCode.EXCHANGE_NOT_ACCEPTED);
     }
 
     @Test
@@ -277,6 +415,80 @@ class ExchangeServiceTest {
     }
 
     @Test
+    @DisplayName("교환을 마치면 준 사람의 보유 수량이 준다")
+    void 교환을_마치면_준_사람의_보유_수량이_준다() throws Exception {
+        Item item = withId(Item.of(null, "카드", null), ITEM_ID);
+        UserHaveItem meHave = UserHaveItem.of(me, item, 3);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(userHaveItemRepository.findByUserIdAndItemId(ME, ITEM_ID)).willReturn(Optional.of(meHave));
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        assertThat(meHave.getQuantityLeft()).isEqualTo(2);
+        assertThat(meHave.getStatus()).isEqualTo(ItemStatus.LEFT);
+    }
+
+    @Test
+    @DisplayName("받는 사람에게 같은 카드 행이 없으면 OUT 상태로 새로 만든다")
+    void 받는_사람에게_같은_카드_행이_없으면_OUT_상태로_새로_만든다() throws Exception {
+        Item item = withId(Item.of(null, "카드", null), ITEM_ID);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 2)));
+        given(userHaveItemRepository.findByUserIdAndItemId(PARTNER, ITEM_ID)).willReturn(Optional.empty());
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        verify(userHaveItemRepository).save(any(UserHaveItem.class));
+    }
+
+    @Test
+    @DisplayName("받는 사람에게 이미 행이 있으면 수량만 더하고 상태는 그대로 둔다")
+    void 받는_사람에게_이미_행이_있으면_수량만_더한다() throws Exception {
+        Item item = withId(Item.of(null, "카드", null), ITEM_ID);
+        UserHaveItem partnerHave = UserHaveItem.of(partner, item, 2);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(userHaveItemRepository.findByUserIdAndItemId(PARTNER, ITEM_ID)).willReturn(Optional.of(partnerHave));
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        assertThat(partnerHave.getQuantity()).isEqualTo(3);
+        assertThat(partnerHave.getQuantityLeft()).isEqualTo(2);
+        assertThat(partnerHave.getStatus()).isEqualTo(ItemStatus.LEFT);
+        verify(userHaveItemRepository, never()).save(any(UserHaveItem.class));
+    }
+
+    @Test
+    @DisplayName("찾던 카드였으면 찾는 수량이 준다")
+    void 찾던_카드였으면_찾는_수량이_준다() throws Exception {
+        Item item = withId(Item.of(null, "카드", null), ITEM_ID);
+        UserWantItem partnerWant = UserWantItem.of(partner, item, 3);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(userWantItemRepository.findByUserIdAndItemId(PARTNER, ITEM_ID)).willReturn(Optional.of(partnerWant));
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        assertThat(partnerWant.getQuantity()).isEqualTo(2);
+        verify(userWantItemRepository, never()).delete(any(UserWantItem.class));
+    }
+
+    @Test
+    @DisplayName("찾던 카드가 다 채워지면 행을 지운다")
+    void 찾던_카드가_다_채워지면_행을_지운다() throws Exception {
+        Item item = withId(Item.of(null, "카드", null), ITEM_ID);
+        UserWantItem partnerWant = UserWantItem.of(partner, item, 1);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(userWantItemRepository.findByUserIdAndItemId(PARTNER, ITEM_ID)).willReturn(Optional.of(partnerWant));
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        verify(userWantItemRepository).delete(partnerWant);
+    }
+
+    @Test
     @DisplayName("시간 조율을 요청하면 전원의 선택을 비운다")
     void 시간_조율은_전원의_선택을_비운다() {
         exchangeService.resetTimeSlots(EXCHANGE_ID, ME);
@@ -309,5 +521,64 @@ class ExchangeServiceTest {
     /** 만든 교환을 화면이 받는 모양으로 읽는다. 조회 경로와 같은 값을 보게 된다. */
     private ExchangeResponseDto toResponseOf(Exchange created) {
         return exchangeService.find(created.getId());
+    }
+
+    // ──────────────────────────────────────────
+    // 카드 수명주기 — 예약 해제와 소진
+    // ──────────────────────────────────────────
+
+    /**
+     * 약속을 취소하면 잡아 뒀던 카드가 풀려야 한다.
+     *
+     * <p>풀리지 않으면 카드가 {@code RESERVED} 에 갇힌다. 매칭 쿼리가 {@code LEFT} 인 카드만 보기
+     * 때문에, 그 사람은 취소 한 번으로 다시는 매칭되지 않는다.
+     */
+    @Test
+    @DisplayName("약속을 취소하면 잡아 둔 카드가 풀리고 재매칭이 걸린다")
+    void 취소하면_카드가_풀린다() throws Exception {
+        UserHaveItem reserved = reservedHaveItem();
+        givenExchangeItem(reserved);
+
+        exchangeService.cancel(EXCHANGE_ID, ME);
+
+        assertThat(reserved.isReserved()).isFalse();
+        // 카드가 풀렸으니 남은 사람들은 다시 상대를 찾아야 한다.
+        verify(eventPublisher, times(2)).publishEvent(any(MatchTriggerEvent.class));
+    }
+
+    @Test
+    @DisplayName("교환을 마치면 내놓은 수량이 줄고 찾는 카드가 빠진다")
+    void 마치면_수량이_줄어든다() throws Exception {
+        exchange.confirmTime(1);
+
+        UserHaveItem given = reservedHaveItem();
+        UserWantItem wanted = UserWantItem.of(partner, given.getItem(), 1);
+        givenExchangeItem(given);
+        given(userWantItemRepository.findByUserIdAndItemId(PARTNER, given.getItem().getId()))
+                .willReturn(Optional.of(wanted));
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        // 두 장 중 한 장이 나갔다.
+        assertThat(given.getQuantityLeft()).isEqualTo(1);
+        // 받은 사람은 더 이상 이 카드를 찾지 않는다. 남겨 두면 곧바로 같은 카드로 재매칭된다.
+        assertThat(wanted.getQuantity()).isZero();
+        verify(userWantItemRepository).delete(wanted);
+    }
+
+    /** ME 가 PARTNER 에게 카드 한 장을 주는 교환 한 줄을 깔아 둔다. */
+    private void givenExchangeItem(UserHaveItem haveItem) {
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.of(exchange, me, haveItem.getItem(), partner)));
+        given(userHaveItemRepository.findByUserIdAndItemId(ME, haveItem.getItem().getId()))
+                .willReturn(Optional.of(haveItem));
+    }
+
+    /** 매칭이 잡아 둔 상태의 보유 카드. 두 장 중 한 장이 이번 교환에 걸려 있다. */
+    private UserHaveItem reservedHaveItem() throws Exception {
+        Item item = withId(Item.of(exchange.getZone().getBooth(), "IONIQ 5 N", null), 7L);
+        UserHaveItem haveItem = UserHaveItem.of(me, item, 2);
+        haveItem.reserve();
+        return haveItem;
     }
 }

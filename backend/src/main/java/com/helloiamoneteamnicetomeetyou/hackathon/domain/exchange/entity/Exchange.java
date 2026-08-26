@@ -181,6 +181,21 @@ public class Exchange {
      * <p><b>두 사람이 서로 다른 버튼을 누를 수 있어서 필요하다.</b> 한 명이 "만났어요" 를 누르고
      * 다른 한 명이 "상대가 오지 않아요" 를 누르면 둘 중 먼저 도착한 것만 반영돼야 한다.
      */
+    /**
+     * 만나는 자리를 옮긴다.
+     *
+     * <p>시간이 정해진 뒤에도 바꿀 수 있다. 장소와 시간은 서로 매인 값이 아니고, 현장에서 자리가
+     * 붐비거나 운영이 구역을 옮기면 시간을 그대로 둔 채 자리만 바꾸는 쪽이 자연스럽다.
+     *
+     * <p>끝났거나 취소된 약속은 건드리지 않는다. 이미 헤어진 사람들에게 자리를 알려 봐야 의미가
+     * 없고, 화면에는 지나간 약속이 되살아난 것처럼 보인다.
+     */
+    public void changeZone(Zone zone) {
+        requireActive();
+
+        this.zone = zone;
+    }
+
     private void requireActive() {
         if (!isActive()) {
             throw new ApplicationException(ErrorCode.EXCHANGE_ALREADY_FINISHED);

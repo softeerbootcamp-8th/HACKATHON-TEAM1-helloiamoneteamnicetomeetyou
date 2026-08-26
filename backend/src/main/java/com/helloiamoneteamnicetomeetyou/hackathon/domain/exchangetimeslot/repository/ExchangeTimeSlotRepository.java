@@ -14,6 +14,15 @@ public interface ExchangeTimeSlotRepository extends JpaRepository<ExchangeTimeSl
     List<ExchangeTimeSlot> findAllByExchangeId(@Param("exchangeId") Long exchangeId);
 
     /**
+     * 교환 여러 건의 선택을 한 번에 읽는다. 어드민 목록이 쓴다.
+     *
+     * <p>목록이 교환마다 따로 물으면 화면에 뜬 카드 수만큼 쿼리가 늘어난다. 부스에서는 진행 중인
+     * 교환이 수십 건 쌓인 채로 이 탭을 열게 된다.
+     */
+    @Query("select s from ExchangeTimeSlot s where s.exchange.id in :exchangeIds")
+    List<ExchangeTimeSlot> findAllByExchangeIdIn(@Param("exchangeIds") List<Long> exchangeIds);
+
+    /**
      * 한 사람의 선택을 통째로 지운다. 다시 저장하기 직전에 부른다.
      *
      * <p>파생 삭제 메서드는 엔티티를 전부 읽어 하나씩 지우기 때문에 벌크로 쓴다.

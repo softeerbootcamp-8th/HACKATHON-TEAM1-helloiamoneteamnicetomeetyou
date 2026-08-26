@@ -14,11 +14,13 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.ent
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.repository.ExchangeParticipantRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangetimeslot.entity.ExchangeTimeSlot;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangetimeslot.repository.ExchangeTimeSlotRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.event.MatchTriggerEvent;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.repository.UserWantItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.entity.Zone;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.repository.ZoneRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
@@ -77,6 +79,7 @@ public class ExchangeService {
     private final ZoneRepository zoneRepository;
     private final ExchangeItemRepository exchangeItemRepository;
     private final UserHaveItemRepository userHaveItemRepository;
+    private final UserWantItemRepository userWantItemRepository;
     private final SseEventPublisher sseEventPublisher;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -168,10 +171,7 @@ public class ExchangeService {
                 .reject();
         exchange.cancel();
 
-        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
-            userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
-                    .ifPresent(UserHaveItem::cancelReservation);
-        }
+        releaseReservations(exchangeId);
 
         for (ExchangeParticipant participant : participants) {
             UUID participantId = participant.getUser().getId();
@@ -179,6 +179,42 @@ public class ExchangeService {
                 sseEventPublisher.toUser(participantId, SseEventType.MATCH_REJECTED, Map.of("exchangeId", exchangeId));
             }
             eventPublisher.publishEvent(new MatchTriggerEvent(participantId));
+        }
+    }
+
+    /**
+     * 이 교환이 잡아 둔 카드를 전부 풀어 다시 매칭 후보로 돌려놓는다.
+     *
+     * <p>거절과 취소가 함께 쓴다. 풀지 않으면 카드가 {@code RESERVED} 에 갇혀 그 사람은 다시는
+     * 매칭되지 않는다 — 매칭 쿼리가 {@code status = 'LEFT'} 인 카드만 본다.
+     */
+    private void releaseReservations(Long exchangeId) {
+        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
+            userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
+                    .ifPresent(UserHaveItem::cancelReservation);
+        }
+    }
+
+    /**
+     * 성사된 교환의 카드를 양쪽에서 덜어낸다.
+     *
+     * <p>주는 쪽은 {@code quantityLeft} 가 줄고 다 나가면 {@code OUT} 이 된다. 받는 쪽은 찾는
+     * 개수가 줄고 0 이 되면 희망 목록에서 아예 빠진다.
+     */
+    private void consumeItems(Long exchangeId) {
+        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
+            Long itemId = item.getItem().getId();
+            int quantity = item.getQuantity();
+
+            userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), itemId)
+                    .ifPresent(have -> have.completeExchange(quantity));
+
+            userWantItemRepository.findByUserIdAndItemId(item.getToUser().getId(), itemId)
+                    .ifPresent(want -> {
+                        if (want.decrease(quantity)) {
+                            userWantItemRepository.delete(want);
+                        }
+                    });
         }
     }
 
@@ -238,7 +274,58 @@ public class ExchangeService {
         timeSlotRepository.saveAll(
                 distinctSlots.stream().map(slot -> ExchangeTimeSlot.of(exchange, user, slot)).toList());
 
-        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_TIME_UPDATED);
+        /*
+          시안(204:5230)의 조건이 "상대 사용자가 시간을 입력 완료 & 일치하는 시간이 존재하는
+          경우" 다. 상대가 볼 알림은 내가 무엇을 골랐는지가 아니라 시간이 맞았는지 안 맞았는지다.
+          그래서 저장한 뒤 겹치는 칸을 다시 세어 두 문구로 갈라 보낸다.
+        */
+        notifyOthers(
+                exchangeId,
+                userId,
+                earliestOverlap(exchangeId) != null
+                        ? SseEventType.EXCHANGE_TIME_MATCHED
+                        : SseEventType.EXCHANGE_TIME_MISMATCHED);
+
+        return toResponse(exchange);
+    }
+
+    /**
+     * 만날 자리를 바꾼다.
+     *
+     * <p>구역은 어드민이 만들고 고치고 지운다. 그래서 화면이 보낸 이름이나 좌표를 믿지 않고
+     * {@code zoneId} 로 다시 읽는다. 화면이 목록을 받아 둔 사이에 어드민이 이름을 바꿨을 수
+     * 있는데, 그때 화면이 들고 있던 옛 값을 저장하면 어드민이 고친 것이 되돌려진다.
+     *
+     * <p><b>같은 부스의 구역만 고를 수 있다.</b> 약도는 부스마다 다른 그림이고 좌표도 그 그림
+     * 안에서의 비율이라, 다른 부스의 구역을 넣으면 핀이 엉뚱한 자리를 가리킨다.
+     *
+     * <p>바꾼 사람만 알면 소용없어서 참가자 전원에게 알린다. 상대가 옛 자리에서 기다리는 것이
+     * 이 기능에서 제일 나쁜 결과다.
+     */
+    @Transactional
+    public ExchangeResponseDto updateZone(Long exchangeId, UUID userId, Long zoneId) {
+        Exchange exchange = getExchange(exchangeId);
+
+        // 참가자인지를 먼저 본다. 남의 약속을 건드린 사람에게 그 약속의 상태를 알려 주면 안 된다.
+        getParticipant(exchangeId, userId);
+
+        // 아직 아무도 수락하지 않은 교환은 자리가 안 붙어 있다. 그대로 두면 어느 부스인지 알 길이
+        // 없어서 아래 부스 대조에서 터진다. 수락 전에는 옮길 자리 자체가 없다고 답하는 것이 맞다.
+        if (!exchange.hasAppointment()) {
+            throw new ApplicationException(ErrorCode.EXCHANGE_NOT_ACCEPTED);
+        }
+
+        Zone zone = zoneRepository.findById(zoneId)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.ZONE_NOT_FOUND));
+
+        Long boothId = exchange.getZone().getBooth().getId();
+        if (!boothId.equals(zone.getBooth().getId())) {
+            throw new ApplicationException(ErrorCode.ZONE_NOT_FOUND);
+        }
+
+        exchange.changeZone(zone);
+
+        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_PLACE_UPDATED);
 
         return toResponse(exchange);
     }
@@ -257,7 +344,7 @@ public class ExchangeService {
         timeSlotRepository.deleteAllByExchangeId(exchangeId);
         exchange.resetTime();
 
-        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_TIME_UPDATED);
+        notifyOthers(exchangeId, userId, SseEventType.EXCHANGE_TIME_REQUESTED);
 
         return toResponse(exchange);
     }
@@ -280,7 +367,7 @@ public class ExchangeService {
 
         exchange.confirmTime(overlap);
 
-        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_TIME_UPDATED);
+        notifyOthers(exchangeId, userId, SseEventType.EXCHANGE_TIME_UPDATED);
 
         return toResponse(exchange);
     }
@@ -312,7 +399,10 @@ public class ExchangeService {
     /**
      * 만나서 교환을 끝냈다. 참가자 누구든 누를 수 있고, 먼저 누른 한 번만 반영된다.
      *
-     * <p>카드 주인은 아직 바꾸지 않는다. 무엇을 주고받는지는 매칭이 정하는 값이라 서버가 모른다.
+     * <p>여기서 카드가 실제로 오간 것으로 친다. 주는 쪽은 보유 수량이 그만큼 줄고, 받는 쪽은
+     * 찾는 수량이 그만큼 준다. 둘 다 하지 않으면 교환이 끝나자마자 같은 카드로 다시 매칭된다.
+     * <p>이 시점에 카드 수량을 실제로 옮긴다. 무엇을 주고받는지는 매칭이 정한 {@link ExchangeItem}
+     * 을 그대로 따른다.
      */
     @Transactional
     public ExchangeResponseDto complete(Long exchangeId, UUID userId) {
@@ -320,10 +410,47 @@ public class ExchangeService {
         getParticipant(exchangeId, userId);
 
         exchange.complete();
+        consumeItems(exchangeId);
+
+        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
+            giveAway(item);
+            receive(item);
+        }
 
         notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_COMPLETED);
 
         return toResponse(exchange);
+    }
+
+    /** 준 사람 쪽 재고를 줄인다. */
+    private void giveAway(ExchangeItem item) {
+        userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
+                .ifPresent(hi -> hi.completeExchange(item.getQuantity()));
+    }
+
+    /**
+     * 받은 사람 쪽에 반영한다. 보유 카드는 늘리고, 그 카드를 찾고 있었으면 찾는 수량에서 뺀다.
+     *
+     * <p>보유 카드에 더하는 것과 재교환 가능하게 만드는 것은 다른 문제다. {@link UserHaveItem#acquired}
+     * 와 {@link UserHaveItem#receiveMore} 둘 다 받은 몫을 곧바로 매칭 후보로 올리지 않는다.
+     */
+    private void receive(ExchangeItem item) {
+        User toUser = item.getToUser();
+        Item receivedItem = item.getItem();
+        int quantity = item.getQuantity();
+
+        userHaveItemRepository.findByUserIdAndItemId(toUser.getId(), receivedItem.getId())
+                .ifPresentOrElse(
+                        existing -> existing.receiveMore(quantity),
+                        () -> userHaveItemRepository.save(UserHaveItem.acquired(toUser, receivedItem, quantity)));
+
+        userWantItemRepository.findByUserIdAndItemId(toUser.getId(), receivedItem.getId())
+                .ifPresent(want -> {
+                    want.reduceQuantity(quantity);
+                    if (want.getQuantity() <= 0) {
+                        userWantItemRepository.delete(want);
+                    }
+                });
     }
 
     /**
@@ -331,6 +458,9 @@ public class ExchangeService {
      *
      * <p><b>상대에게 알리는 것이 이 API 의 존재 이유다.</b> 취소한 사람 화면에서만 사라지면 상대는
      * 오지 않을 사람을 계속 기다리게 된다.
+     *
+     * <p>거절과 똑같이 카드 예약을 풀고 전원에게 재매칭을 건다. 예전에는 이 둘을 하지 않아서,
+     * 약속을 한 번 취소하면 카드가 {@code RESERVED} 에 갇혀 그 사람은 다시는 매칭되지 않았다.
      */
     @Transactional
     public ExchangeResponseDto cancel(Long exchangeId, UUID userId) {
@@ -339,8 +469,13 @@ public class ExchangeService {
 
         exchange.cancel();
         timeSlotRepository.deleteAllByExchangeId(exchangeId);
+        releaseReservations(exchangeId);
 
-        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_CANCELLED);
+        List<UUID> participantIds = participantIds(exchangeId);
+        notifyOthers(exchangeId, userId, SseEventType.EXCHANGE_CANCELLED);
+        for (UUID participantId : participantIds) {
+            eventPublisher.publishEvent(new MatchTriggerEvent(participantId));
+        }
 
         return toResponse(exchange);
     }
@@ -462,13 +597,28 @@ public class ExchangeService {
     /**
      * 참가자 전원에게 알린다. 누른 사람도 포함한다.
      *
-     * <p>누른 사람은 응답으로 최신 상태를 이미 받았으니 한 번 더 읽는 셈이지만, 같은 사람이 탭을
-     * 여러 개 열어 뒀을 때 나머지 탭이 갱신되려면 이 편이 맞다.
+     * <p><b>{@code PushMessage} 에 문구가 없는, 화면 갱신용 이벤트에만 쓴다.</b> 문구가 있는
+     * 이벤트를 이걸로 보내면 누른 사람 알림함에도 자기가 방금 한 행동이 쌓이고, 앱이 닫혀
+     * 있으면 잠금화면 푸시까지 간다. 그런 이벤트는 {@link #notifyOthers} 를 쓴다.
      */
     private void notifyParticipants(Long exchangeId, List<UUID> userIds, SseEventType type) {
         Map<String, Object> data = Map.of("exchangeId", exchangeId);
 
         userIds.forEach(userId -> sseEventPublisher.toUser(userId, type, data));
+    }
+
+    /**
+     * 누른 사람을 뺀 나머지 참가자에게만 알린다.
+     *
+     * <p>시안(204:5026)의 노출 조건이 전부 "상대 사용자가 ...한 경우" 다. 누른 사람은 응답으로
+     * 최신 상태를 이미 받으니 알릴 것이 없다. {@code reject()} 도 같은 방식으로 본인을 뺀다.
+     */
+    private void notifyOthers(Long exchangeId, UUID actorId, SseEventType type) {
+        Map<String, Object> data = Map.of("exchangeId", exchangeId);
+
+        participantIds(exchangeId).stream()
+                .filter(userId -> !userId.equals(actorId))
+                .forEach(userId -> sseEventPublisher.toUser(userId, type, data));
     }
 
     private ExchangeResponseDto toResponse(Exchange exchange) {
