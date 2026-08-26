@@ -86,11 +86,19 @@ export function TimeSelect() {
   const overlap = appt.overlapSlot
   const matched = overlap !== null
   const confirmed = appt.confirmedLabel !== null
+  /*
+    확정은 참가자 전원이 눌러야 된다. 내가 눌렀는지는 서버가 참가자마다 들고 있어서, 새로고침
+    하거나 다른 탭에서 눌렀어도 여기서 그대로 보인다.
+
+    상대가 눌렀는지는 따로 보지 않는다. 전원이 누른 순간 서버가 시각을 정해 confirmedLabel 이
+    채워지므로, "내가 눌렀는데 아직 확정이 아니다" 는 곧 "상대가 아직 안 눌렀다" 다.
+  */
+  const iConfirmed = appt.myTimeConfirmed
   // 겹치는 칸은 서버가 가장 빠른 하나만 알려준다. 밑줄은 그 자리에만 긋는다.
   const overlaps = matched ? [overlap] : []
 
   /**
-   * 서버에 저장하고 결과로 화면을 맞춘다.
+   * 서버에 저장하고 결과로 화면을 맞춘다. 저장된 약속을 돌려주고, 실패하면 `null` 이다.
    *
    * 실패하면 서버에서 현재 상태를 다시 읽는다. 화면만 바뀐 채로 남으면 상대에게는 안 보이는 칸이
    * 나에게만 칠해져 있게 되고, 실패의 원인이 "상대가 먼저 했다" 인 경우에는 다시 읽는 것만으로
@@ -101,11 +109,11 @@ export function TimeSelect() {
     try {
       const exchange = await action()
       dispatch({ type: 'exchange-synced', exchange, myUserId })
-      return true
+      return exchange
     } catch {
       const latest = await fetchExchange(appt.exchangeId).catch(() => null)
       if (latest) dispatch({ type: 'exchange-synced', exchange: latest, myUserId })
-      return false
+      return null
     } finally {
       setBusy(false)
     }
@@ -120,31 +128,28 @@ export function TimeSelect() {
 
     // 누른 즉시 칠한다. 서버 응답을 기다리면 손가락을 뗀 뒤에야 칸이 차서 눌린 느낌이 사라진다.
     dispatch({ type: 'my-slots-picked', slots: next })
-    void run(() => updateTimeSlots(appt.exchangeId, myUserId, next)).then((ok) => {
-      if (!ok) dispatch({ type: 'toast', message: '시간을 저장하지 못했어요' })
+    void run(() => updateTimeSlots(appt.exchangeId, myUserId, next)).then((exchange) => {
+      if (!exchange) dispatch({ type: 'toast', message: '시간을 저장하지 못했어요' })
     })
   }
 
   /**
-   * 약속을 확정한다.
+   * "이 시간으로 약속!". 내가 이 시간에 동의했다는 것을 남긴다.
    *
-   * **상대가 먼저 눌렀으면 실패가 아니다.** 서버는 이미 정해진 약속을 다시 확정하지 못하게
-   * 막는데, 누른 사람 입장에서는 원하던 일이 이미 일어난 것이라 그대로 약속 화면으로 넘어간다.
+   * **여기서 바로 약속 화면으로 넘어가지 않는다.** 시각은 참가자 전원이 눌러야 정해지고, 그
+   * 마지막 한 명이 되었을 때만 서버가 응답에 `confirmedTime` 을 담아 준다. 아직 안 누른 사람이
+   * 있으면 이 화면에 남아 기다린다. 상대가 마저 누르면 EXCHANGE_TIME_UPDATED 가 들어와
+   * 버튼이 "약속 보러 가기" 로 바뀐다.
    */
   const confirmTime = async () => {
-    if (confirmed) {
-      navigate('/appointment')
+    const exchange = await run(() => confirmExchangeTime(appt.exchangeId, myUserId))
+
+    if (!exchange) {
+      dispatch({ type: 'toast', message: '잠시 뒤에 다시 시도해 주세요' })
       return
     }
 
-    const ok = await run(() => confirmExchangeTime(appt.exchangeId, myUserId))
-
-    if (ok || activeAppointment(state)?.confirmedLabel) {
-      navigate('/appointment')
-      return
-    }
-
-    dispatch({ type: 'toast', message: '잠시 뒤에 다시 시도해 주세요' })
+    if (exchange.confirmedTime) navigate('/appointment')
   }
 
   return (
@@ -240,33 +245,49 @@ export function TimeSelect() {
 
       <div className="shrink-0 px-6 pt-3 pb-8">
         {/*
-          시안의 CTA 는 세 갈래다. 상대가 아직 시간을 안 넣었으면 아무것도 할 수 없고,
-          넣었는데 겹치는 시간이 없으면 조율을 요청하고, 겹치면 그 자리에서 확정한다.
+          CTA 는 네 갈래다. 상대가 아직 시간을 안 넣었으면 아무것도 할 수 없고, 넣었는데 겹치는
+          시간이 없으면 조율을 요청하고, 겹치면 확정을 누르고, 누른 뒤에는 남은 사람을 기다린다.
           내가 시간을 안 골랐어도 상대가 골랐으면 조율 요청은 보낼 수 있다.
+
+          **확정은 전원이 눌러야 된다.** 한 명이 눌러 정해지면 아직 화면을 보고 있지도 않은
+          사람의 약속 시간이 남의 손에 정해진다. 대신 한 명이 끝까지 안 누르면 약속이 안 잡히는데,
+          그때는 "다른 시간 물어보기" 가 아니라 상대에게 나간 알림이 불러오는 몫이다.
 
           조율 요청은 상대에게 알림을 보내는 것뿐이다(시안 204:5026 "시간 변경 요청").
           양쪽이 고른 칸은 그대로 남아서, 돌아온 사람은 자기 선택 위에 칸을 더하면 된다.
         */}
         {!answered && <Button disabled>상대의 시간을 기다리는 중이에요</Button>}
 
-        {answered && matched && (
-          <Button variant="brand" disabled={busy} onClick={() => void confirmTime()}>
-            {confirmed ? '약속 보러 가기' : '이 시간으로 약속!'}
+        {answered && confirmed && (
+          <Button variant="brand" onClick={() => navigate('/appointment')}>
+            약속 보러 가기
           </Button>
         )}
 
-        {answered && !matched && (
+        {answered && !confirmed && matched && !iConfirmed && (
+          <Button variant="brand" disabled={busy} onClick={() => void confirmTime()}>
+            이 시간으로 약속!
+          </Button>
+        )}
+
+        {answered && !confirmed && matched && iConfirmed && (
+          <Button disabled>상대의 확정을 기다리는 중이에요</Button>
+        )}
+
+        {answered && !confirmed && !matched && (
           <Button
             disabled={busy}
             onClick={() => {
-              void run(() => requestTimeCoordination(appt.exchangeId, myUserId)).then((ok) => {
-                if (!ok) {
-                  dispatch({ type: 'toast', message: '잠시 뒤에 다시 시도해 주세요' })
-                  return
-                }
-                dispatch({ type: 'request-time-again' })
-                navigate('/home')
-              })
+              void run(() => requestTimeCoordination(appt.exchangeId, myUserId)).then(
+                (exchange) => {
+                  if (!exchange) {
+                    dispatch({ type: 'toast', message: '잠시 뒤에 다시 시도해 주세요' })
+                    return
+                  }
+                  dispatch({ type: 'request-time-again' })
+                  navigate('/home')
+                },
+              )
             }}
           >
             다른 시간 물어보기

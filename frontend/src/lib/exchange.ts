@@ -36,6 +36,13 @@ export type ExchangeParticipant = {
   username: string | null
   slots: number[]
   answered: boolean
+  /**
+   * 이 사람이 "이 시간으로 약속!" 을 눌렀는지.
+   *
+   * **전원이 눌러야 `confirmedTime` 이 채워진다.** 한 명이 눌렀다고 약속이 잡히면, 아직 화면을
+   * 보고 있지도 않은 사람의 시간이 남의 손에 정해진다.
+   */
+  timeConfirmed: boolean
   arrived: boolean
 }
 

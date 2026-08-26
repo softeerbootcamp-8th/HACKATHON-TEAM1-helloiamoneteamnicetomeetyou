@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "exchange_participants", indexes = {
@@ -43,6 +44,20 @@ public class ExchangeParticipant {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
     private ParticipantStatus status;
+
+    /**
+     * 이 사람이 "이 시간으로 약속!" 을 눌렀는지.
+     *
+     * <p><b>{@code status} 에 넣지 않고 따로 둔다.</b> 시간을 확정한 사람은 그 뒤에 약속 장소에
+     * 도착해서 {@code ARRIVED} 가 되는데, 한 칸짜리 상태로 두면 도착하는 순간 확정했다는 사실이
+     * 지워진다. 둘은 같은 줄에서 함께 참인 값이라 서로 덮으면 안 된다.
+     *
+     * <p>전원이 눌러야 {@code Exchange.exchangeTime} 이 정해진다. 겹치는 가장 빠른 칸이 바뀌면
+     * 전원의 이 값이 도로 내려간다({@link #cancelTimeConfirm}).
+     */
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    private boolean timeConfirmed;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime joinedAt;
@@ -86,6 +101,21 @@ public class ExchangeParticipant {
         participant.status = ParticipantStatus.PENDING;
         participant.joinedAt = LocalDateTime.now();
         return participant;
+    }
+
+    /** "이 시간으로 약속!" 을 눌렀다. 참가자 전원이 누르면 그때 교환의 시각이 정해진다. */
+    public void confirmTime() {
+        this.timeConfirmed = true;
+    }
+
+    /**
+     * 눌러 둔 확정을 되돌린다. 겹치는 가장 빠른 칸이 옮겨갔을 때 부른다.
+     *
+     * <p>동의는 그때 화면에 보이던 시각에 대한 것이다. 칸이 옮겨간 뒤에도 남겨 두면, 마지막
+     * 사람이 누르는 순간 아무도 본 적 없는 시각으로 약속이 잡힌다.
+     */
+    public void cancelTimeConfirm() {
+        this.timeConfirmed = false;
     }
 
     public boolean hasArrived() {

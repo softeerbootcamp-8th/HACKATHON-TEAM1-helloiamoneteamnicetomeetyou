@@ -60,6 +60,8 @@ export type Appointment = {
   identityNumber: number
   mySlots: number[]
   myName: string
+  /** 내가 "이 시간으로 약속!" 을 눌렀는지. 전원이 눌러야 시간이 확정된다. */
+  myTimeConfirmed: boolean
   myArrived: boolean
   partners: AppointmentPartner[]
   /** 모두가 되는 가장 빠른 칸. 서버가 계산해 준다. */

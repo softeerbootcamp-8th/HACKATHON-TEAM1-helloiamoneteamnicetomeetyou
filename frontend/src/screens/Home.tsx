@@ -251,7 +251,8 @@ export function Home() {
     else if (
       kind === 'EXCHANGE_TIME_REQUESTED' ||
       kind === 'EXCHANGE_TIME_MATCHED' ||
-      kind === 'EXCHANGE_TIME_MISMATCHED'
+      kind === 'EXCHANGE_TIME_MISMATCHED' ||
+      kind === 'EXCHANGE_TIME_AGREED'
     )
       navigate('/time')
     else if (
