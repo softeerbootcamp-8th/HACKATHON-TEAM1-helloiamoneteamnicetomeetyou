@@ -4,6 +4,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeAc
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeParticipantActionRequestDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.TimeSlotUpdateRequestDto;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ZoneUpdateRequestDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service.ExchangeService;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.response.CommonResponse;
 import java.util.UUID;
@@ -92,6 +93,18 @@ public class ExchangeController {
                 exchangeService.updateTimeSlots(exchangeId, request.userId(), request.slots());
 
         return ResponseEntity.ok(CommonResponse.ok(exchange, "시간을 저장했습니다."));
+    }
+
+    /** 만날 자리를 바꾼다. 참가자 전원에게 실시간으로 알린다. */
+    @PutMapping("/{exchangeId}/zone")
+    public ResponseEntity<CommonResponse<ExchangeResponseDto>> updateZone(
+            @PathVariable Long exchangeId,
+            @RequestBody ZoneUpdateRequestDto request) {
+
+        ExchangeResponseDto exchange =
+                exchangeService.updateZone(exchangeId, request.userId(), request.zoneId());
+
+        return ResponseEntity.ok(CommonResponse.ok(exchange, "교환 장소를 바꿨습니다."));
     }
 
     /** "시간 조율 요청하기". 참가자 전원의 선택을 비우고 격자를 지금 기준으로 다시 잡는다. */

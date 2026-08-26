@@ -6,18 +6,24 @@ import { RejectDialog } from '@/components/domain/ConfirmDialogs'
 import { Button } from '@/components/ui/Button'
 import { PinIcon } from '@/components/ui/icons'
 import { TopBar } from '@/components/ui/TopBar'
+import { updateExchangeZone } from '@/lib/exchange'
+import { messageOf } from '@/lib/api'
 import { springSnap } from '@/lib/motion'
+import { getDeviceId } from '@/store/identity'
 import { activeAppointment } from '@/store/reducer'
 import { useCancelAppointment } from '@/store/use-cancel-appointment'
 import { useLastDefined } from '@/lib/useLastDefined'
 import { useStore } from '@/store/useStore'
 
 /**
- * 교환 장소 확인. 지정 장소는 하나로 정해져 있고, 이 화면은 그 위치가 행사장
- * 어디쯤인지 눈으로 보여주는 자리다. 그래서 다른 핀은 고를 수 없다.
+ * 만날 자리를 고른다.
  *
- * 장소의 이름과 위치, 약도 위 자리까지 전부 서버에서 온다. 약도 이미지만 아직 없어서 화면이
- * 격자로 대신 그리고, 그 위에 서버가 준 비율대로 핀을 찍는다.
+ * 구역은 어드민에서 만들고 고치고 지운다. 이름과 위치, 약도 위 자리까지 전부 서버에서 오기
+ * 때문에 운영이 자리를 늘려도 화면을 고칠 일이 없다. 약도 이미지만 아직 없어서 화면이 격자로
+ * 대신 그리고, 그 위에 서버가 준 비율대로 핀을 찍는다.
+ *
+ * **고른 자리는 서버에 저장되고 상대 화면에도 곧바로 반영된다.** 한쪽만 옮기면 다른 한 명이
+ * 옛 자리에서 기다리게 되는데, 그게 이 화면에서 제일 나쁜 결과다.
  */
 export function PlaceSelect() {
   const navigate = useNavigate()
@@ -29,6 +35,27 @@ export function PlaceSelect() {
   // 약속 없이 주소로 바로 들어온 경우에는 시간 화면과 같은 자리로 보낸다.
   const here = appt?.zone ?? null
   const zones = state.zones
+  const [moving, setMoving] = useState(false)
+
+  /**
+   * 핀을 눌러 자리를 옮긴다.
+   *
+   * 이미 그 자리면 서버를 부르지 않는다. 같은 값을 저장해 봐야 상대에게 "자리가 바뀌었어요"
+   * 알림만 한 번 더 가고 화면은 그대로다.
+   */
+  const moveTo = async (zoneId: number) => {
+    if (!appt || moving || zoneId === here?.id) return
+
+    setMoving(true)
+    try {
+      // 저장하면 서버가 참가자 전원에게 알리고, 그 신호를 받아 store 가 다시 읽는다.
+      await updateExchangeZone(appt.exchangeId, getDeviceId(), zoneId)
+    } catch (error) {
+      dispatch({ type: 'toast', message: messageOf(error) })
+    } finally {
+      setMoving(false)
+    }
+  }
 
   return (
     <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
@@ -36,9 +63,9 @@ export function PlaceSelect() {
 
       <div className="flex-1 overflow-y-auto px-6 no-scrollbar">
         <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink">
-          교환 장소를 확인해주세요
+          교환 장소를 정해주세요
         </h1>
-        <p className="mt-2 text-[13px] text-neutral-400">핀이 있는 위치에서 교환할 수 있어요</p>
+        <p className="mt-2 text-[13px] text-neutral-400">핀을 누르면 만날 자리가 바뀌어요</p>
 
         <div className="relative mt-6 h-[230px] overflow-hidden rounded-2xl bg-neutral-100">
           {/* 운영측에서 받은 약도 자리. 지금은 격자로 대신한다. */}
@@ -59,12 +86,9 @@ export function PlaceSelect() {
             <motion.button
               type="button"
               key={zone.id}
-              onClick={() =>
-                dispatch({
-                  type: 'toast',
-                  message: `이번에는 ${here?.name ?? zone.name}에서만 교환할 수 있어요`,
-                })
-              }
+              onClick={() => void moveTo(zone.id)}
+              disabled={moving}
+              aria-current={zone.id === here?.id}
               initial={{ opacity: 0, y: -8, scale: 0.7 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               whileTap={{ scale: 0.88 }}
@@ -72,29 +96,33 @@ export function PlaceSelect() {
               className="absolute -translate-x-1/2 -translate-y-1/2 text-center"
               style={{ left: `${zone.mapX}%`, top: `${zone.mapY}%` }}
             >
+              {/*
+                고를 수 있는 핀이 흐리면 눌러 봐야 안 된다고 읽힌다. 지금 자리를 진하게 두고
+                나머지는 그보다 한 단계만 연하게 둬서, 둘 다 누를 수 있는 것으로 보이게 한다.
+              */}
               <PinIcon
                 className={
                   zone.id === here?.id
-                    ? 'mx-auto size-8 text-ink'
-                    : 'mx-auto size-7 text-neutral-300'
+                    ? 'mx-auto size-8 text-brand'
+                    : 'mx-auto size-7 text-neutral-400'
                 }
               />
-              <span className="mt-1 block text-[10px] text-neutral-400">{zone.name}</span>
+              <span
+                className={
+                  zone.id === here?.id
+                    ? 'mt-1 block text-[10px] font-bold text-ink'
+                    : 'mt-1 block text-[10px] text-neutral-400'
+                }
+              >
+                {zone.name}
+              </span>
             </motion.button>
           ))}
         </div>
 
-        <motion.button
-          type="button"
-          onClick={() =>
-            dispatch({
-              type: 'toast',
-              message: `이번에는 ${here?.name ?? '지정 장소'}에서만 교환할 수 있어요`,
-            })
-          }
+        <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          whileTap={{ scale: 0.98 }}
           transition={{ ...springSnap, delay: 0.1 }}
           className="mt-5 flex w-full items-center gap-3 rounded-2xl border-2 border-ink bg-neutral-50 p-3.5 text-left"
         >
@@ -107,7 +135,7 @@ export function PlaceSelect() {
             </p>
             <p className="text-[12px] text-neutral-400">{here?.location ?? ''}</p>
           </div>
-        </motion.button>
+        </motion.div>
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
