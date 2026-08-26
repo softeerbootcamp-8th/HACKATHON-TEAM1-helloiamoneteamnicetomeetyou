@@ -79,6 +79,9 @@ public class UserWantItem {
             return true;
         }
         return false;
+    }
+
+    /**
      * 교환으로 이만큼 받아서 그만큼 덜 찾아도 된다.
      *
      * <p>0 이하가 됐을 때 행을 지울지는 부르는 쪽(서비스)이 정한다. 여기서는 수량만 옮긴다.
