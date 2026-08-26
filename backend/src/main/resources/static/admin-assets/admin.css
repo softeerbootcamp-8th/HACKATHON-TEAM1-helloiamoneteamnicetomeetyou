@@ -21,27 +21,40 @@
     같은 색상각에서 밝기만 옮긴 값이다.
 
     --brand 는 채우는 자리(버튼 배경, 점, 선택된 알약)에 쓰고, 글자와 링크에는 --brand-strong
-    을 쓴다. --brand 위에 글자를 얹으면 흰 바탕에서 대비가 4:1 을 못 넘어서 읽기 힘들다.
+    을 쓴다. --brand 를 글자로 쓰면 흰 바탕에서 대비가 2.39:1 이라 읽을 수가 없다.
+
+    --muted 와 --brand-strong 은 대비를 재서 고쳤다. 예전 값(#9aa0a8, #1081b2)은 흰 바탕에서
+    각각 2.64:1, 4.37:1 로 본문 기준 4.5:1 에 못 미쳤는데, 이 둘이 목록의 부가 정보와 링크
+    대부분에 쓰이고 있어서 화면 전체가 흐릿하게 보이는 가장 큰 원인이었다.
   */
   --brand: #2cb3ed;
-  --brand-strong: #1081b2;
+  --brand-strong: #0b6285;
   --brand-soft: #e8f7fd;
   --brand-ring: rgba(44, 179, 237, 0.28);
 
   --ink: #111111;
-  --ink-sub: #4a4f57;
-  --muted: #9aa0a8;
+  --ink-sub: #454b54;
+  --muted: #656c76;
 
   --bg: #f4f5f7;
   --surface: #ffffff;
   --tile: #eef0f4;
   --disabled: #f1f1f0;
-  --line: #ececec;
-  --line-strong: #dfe2e7;
+  --line: #e6e8ec;
+  --line-strong: #d5d9e0;
 
+  /*
+    채우는 색과 글자 색을 나눠 둔다.
+
+    #ff5a5a 는 배경이나 테두리로 쓰면 잘 보이지만 흰 바탕 위 글자로 쓰면 대비가 3.06:1 이라
+    본문 기준 4.5:1 에 못 미친다. --warn 은 2.05:1 로 더 나쁘다. 그래서 점·테두리·배경에
+    쓰는 색과 글자에 쓰는 색을 따로 둔다. 글자에는 반드시 -text 쪽을 쓴다.
+  */
   --danger: #ff5a5a;
+  --danger-text: #c92a2a;
   --danger-soft: #ffefef;
   --warn: #ff9f2e;
+  --warn-text: #8a5200;
   --warn-soft: #fff4e5;
 
   --overlay: rgba(0, 0, 0, 0.35);
@@ -157,7 +170,7 @@ h3 {
   border-radius: 999px;
   background: var(--tile);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -170,7 +183,7 @@ h3 {
   padding: 8px 14px;
   border-radius: 10px;
   color: var(--ink-sub);
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 500;
   transition: background var(--out), color var(--out), transform var(--snap);
 }
@@ -203,7 +216,7 @@ h3 {
 
 .split {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 320px minmax(0, 1fr);
   align-items: start;
   min-height: calc(100vh - 60px);
 }
@@ -221,7 +234,7 @@ h3 {
 }
 
 .page-title h1 {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
 }
 
@@ -234,7 +247,7 @@ h3 {
 .pick-desc {
   margin: 4px 0 12px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.6;
 }
 
@@ -268,7 +281,7 @@ h3 {
 .pane-head {
   padding: 15px 18px 11px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -332,7 +345,7 @@ h3 {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14.5px;
+  font-size: 15px;
 }
 
 .pick-main b {
@@ -343,7 +356,7 @@ h3 {
   display: block;
   margin-top: 2px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 /* 접속 중 표시. 색 하나로 끝내고 글자를 늘리지 않는다. */
@@ -359,9 +372,16 @@ h3 {
 }
 
 /* --- 오른쪽 상세 ------------------------------------------------------- */
+/*
+  상세 폭.
+
+  글줄이 끝없이 길어지면 눈이 다음 줄 첫 글자를 못 찾는다. 그래서 상한을 두되, 1000px 은
+  요즘 노트북에서 오른쪽 400px 을 통째로 비워 두는 값이라 화면이 비어 보이는 원인이었다.
+  아래 .grid-2 가 두 칸으로 갈라지는 폭까지는 열어 준다.
+*/
 .pane-detail {
-  padding: 20px 22px 60px;
-  max-width: 1000px;
+  padding: 22px 26px 60px;
+  max-width: 1280px;
   animation: page-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -369,18 +389,52 @@ h3 {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
 }
 
 .detail-head h1 {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
 }
 
-.title-input {
-  max-width: 260px;
-  font-size: 17px;
-  font-weight: 600;
+/*
+  이름을 그 자리에서 고치는 칸.
+
+  이 화면에는 제목 자리에 입력칸이 앉아 있다. 예전에는 테두리가 늘 보여서 "제목이 없고 웬
+  텍스트 상자가 하나 있다" 로 읽혔다. 평소에는 제목처럼 두고, 손을 올리거나 커서를 넣었을
+  때만 고칠 수 있는 칸이라는 것을 보여 준다.
+*/
+.input.title-input {
+  max-width: 320px;
+  padding-left: 10px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.input.title-input:hover {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+.input.title-input:focus {
+  border-color: var(--brand);
+  background: var(--surface);
+}
+
+/* 고치기 전에는 버튼이 나서지 않게 둔다. */
+.detail-head .inline-form .btn {
+  opacity: 0;
+  transition: opacity var(--out);
+}
+
+.detail-head .inline-form:hover .btn,
+.detail-head .inline-form:focus-within .btn {
+  opacity: 1;
 }
 
 /* 상세 안의 묶음 하나. 카드보다 가벼운 테두리라 화면이 답답해지지 않는다. */
@@ -434,7 +488,7 @@ h3 {
 .box-head .hint {
   margin-left: auto;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -513,7 +567,7 @@ h3 {
   padding: 5px 8px 5px 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
 }
 
@@ -538,7 +592,7 @@ h3 {
   border-radius: 999px;
   background: var(--ink);
   color: var(--surface);
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
   white-space: nowrap;
   transition: transform var(--snap), background var(--out), box-shadow var(--out), opacity var(--out);
@@ -588,7 +642,7 @@ h3 {
 
 .btn.danger {
   background: var(--danger-soft);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .btn.danger:hover {
@@ -599,7 +653,7 @@ h3 {
 .btn.sm {
   height: 34px;
   padding: 0 13px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .btn.wide {
@@ -629,7 +683,7 @@ h3 {
   border-radius: 50%;
   background: var(--surface);
   color: var(--ink-sub);
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
   line-height: 1;
   transition: transform var(--snap), background var(--out), color var(--out);
@@ -660,7 +714,7 @@ h3 {
 
 .field label {
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -673,7 +727,7 @@ select.input {
   background: var(--surface);
   color: var(--ink);
   font-family: inherit;
-  font-size: 14.5px;
+  font-size: 15px;
   transition: border-color var(--out), box-shadow var(--out);
   appearance: none;
 }
@@ -709,7 +763,7 @@ select.input.sm {
   height: 34px;
   padding: 0 11px;
   border-radius: 10px;
-  font-size: 13.5px;
+  font-size: 14px;
 }
 
 select.input.sm {
@@ -729,7 +783,7 @@ select.input.sm {
   padding: 0;
   border-radius: 999px;
   text-align: center;
-  font-size: 13.5px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -803,14 +857,14 @@ a.row {
 }
 
 .row .title {
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
 }
 
 .row .meta {
   margin-top: 2px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .row .actions {
@@ -831,7 +885,7 @@ a.row {
   border-radius: 13px;
   background: var(--tile);
   color: var(--ink);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   overflow: hidden;
 }
@@ -877,7 +931,7 @@ a.row {
   border-radius: 999px;
   background: var(--tile);
   color: var(--ink-sub);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -889,12 +943,12 @@ a.row {
 
 .badge.danger {
   background: var(--danger-soft);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .badge.warn {
   background: var(--warn-soft);
-  color: var(--warn);
+  color: var(--warn-text);
 }
 
 .badge.live::before {
@@ -920,6 +974,12 @@ a.row {
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
   font-size: 12px;
   color: var(--muted);
+  letter-spacing: -0.02em;
+}
+
+/* 상세 머리의 UUID 는 복사해 갈 때만 쓰는 값이라 오른쪽 끝으로 민다. */
+.detail-head .mono {
+  margin-left: auto;
 }
 
 /* ==========================================================================
@@ -942,13 +1002,13 @@ a.row {
 /* 상세 안에서는 빈 칸도 한 줄이면 된다. */
 .empty.sm {
   padding: 18px 16px;
-  font-size: 13px;
+  font-size: 14px;
   text-align: left;
 }
 
 .empty .dim {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 /* ==========================================================================
@@ -1044,7 +1104,7 @@ dialog.sheet .sheet-body {
 }
 
 dialog.sheet h3 {
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 600;
 }
 
@@ -1103,20 +1163,20 @@ dialog.sheet .sheet-actions {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 21px;
+  font-size: 24px;
   font-weight: 800;
 }
 
 .login h1 {
   margin-top: 20px;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
 }
 
 .login p.hint {
   margin: 7px 0 24px;
   color: var(--muted);
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.6;
 }
 
@@ -1131,8 +1191,8 @@ dialog.sheet .sheet-actions {
   padding: 11px 14px;
   border-radius: 13px;
   background: var(--danger-soft);
-  color: var(--danger);
-  font-size: 13px;
+  color: var(--danger-text);
+  font-size: 14px;
   font-weight: 600;
   animation: shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
@@ -1221,7 +1281,7 @@ dialog.sheet .sheet-actions {
 }
 
 .pick-row b {
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1234,8 +1294,8 @@ dialog.sheet .sheet-actions {
   padding: 1px 6px;
   border-radius: 5px;
   background: var(--warn-soft);
-  color: var(--warn);
-  font-size: 10.5px;
+  color: var(--warn-text);
+  font-size: 11px;
   font-weight: 600;
 }
 
@@ -1264,12 +1324,12 @@ dialog.sheet .sheet-actions {
 .trade-arrow {
   flex: 0 0 auto;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .trade-none {
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 /* 목록 안의 아주 작은 카드 얼굴. */
@@ -1277,7 +1337,7 @@ dialog.sheet .sheet-actions {
   width: 24px;
   height: 24px;
   border-radius: 7px;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -1322,7 +1382,7 @@ dialog.sheet .sheet-actions {
   gap: 8px;
   margin-top: 3px;
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 /* 라벨과 숫자가 갈라져서 두 줄이 되면 무슨 숫자인지 알 수 없다. */
@@ -1333,14 +1393,14 @@ dialog.sheet .sheet-actions {
 .counts b {
   display: inline;
   color: var(--ink-sub);
-  font-size: 11.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
 /* 0 이면 이 카드는 아무리 기다려도 짝이 안 난다. 숫자에 바로 표시한다. */
 .counts .zero,
 .counts .zero b {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .pick.dead {
@@ -1414,7 +1474,7 @@ dialog.sheet .sheet-actions {
   height: 46px;
   border-radius: 12px;
   background: var(--tile);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   overflow: hidden;
 }
@@ -1444,7 +1504,7 @@ dialog.sheet .sheet-actions {
 }
 
 .tile-name {
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.35;
   color: var(--ink-sub);
 }
@@ -1459,7 +1519,7 @@ dialog.sheet .sheet-actions {
   border-radius: 50%;
   background: var(--brand);
   color: var(--surface);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 17px;
 }
 
@@ -1523,7 +1583,7 @@ dialog.sheet .sheet-actions {
 }
 
 .case-body b {
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 700;
 }
 
@@ -1534,7 +1594,7 @@ dialog.sheet .sheet-actions {
   gap: 5px;
   margin: 9px 0 7px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .case-flow i {
@@ -1546,7 +1606,7 @@ dialog.sheet .sheet-actions {
   border-radius: 7px;
   background: var(--tile);
   color: var(--ink-sub);
-  font-size: 11px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 700;
 }
@@ -1559,7 +1619,7 @@ dialog.sheet .sheet-actions {
 .case-desc {
   display: block;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -1568,8 +1628,8 @@ dialog.sheet .sheet-actions {
   padding: 9px 12px;
   border-radius: 10px;
   background: var(--warn-soft);
-  color: var(--warn);
-  font-size: 12.5px;
+  color: var(--warn-text);
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -1593,7 +1653,7 @@ dialog.sheet .sheet-actions {
   padding: 7px 13px;
   border-radius: 9px;
   color: var(--ink-sub);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   transition: background var(--out), color var(--out);
 }
@@ -1668,12 +1728,12 @@ dialog.sheet .sheet-actions {
 
 .ex-id {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
 .ex-state {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -1683,7 +1743,7 @@ dialog.sheet .sheet-actions {
   border-radius: 999px;
   background: var(--tile);
   color: var(--ink-sub);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -1698,7 +1758,7 @@ dialog.sheet .sheet-actions {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .ex-person > a {
@@ -1857,7 +1917,7 @@ button.ex-time-act {
 
 .ex-meta {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .ex-acts {
