@@ -52,6 +52,22 @@ public class UserHaveItem {
     @Column(nullable = false)
     private Integer quantityLeft;
 
+    /**
+     * 진행 중인 교환에 묶여 있는 개수.
+     *
+     * <p><b>이 값이 없으면 "지금 몇 장 내놓겠다" 를 받아 적을 수 없다.</b> 세 숫자가 뜻이 전부
+     * 다르다. {@code quantity} 는 들고 있는 개수, {@code quantityLeft} 는 그중 지금 새로 내줄 수
+     * 있는 개수, 이 값은 이미 약속에 걸려 손댈 수 없는 개수다. 예전에는 묶인 몫을
+     * {@code quantity - quantityLeft} 로 짐작했는데, 교환으로 받은 카드가 {@code quantity} 만
+     * 올리는 바람에 그 뺄셈이 맞지 않았다.
+     *
+     * <p>기본값을 박아 둔 이유는 {@code createdAt} 과 같다. {@code ddl-auto: update} 가 행이 있는
+     * 테이블에 {@code NOT NULL} 컬럼을 그냥 붙이려다 실패하면 컬럼 없이 서버가 떠 버린다.
+     */
+    @ColumnDefault("0")
+    @Column(nullable = false)
+    private Integer reservedQuantity;
+
     @Version
     private Long version;
 
@@ -73,6 +89,7 @@ public class UserHaveItem {
         userHaveItem.quantity = quantity;
         userHaveItem.status = ItemStatus.LEFT;
         userHaveItem.quantityLeft = quantity;
+        userHaveItem.reservedQuantity = 0;
         userHaveItem.createdAt = LocalDateTime.now();
         return userHaveItem;
     }
@@ -90,6 +107,7 @@ public class UserHaveItem {
         userHaveItem.item = item;
         userHaveItem.quantity = quantity;
         userHaveItem.quantityLeft = 0;
+        userHaveItem.reservedQuantity = 0;
         userHaveItem.status = ItemStatus.OUT;
         userHaveItem.createdAt = LocalDateTime.now();
         return userHaveItem;
@@ -109,54 +127,92 @@ public class UserHaveItem {
     /**
      * 이 중 {@code amount} 개를 이 순간 새로 제안할 수 없게 잠근다.
      *
-     * <p><b>{@code quantityLeft} 를 그만큼 바로 깎는다.</b> 예전에는 여기서 상태만 바꾸고
-     * 개수는 완료 시점에 깎았는데, 그러면 3개 중 1개만 교환에 들어가도 행 전체가
-     * {@code RESERVED} 로 잠겨서 나머지 2개까지 후보 쿼리에서 사라졌다. 후보 쿼리가 이제
-     * {@code status} 대신 {@code quantityLeft > 0} 을 본다.
+     * <p><b>{@code quantityLeft} 를 그만큼 깎아 {@code reservedQuantity} 로 옮긴다.</b> 행 전체를
+     * 잠그지 않는 이유는, 3개 중 1개만 교환에 들어가도 나머지 2개까지 후보 쿼리에서 사라지기
+     * 때문이다. 후보 쿼리는 {@code status} 가 아니라 {@code quantityLeft > 0} 을 본다.
+     *
+     * <p>남은 것보다 많이 잠글 수는 없다. 넘치게 들어오면 남은 만큼만 잠근다.
      */
     public void reserve(int amount) {
-        this.quantityLeft = Math.max(0, this.quantityLeft - amount);
-        this.status = ItemStatus.RESERVED;
+        int locked = Math.clamp(amount, 0, this.quantityLeft);
+
+        this.quantityLeft -= locked;
+        this.reservedQuantity += locked;
+        refreshStatus();
     }
 
     /** 지금 이 행에 진행 중인 예약이 하나라도 있는가. 있으면 등록을 통째로 해제할 수 없다. */
     public boolean isReserved() {
-        return this.status == ItemStatus.RESERVED;
+        return this.reservedQuantity > 0;
+    }
+
+    /** 내가 내놓기로 등록해 둔 개수. 묶여 있는 몫까지 합친 값이라 등록 화면이 되살릴 값이 이것이다. */
+    public int getRegisteredQuantity() {
+        return this.quantityLeft + this.reservedQuantity;
     }
 
     /**
-     * 예약해 둔 거래가 실제로 끝났다.
+     * 예약해 둔 거래가 실제로 끝났다. 카드가 손을 떠났으므로 묶여 있던 몫과 보유 개수에서 뺀다.
      *
-     * <p>{@code quantityLeft} 는 이미 {@link #reserve} 에서 깎아 뒀으니 여기서 또 깎지 않는다.
-     * 상태만 지금 {@code quantityLeft} 에 맞게 정리한다.
+     * <p>{@code quantityLeft} 는 {@link #reserve} 에서 이미 옮겨 뒀으니 여기서 건드리지 않는다.
+     *
+     * <p><b>{@code quantity} 를 같이 깎지 않으면 그 카드를 다시 등록해도 아무 일이 안 일어난다.</b>
+     * 예전 {@link #changeQuantity} 가 총 수량과의 차이로 움직였기 때문인데, 지금은 등록이 내줄
+     * 개수를 직접 적으므로 그 문제는 없어졌다. 그래도 넘긴 카드가 보유 개수에 남아 있으면 어드민
+     * 화면이 없는 카드를 있다고 말하게 된다.
      */
-    public void completeExchange() {
-        this.status = this.quantityLeft > 0 ? ItemStatus.LEFT : ItemStatus.OUT;
+    public void completeExchange(int amount) {
+        int done = Math.clamp(amount, 0, this.reservedQuantity);
+
+        this.reservedQuantity -= done;
+        this.quantity = Math.max(0, this.quantity - done);
+        refreshStatus();
     }
 
     /**
      * 예약을 풀고 그만큼 다시 후보로 돌려놓는다.
      *
-     * <p>{@link #reserve} 가 깎아 둔 만큼 {@code amount} 로 되돌려 받는다. 총 등록 수량
-     * ({@code quantity}) 을 넘지 않게 잡아 둔다 — 넘으면 실제보다 부풀려진 개수가 후보에 오른다.
+     * <p>{@link #reserve} 가 옮겨 둔 만큼을 되돌려 받는다. 묶어 둔 것보다 많이 풀 수는 없다.
+     * 넘치게 들어오면 묶인 만큼만 푼다. 그러지 않으면 실제보다 부풀려진 개수가 후보에 오른다.
      */
     public void cancelReservation(int amount) {
-        this.quantityLeft = Math.min(this.quantity, this.quantityLeft + amount);
-        this.status = this.quantityLeft > 0 ? ItemStatus.LEFT : ItemStatus.OUT;
+        int back = Math.clamp(amount, 0, this.reservedQuantity);
+
+        this.reservedQuantity -= back;
+        this.quantityLeft += back;
+        refreshStatus();
     }
 
     /**
-     * 수량을 바꾸고 남은 수량도 같은 만큼 움직인다.
+     * 내놓을 개수를 이 값으로 맞춘다. 등록 화면의 "지금 몇 장 내놓겠다" 가 그대로 들어온다.
      *
-     * <p>남은 수량을 그대로 두면 어드민에서 카드를 더 붙여도 매칭에 잡히지 않는다.
-     * 이미 예약 중이면 상태는 건드리지 않는다.
+     * <p><b>차이가 아니라 값을 그대로 적는다.</b> 예전에는 예전 총 수량과의 차이로
+     * {@code quantityLeft} 를 움직였는데, 그러면 개수가 그대로일 때 차이가 0 이라 아무 일도 일어나지
+     * 않았다. 다 넘긴 카드를 같은 개수로 다시 등록하거나, 교환으로 받은 카드를 내놓으려 할 때
+     * 눌러도 반응이 없던 것이 이것 때문이다.
+     *
+     * <p>묶여 있는 몫은 건드리지 않는다. 이미 상대와 약속한 카드라 등록 화면에서 뺄 수 있는
+     * 것이 아니다. 보유 개수는 내놓기로 한 몫과 묶인 몫을 합친 값이 된다.
      */
     public void changeQuantity(Integer quantity) {
-        int delta = quantity - this.quantity;
-        this.quantity = quantity;
-        this.quantityLeft = Math.clamp(this.quantityLeft + delta, 0, quantity);
-        if (this.status != ItemStatus.RESERVED) {
-            this.status = this.quantityLeft > 0 ? ItemStatus.LEFT : ItemStatus.OUT;
+        this.quantityLeft = Math.max(0, quantity);
+        this.quantity = this.quantityLeft + this.reservedQuantity;
+        refreshStatus();
+    }
+
+    /**
+     * 세 숫자가 바뀔 때마다 상태를 다시 맞춘다.
+     *
+     * <p>묶인 것이 하나라도 있으면 {@code RESERVED} 다. 일부만 묶여 남은 몫이 있어도 마찬가지인데,
+     * 이 상태가 후보에서 빼는 기준이 아니라 "등록을 통째로 해제할 수 없다" 는 표시이기 때문이다.
+     * 후보 쿼리는 {@code quantityLeft > 0} 을 따로 본다.
+     */
+    private void refreshStatus() {
+        if (this.reservedQuantity > 0) {
+            this.status = ItemStatus.RESERVED;
+            return;
         }
+
+        this.status = this.quantityLeft > 0 ? ItemStatus.LEFT : ItemStatus.OUT;
     }
 }

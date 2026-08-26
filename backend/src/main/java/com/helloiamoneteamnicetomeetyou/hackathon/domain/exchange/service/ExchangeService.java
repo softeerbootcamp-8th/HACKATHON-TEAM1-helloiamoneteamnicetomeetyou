@@ -199,10 +199,11 @@ public class ExchangeService {
     /**
      * 이 교환이 잡아 둔 카드를 전부 풀어 다시 매칭 후보로 돌려놓는다.
      *
-     * <p>거절과 취소가 함께 쓴다. 풀지 않으면 카드가 {@code quantityLeft} 에 못 잡혀 그 사람은
-     * 다시는 매칭되지 않는다 — 매칭 쿼리가 {@code quantityLeft > 0} 인 카드만 본다.
+     * <p>거절과 취소, 그리고 어드민이 막힌 교환을 끊을 때가 함께 쓴다. 풀지 않으면 카드가
+     * {@code quantityLeft} 에 못 잡혀 그 사람은 다시는 매칭되지 않는다. 매칭 쿼리가
+     * {@code quantityLeft > 0} 인 카드만 보기 때문이다.
      */
-    private void releaseReservations(Long exchangeId) {
+    public void releaseReservations(Long exchangeId) {
         for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
             userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
                     .ifPresent(hi -> hi.cancelReservation(item.getQuantity()));
@@ -409,6 +410,10 @@ public class ExchangeService {
     /**
      * 만나서 교환을 끝냈다. 참가자 누구든 누를 수 있고, 먼저 누른 한 번만 반영된다.
      *
+     * <p><b>두 번째로 누른 사람도 성공으로 받는다.</b> 3자 교환에서 셋이 거의 동시에 누르면 늦은
+     * 둘은 이미 끝난 약속을 끝내려 하게 되는데, 여기서 409 를 주면 화면이 그것을 "상대가 취소했다"
+     * 로 읽어서 정상적으로 끝난 사람이 완료 화면을 못 보고 홈으로 튕긴다.
+     *
      * <p>이 시점에 카드 수량을 실제로 옮긴다. 주는 쪽은 보유 수량이 그만큼 줄고, 받는 쪽은 그
      * 카드를 얻고 찾는 수량에서 뺀다. 무엇을 주고받는지는 매칭이 정한 {@link ExchangeItem} 을
      * 그대로 따른다.
@@ -418,12 +423,14 @@ public class ExchangeService {
         Exchange exchange = getExchange(exchangeId);
         getParticipant(exchangeId, userId);
 
-        exchange.complete();
-
-        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
-            giveAway(item);
-            receive(item);
+        // 늦게 누른 사람은 여기로 온다. 재고는 먼저 누른 쪽에서 이미 옮겼으므로 다시 옮기지 않고
+        // 지금 상태를 그대로 돌려준다. 취소된 약속이면 아래 complete() 가 막는다.
+        if (exchange.getStatus() == ExchangeStatus.COMPLETED) {
+            return toResponse(exchange);
         }
+
+        exchange.complete();
+        settleItems(exchangeId);
 
         notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_COMPLETED);
 
@@ -431,13 +438,30 @@ public class ExchangeService {
     }
 
     /**
+     * 이 교환이 오가기로 한 카드를 실제로 옮긴다.
+     *
+     * <p>참가자가 끝냈을 때와 어드민이 닫았을 때가 함께 쓴다. 어드민 쪽에서 이걸 부르지 않으면
+     * 잠가 둔 카드가 풀리지도 넘어가지도 않은 채 남아 그 사람은 다시 매칭되지 않는다.
+     *
+     * <p><b>끝난 교환에 두 번 부르면 안 된다.</b> 부르는 쪽이 상태를 먼저 보고 한 번만 부른다.
+     */
+    public void settleItems(Long exchangeId) {
+        for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
+            giveAway(item);
+            receive(item);
+        }
+    }
+
+    /**
      * 준 사람 쪽 재고를 확정한다.
      *
-     * <p>개수는 이미 예약 시점({@code reserve})에 깎여 있다. 여기서 또 깎으면 두 번 깎인다.
+     * <p>내줄 수 있는 개수({@code quantityLeft})는 이미 예약 시점({@code reserve})에 깎여 있다.
+     * 여기서 넘기는 개수는 등록해 둔 총 수량({@code quantity})에서 뺄 몫이다. 카드가 실제로
+     * 손을 떠났으므로 총 수량도 같이 줄어야 한다.
      */
     private void giveAway(ExchangeItem item) {
         userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
-                .ifPresent(UserHaveItem::completeExchange);
+                .ifPresent(hi -> hi.completeExchange(item.getQuantity()));
     }
 
     /**

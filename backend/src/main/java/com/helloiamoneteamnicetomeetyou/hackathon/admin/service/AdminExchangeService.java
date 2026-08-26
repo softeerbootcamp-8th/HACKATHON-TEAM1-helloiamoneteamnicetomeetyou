@@ -236,17 +236,46 @@ public class AdminExchangeService {
         eventPublisher.publishEvent(new MatchTriggerEvent(userId));
     }
 
+    /**
+     * 막힌 교환을 끊는다. 잡아 둔 카드도 같이 풀어 준다.
+     *
+     * <p>풀지 않으면 어드민이 정리해 준 그 카드가 예약된 개수만큼 영영 매칭에서 빠진다. 끊는
+     * 목적이 그 사람을 다시 시연에 넣는 것이라 정반대의 결과가 된다.
+     *
+     * <p>이미 끝났거나 취소된 교환에는 풀 것이 없다. 완료된 교환에 예약을 돌려주면 이미 상대에게
+     * 넘어간 카드가 되살아난다.
+     */
     @Transactional
     public void cancel(Long exchangeId) {
         Exchange exchange = findExchange(exchangeId);
+        boolean wasActive = exchange.isActive();
+
         exchange.cancelByAdmin();
+        if (wasActive) {
+            exchangeService.releaseReservations(exchangeId);
+        }
+
         notifyParticipants(exchange, SseEventType.EXCHANGE_CANCELLED);
     }
 
+    /**
+     * 실물 교환은 끝났는데 화면에서 완료 처리가 안 된 건을 닫는다. 카드도 같이 넘긴다.
+     *
+     * <p>넘기지 않으면 잠가 둔 카드가 풀리지도 상대에게 가지도 않은 채 남아서, 어드민이 닫아 준
+     * 사람이 오히려 다시 매칭되지 않는다.
+     *
+     * <p>이미 끝났거나 취소된 교환은 건드리지 않는다. 두 번 넘기면 개수가 두 번 깎인다.
+     */
     @Transactional
     public void complete(Long exchangeId) {
         Exchange exchange = findExchange(exchangeId);
+        boolean wasActive = exchange.isActive();
+
         exchange.completeByAdmin();
+        if (wasActive) {
+            exchangeService.settleItems(exchangeId);
+        }
+
         notifyParticipants(exchange, SseEventType.EXCHANGE_COMPLETED);
     }
 
