@@ -24,7 +24,7 @@ import { appointmentStatus, sortedAppointments } from '@/store/appointment-statu
 import { getDeviceId } from '@/store/identity'
 import type { WaitingStatus } from '@/store/matching'
 import { persistSetupDone } from '@/store/setup-status'
-import { useTopHaveItemId } from '@/store/top-card'
+import { byPresence, topItemIdOf } from '@/store/top-card'
 import type { Selection } from '@/store/types'
 import { useStore } from '@/store/useStore'
 
@@ -169,7 +169,7 @@ export function Home() {
 
   const haveCount = state.have.reduce((sum, s) => sum + s.qty, 0)
 
-  const topItemId = useTopHaveItemId(state.have)
+  const topItemId = topItemIdOf(state.have)
 
   // 약속이 둘 이상이면 가까운 순으로 늘어놓고 가로로 밀어서 본다.
   const statuses = sortedAppointments(state.appointments).map((appointment) =>
@@ -751,7 +751,7 @@ function MyCardsFan({
   onEdit: () => void
   onClose: () => void
 }) {
-  const sorted = [...have].sort((a, b) => b.qty - a.qty)
+  const sorted = [...have].sort(byPresence)
 
   if (sorted.length === 0) {
     return (
