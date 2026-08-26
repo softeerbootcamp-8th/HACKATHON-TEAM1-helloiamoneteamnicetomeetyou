@@ -122,8 +122,10 @@ public class AdminUserController {
 
     @PostMapping("/{userId}/delete")
     public String deleteDummy(@PathVariable UUID userId, RedirectAttributes redirectAttributes) {
-        adminUserService.deleteDummy(userId);
-        redirectAttributes.addFlashAttribute("toast", "더미를 지웠습니다.");
+        int removedExchanges = adminUserService.deleteDummy(userId);
+        redirectAttributes.addFlashAttribute("toast", removedExchanges == 0
+                ? "더미를 지웠습니다."
+                : "더미를 지웠습니다. 이 사람이 낀 교환 " + removedExchanges + "건도 같이 지웠습니다.");
 
         return "redirect:/admin?tab=users";
     }

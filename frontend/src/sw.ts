@@ -46,17 +46,19 @@ registerRoute(
  * 그림이 안 뜬다. 하필 식별 화면은 사람이 몰린 곳에서 쓰고 그림이 화면 내용의 전부다.
  * CacheFirst 는 그 왕복을 건너뛴다.
  *
- * 파일 이름이 곧 내용이라(`lemon.webp` 는 항상 같은 그림) 안전하다. 그림을 갈아 끼우면
- * 이름을 바꾸거나 30일을 기다려야 한다.
+ * **주소가 곧 내용이어야 한다.** 그림을 같은 이름으로 갈아 끼우면 여기 걸린 사람은 30일 동안
+ * 옛 그림을 본다. 식별 표시는 `store/identity-mark.ts` 의 `IMAGE_VERSION` 을 올려서 주소를
+ * 바꾼다.
  */
 registerRoute(
   ({ url }) => url.origin === 'https://sdumqvkniemiowanvsef.supabase.co',
   new CacheFirst({
     cacheName: 'supabase-images',
     plugins: [
-      // `new Image()` 로 받는 요청은 no-cors 라 opaque(status 0) 로 온다. 0 을 안 넣으면
-      // 캐시에 들어가지 않아서 미리 받아 두는 것이 통째로 무용지물이 된다.
-      new CacheableResponsePlugin({ statuses: [0, 200] }),
+      // **0(opaque)을 넣지 않는다.** no-cors 로 나간 요청은 성공이든 404 든 status 가 0 이라,
+      // 0 을 캐시하면 실패한 응답이 성공으로 굳어서 그 기기에서는 그림이 영영 안 뜬다.
+      // 그림을 부르는 쪽에 crossOrigin 을 붙여 두었으니 실제 status 가 그대로 온다.
+      new CacheableResponsePlugin({ statuses: [200] }),
       new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 }),
     ],
   }),

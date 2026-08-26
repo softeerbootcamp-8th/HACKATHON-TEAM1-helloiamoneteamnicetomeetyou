@@ -87,6 +87,11 @@ export function GoodsFace({
           aria-hidden
           loading="lazy"
           draggable={false}
+          /*
+            서비스 워커가 이 버킷을 캐시한다(`sw.ts`). crossOrigin 이 없으면 응답이 opaque 로
+            와서 성공·실패를 가릴 수 없어 캐시에 못 넣는다. 버킷이 CORS 를 열어 두어서 붙인다.
+          */
+          crossOrigin="anonymous"
           onError={() => setFailed(true)}
           className="absolute -top-[9%] -left-[9%] h-[118%] w-[118%] max-w-none object-contain select-none"
         />

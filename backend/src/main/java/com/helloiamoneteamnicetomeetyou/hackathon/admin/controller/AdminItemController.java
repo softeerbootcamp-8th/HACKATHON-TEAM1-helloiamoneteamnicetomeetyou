@@ -44,10 +44,22 @@ public class AdminItemController {
 
     @PostMapping("/{itemId}/delete")
     public String delete(@PathVariable Long itemId, RedirectAttributes redirectAttributes) {
-        adminBoothService.deleteItem(itemId);
-        redirectAttributes.addFlashAttribute("toast", "카드를 지웠습니다.");
+        int removedExchanges = adminBoothService.deleteItem(itemId);
+        redirectAttributes.addFlashAttribute("toast", deletedMessage(removedExchanges));
 
         return "redirect:/admin?tab=items";
+    }
+
+    /**
+     * 지운 결과를 한 줄로 알려 준다.
+     *
+     * <p>카드를 지우면 그 카드가 오간 교환도 같이 사라지는데, 그 사실을 말해 주지 않으면 교환 탭에
+     * 있던 건이 왜 없어졌는지 알 수 없다.
+     */
+    static String deletedMessage(int removedExchanges) {
+        return removedExchanges == 0
+                ? "카드를 지웠습니다."
+                : "카드를 지웠습니다. 이 카드가 오간 교환 " + removedExchanges + "건도 같이 지웠습니다.";
     }
 
     /** 이 카드를 내놓는 사람으로 넣는다. */
