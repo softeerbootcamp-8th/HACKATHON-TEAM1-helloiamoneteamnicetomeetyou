@@ -1,89 +1,187 @@
-# HACKATHON-TEAM1-helloiamoneteamnicetomeetyou
+<div align="center">
 
-안녕하세요 원팀입니다 잘부탁드립니다
+# NearLy
 
-프론트엔드와 백엔드를 한 저장소에서 관리합니다. 두 디렉터리는 서로 의존하지 않고, 각자
-자기 디렉터리 안에서만 빌드하고 테스트합니다.
+### 근거리 기반 랜덤 굿즈 교환 서비스
 
-```
-.
-├── backend/    Spring Boot 4 · Java 21 · Gradle
-├── frontend/   React 19 · TypeScript · Vite · Tailwind CSS
-├── .claude/    개발 지침과 슬래시 커맨드 (Claude Code 설정)
-└── .github/
-    ├── ISSUE_TEMPLATE/, PULL_REQUEST_TEMPLATE.md
-    └── workflows/
-        ├── deploy-backend.yml   main push 시 backend/ 가 바뀌었으면 EC2 로 배포
-        └── ci-frontend.yml      PR 에서 frontend/ 포맷·린트·빌드 확인
-```
+같은 공간에 있는 교환 상대를 찾아, 원하는 굿즈로 바꿉니다.
+
+<img src="https://github.com/user-attachments/assets/3b30f8a1-f223-40a9-ba3b-47e53b6de4b9" width="720" alt="NearLy" />
+
+</div>
+
+---
 
 <br>
 
-## 개발 컨벤션
+## 목차
 
-브랜치, 커밋, 이슈, PR 규칙과 영역별 코딩 컨벤션은 아래 문서에 있습니다.
-
-| 문서 | 내용 |
-|---|---|
-| [`CLAUDE.md`](./CLAUDE.md) | 공통 규칙과 개발 프로세스 (브랜치, 커밋, 이슈, PR) |
-| [`backend/CLAUDE.md`](./backend/CLAUDE.md) | 패키지 구조, DTO, 예외, 네이밍, 테스트 |
-| [`frontend/CLAUDE.md`](./frontend/CLAUDE.md) | 폴더 구조, API 호출, 화면 상태, 네이밍 |
-| [`.claude/skills/oneteam-development/`](./.claude/skills/oneteam-development/) | API 응답 형식과 영역별 상세 지침 |
-
-브랜치는 `main ← dev ← {be\|fe}/{타입}/{이슈번호}-{기능}` 순서로 따고, 커밋과 이슈,
-PR 제목은 모두 `feat(be): 주문 생성 API 구현` 형식(Conventional Commits)으로 씁니다.
+- [서비스 설명](#서비스-설명)
+- [기술 스택](#기술-스택)
+- [서비스 아키텍처](#서비스-아키텍처)
+- [ERD](#erd)
+- [Known Issues](#known-issues)
+- [팀 구성](#팀-구성)
 
 <br>
 
-## 백엔드 실행하기
+## 서비스 설명
 
-Java 21 이 필요하고, Gradle 은 wrapper 가 알아서 받습니다.
-DB 로 MySQL 을 쓰기 때문에 실행 전에 컨테이너로 DB 를 먼저 띄웁니다.
+팝업스토어에서 랜덤 굿즈를 산 방문객은 원하는 캐릭터나 상품이 나오지 않거나 중복이 생기면 교환할
+상대를 직접 찾아 나섭니다. 같은 현장에 교환이 가능한 사람이 있어도 서로를 알지 못한다는 것이
+문제였고, NearLy 는 현장에서 그 교환 가능성을 찾아 연결해 줍니다.
+
+| | 기존 방식 | NearLy |
+| --- | --- | --- |
+| **상대 탐색** | X 와 오픈채팅, 커뮤니티를 직접 검색 | 원하는 굿즈만 등록하면 자동으로 매칭 |
+| **매칭 성공률** | 1:1 이 맞아야만 성사 | 1:1 이 안 되면 세 사람이 순환하는 삼자 교환 |
+| **의사 확인** | 모르는 사람에게 직접 말을 걸어야 함 | 등록과 신청으로 교환 의사를 미리 확인 |
+| **약속 조율** | 상대가 현장에 있는지 확인하고 시간과 장소를 협의 | 지정 교환장소 고정, 겹치는 시간 자동 확정 |
+| **현장에서 만나기** | 사람들 사이에서 상대를 직접 찾음 | 같은 과일 화면을 든 사람을 찾아 식별 |
+
+<br>
+
+### 주요 기능
+
+- **알아서 찾아주는 교환 상대** — 내놓을 굿즈(Have)와 찾는 굿즈(Wanted)를 등록하면 조건이 맞는
+  상대를 시스템이 자동으로 찾습니다.
+- **둘이 아니어도 셋이서 교환** — 서로 정확히 맞는 상대가 없어도 A 에서 B, B 에서 C, C 에서 A 로
+  도는 삼자 교환으로 성사 기회를 넓힙니다.
+- **현장에서 바로 교환** — 약속이 확정되면 과일 아이콘 식별 화면을 발급해서, 같은 화면을 든 사람을
+  찾아 대면 교환합니다.
+- **찔러보기** — 자동 매칭을 기다리지 않고 원하는 상대의 카드에 직접 교환을 신청할 수 있습니다.
+- **시간 조율** — 15분 단위로 가능한 시간을 고르면 모두가 되는 가장 빠른 시간으로 확정됩니다.
+
+<br>
+
+### 핵심 플로우
+
+<img src="https://github.com/user-attachments/assets/d5e7f076-9d66-4a68-a087-f8d7fd3b2782" width="900" alt="User flow" />
+
+굿즈를 얻은 다음 교환이 성사되기까지를 교환 등록, 교환 매칭, 정해진 시간에 만남, 교환 네 단계로
+줄였습니다. 교환이 끝난 뒤에도 아직 찾는 카드가 남아 있으면 자동 매칭이 다시 돕니다.
+
+<br>
+
+### 화면 구성
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="https://github.com/user-attachments/assets/bcad306c-1679-4a5a-8568-4c671ec0086b" width="230" alt="교환 대기존" /></td>
+    <td align="center" width="33%"><img src="https://github.com/user-attachments/assets/7eaa0a0f-0a53-461a-ad27-90fa7d3db91d" width="230" alt="삼자 매칭 결과" /></td>
+    <td align="center" width="33%"><img src="https://github.com/user-attachments/assets/2a094655-54d7-4c2f-801a-51d96b65f73a" width="230" alt="현장 식별" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>교환 대기존</b><br/><sub>지금 부스에 올라온 카드를 보고<br/>내 카드를 끌어 찔러봅니다</sub></td>
+    <td align="center"><b>삼자 매칭 결과</b><br/><sub>세 사람의 카드가 어떻게<br/>이어지는지 보여 줍니다</sub></td>
+    <td align="center"><b>현장 식별</b><br/><sub>같은 과일 화면을 든 사람이<br/>교환할 상대입니다</sub></td>
+  </tr>
+</table>
+
+부스 운영자가 쓰는 어드민은 서버에서 그려 내려보냅니다. 화면과 사용법은
+[`docs/admin`](./docs/admin) 에 있습니다.
+
+<br>
+
+## 기술 스택
+
+| 구분 | 사용한 것 |
+| --- | --- |
+| **프론트엔드** | React 19, TypeScript, Vite 8, Tailwind CSS 4, React Router 8, Motion |
+| **PWA** | vite-plugin-pwa, Workbox, Web Push (VAPID) |
+| **백엔드** | Java 21, Spring Boot 4, Spring Data JPA, Thymeleaf |
+| **데이터베이스** | MySQL 8.4 (로컬은 Docker Compose, 배포는 RDS) |
+| **실시간** | SSE (Server-Sent Events), 가상 스레드 |
+| **인프라** | AWS EC2 t4g.micro, AWS RDS, Caddy, Docker, GHCR, Vercel |
+| **CI/CD** | GitHub Actions, Dozzle, Slack Webhook |
+
+프론트엔드와 백엔드를 한 저장소에서 관리하고, 두 디렉터리는 서로 의존하지 않습니다. 브랜치와 커밋
+규칙, 영역별 코딩 컨벤션은 [`CLAUDE.md`](./CLAUDE.md), [`backend/CLAUDE.md`](./backend/CLAUDE.md),
+[`frontend/CLAUDE.md`](./frontend/CLAUDE.md) 에 있습니다.
+
+<br>
+
+## 서비스 아키텍처
+
+![서비스 아키텍처](./docs/architecture.png)
+
+프론트엔드는 Vercel 에, 백엔드는 EC2 한 대에 올라가 있습니다. 두 오리진이 다르기 때문에 CORS 는
+`/api/**` 에만 열어 두었고, 어드민은 서버가 그리는 화면이라 CORS 가 필요하지 않습니다.
+
+화면이 HTTPS 로 서빙되는데 그 안에서 http 주소를 부르면 mixed content 로 막히기 때문에 백엔드에도
+HTTPS 가 필요했습니다. Cloudflare 터널은 재시작할 때마다 주소가 바뀌는 것이 걸려서, EC2 앞에
+Caddy 를 두고 sslip.io 도메인을 쓰는 쪽을 골랐습니다. 인스턴스를 재시작해도 주소가 그대로입니다.
+
+배포 대상이 t4g.micro 라서 이미지를 `linux/arm64` 로 빌드하고, RAM 이 1 GiB 뿐이라 컨테이너를
+640m 으로 묶고 G1GC 를 명시했습니다. main 에 push 하면 테스트와 이미지 빌드를 거쳐 SSH 로 배포한
+뒤 `/health` 가 응답할 때까지 확인하고, 결과를 Slack 으로 보냅니다.
+
+<br>
+
+## ERD
+
+<img src="https://github.com/user-attachments/assets/749b2861-3262-4894-b710-8093549add80" width="960" alt="ERD" />
+
+한 사용자가 내놓을 카드는 `user_have_items` 에, 찾는 카드는 `user_want_items` 에 수량과 함께
+담깁니다. 매칭이 성사되면 `exchanges` 한 건이 생기고 참여자는 `exchange_participants` 로,
+누가 누구에게 어떤 카드를 주는지는 `exchange_items` 로 남습니다. 참여자가 둘이면 1:1 교환이고
+셋이면 삼자 교환이라, 두 경우를 나누지 않고 같은 구조를 씁니다.
+
+<br>
+
+## Known Issues
+
+3일 동안 만든 것이라 알면서 두고 간 부분이 있습니다.
+
+| 내용 | 지금 상태 |
+| --- | --- |
+| **로그인이 없습니다** | 브라우저가 만든 UUID 를 `localStorage` 에 저장해 사용자를 구분합니다. 브라우저 데이터를 지우거나 기기를 바꾸면 이전 기록으로 돌아가지 못합니다 |
+| **서버를 여러 대로 늘릴 수 없습니다** | SSE 연결을 인스턴스 메모리에 들고 있어서, 두 대로 늘리면 다른 인스턴스에 붙은 사용자에게 이벤트가 가지 않습니다 |
+| **스키마 마이그레이션 도구가 없습니다** | `ddl-auto=update` 로 맞추고 있어서 컬럼을 지우거나 이름을 바꾸는 변경은 반영되지 않습니다 |
+| **iOS 는 홈 화면에 추가해야 푸시가 옵니다** | 사파리 탭에서는 `PushManager` 자체가 노출되지 않아, 설치하지 않으면 알림을 켤 수 없습니다 |
+| [#99](https://github.com/softeerbootcamp-8th/HACKATHON-TEAM1-helloiamoneteamnicetomeetyou/issues/99) 아무도 수락하지 않은 매칭 제안이 남습니다 | 제안이 만료되지 않아 두 사람이 계속 묶여 있습니다 |
+| [#34](https://github.com/softeerbootcamp-8th/HACKATHON-TEAM1-helloiamoneteamnicetomeetyou/issues/34) 부스 안 다른 사용자 보유 카드 조회 | 목록 조회 API 가 열려 있는 이슈로 남아 있습니다 |
+
+<br>
+
+## 팀 구성
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="https://github.com/user-attachments/assets/508bd507-dd85-49d5-baa6-f250ce1141c8" width="130" alt="기승민" /></td>
+    <td align="center" width="33%"><img src="https://github.com/bigbell999.png" width="130" alt="유승종" /></td>
+    <td align="center" width="33%"><img src="https://github.com/user-attachments/assets/c00b45ee-9954-4f84-8120-c44b0544dbbd" width="130" alt="최서지" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>기승민</b><br/><a href="https://github.com/KiSeungMin">@KiSeungMin</a></td>
+    <td align="center"><b>유승종</b><br/><a href="https://github.com/bigbell999">@bigbell999</a></td>
+    <td align="center"><b>최서지</b><br/><a href="https://github.com/choiseoji">@choiseoji</a></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>어드민 콘솔<br/>카드 카탈로그와 부스<br/>프론트엔드 배포</sub></td>
+    <td align="center"><sub>교환 대기장과 찔러보기<br/>SSE 실시간 연결<br/>백엔드 배포</sub></td>
+    <td align="center"><sub>자동 매칭 (1:1, 삼자)<br/>매칭 수락과 거절<br/>알림</sub></td>
+  </tr>
+</table>
+
+<br>
+
+## 로컬에서 실행하기
+
+백엔드는 Java 21 이 필요하고 Gradle 은 wrapper 가 받습니다. DB 컨테이너를 먼저 띄웁니다.
 
 ```bash
 cd backend
-docker compose up -d mysql # localhost:3306 (DB: hackathon)
-./gradlew bootRun          # http://localhost:8080
-./gradlew test
+docker compose up -d mysql   # localhost:3306 (DB: hackathon)
+./gradlew bootRun            # http://localhost:8080
 ```
 
-도커로 띄워서 확인하려면 아래를 씁니다. 배포와 같은 이미지를 그대로 씁니다.
-
-```bash
-cd backend
-docker compose up --build -d
-docker compose down
-```
-
-<br>
-
-## 프론트엔드 실행하기
-
-Node 22 이상과 pnpm 이 필요합니다. pnpm 이 없으면 `corepack enable` 로 켭니다.
+프론트엔드는 Node 22 이상과 pnpm 이 필요합니다. pnpm 이 없으면 `corepack enable` 로 켭니다.
 
 ```bash
 cd frontend
 pnpm install
-pnpm dev                   # http://localhost:5173
+pnpm dev                     # http://localhost:5173
 ```
 
-첫 화면에 백엔드 연결 상태가 나옵니다. 백엔드를 같이 띄워 두면 `연결됨` 으로 바뀝니다.
-
-| 명령 | 하는 일 |
-|---|---|
-| `pnpm dev` | 개발 서버. `/api` 와 `/health` 는 8080 으로 프록시됩니다 |
-| `pnpm build` | 타입 검사 후 `dist/` 로 빌드 |
-| `pnpm lint` | ESLint (`--fix` 는 `pnpm lint:fix`) |
-| `pnpm format` | Prettier 로 전체 정리 |
-
-`import { api } from '@/lib/api'` 처럼 `@` 로 `src` 를 가리킵니다. 이 별칭은
-`vite.config.ts` 와 `tsconfig.app.json` 두 곳에 적혀 있으니 한쪽만 고치지 않습니다.
-
-<br>
-
-## 배포
-
-백엔드만 자동 배포합니다. main 에 `backend/` 변경이 들어오면 테스트를 돌리고, arm64 이미지를
-GHCR 에 올린 뒤 EC2(t4g.micro)에서 컨테이너를 갈아 끼웁니다. 결과는 슬랙으로 옵니다.
-
-프론트엔드는 아직 배포 파이프라인이 없습니다. PR 에서 포맷과 린트, 빌드만 확인합니다.
+`pnpm dev` 는 `/api` 와 `/health` 를 8080 으로 넘겨주기 때문에 백엔드를 같이 띄우면 그대로 붙습니다.
