@@ -321,51 +321,19 @@ export function Home() {
           })}
 
           {/*
-            펼친 동안 아무 데나 누르면 다시 접힌다. 보이지 않는 판이다.
-
-            <b>색을 깔지 않는다.</b> 전에는 여기에 옅은 회색과 blur 를 줘서 뒤를 흐렸는데,
-            이 판이 레이더 무대(정사각형)에만 걸쳐 있어서 화면을 덮지 못하고 카드 뒤에 회색
-            네모 한 장이 떠 있는 것처럼 보였다. 시안(225:24680)에도 흐린 판이 없다.
+            펼치면 카드 묶음이 화면을 덮는 층(`MyCardsOverlay`)으로 옮겨 간다. 여기 남는
+            것은 접혀 있을 때의 끌 수 있는 묶음뿐이라, 펼친 동안에는 이 자리를 비운다.
           */}
-          {fanOpen && (
-            <button
-              type="button"
-              aria-label="내 카드 접기"
-              onClick={() => setFanOpen(false)}
-              className="absolute inset-0 z-10"
-            />
-          )}
+          {!fanOpen && (
+            <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+              <p className="mb-1 text-center text-[11px] font-bold text-ink md:text-[14px]">
+                내 카드
+              </p>
 
-          {/*
-            펼친 동안에는 이 층이 클릭을 받지 않는다. 카드든 카드 사이 빈 곳이든 누르면
-            그대로 뒤에 깔린 '내 카드 접기' 판으로 떨어져서 접힌다. 예전에는 이 층이
-            부채꼴 크기만큼 클릭을 삼켜서, 화면 대부분이 눌러도 아무 일이 없는 자리였다.
-            버튼 둘만 pointer-events 를 되살린다.
-          */}
-          <div
-            className={cn(
-              'absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2',
-              fanOpen && 'pointer-events-none',
-            )}
-          >
-            <p className="mb-1 text-center text-[11px] font-bold text-ink md:text-[14px]">
-              {fanOpen ? `내 카드 ${state.have.length}종 ${haveCount}장` : '내 카드'}
-            </p>
-
-            {fanOpen ? (
-              <MyCardsFan
-                have={state.have}
-                onEdit={() => {
-                  setFanOpen(false)
-                  navigate('/have')
-                }}
-                onClose={() => setFanOpen(false)}
-              />
-            ) : (
-              /*
-              끌면 찔러보기, 그냥 누르면 내 카드를 펼쳐 본다. 끌고 난 뒤에도 click 이
-              따라오기 때문에 끌었는지를 기억해 두고 그 click 은 버린다.
-            */
+              {/*
+                끌면 찔러보기, 그냥 누르면 내 카드를 펼쳐 본다. 끌고 난 뒤에도 click 이
+                따라오기 때문에 끌었는지를 기억해 두고 그 click 은 버린다.
+              */}
               <motion.div
                 drag
                 dragSnapToOrigin
@@ -395,16 +363,12 @@ export function Home() {
               >
                 <CardStack topItemId={topItemId} count={Math.max(haveCount, 1)} lifted={dragging} />
               </motion.div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         <p className="mt-8 shrink-0 text-center text-[12px] text-neutral-400 md:text-[14px]">
-          {fanOpen
-            ? '아무 곳이나 누르면 닫혀요'
-            : dragging
-              ? '놓아주면 찔러보기가 전송돼요'
-              : '내 카드를 상대 카드 위로 끌어보세요'}
+          {dragging ? '놓아주면 찔러보기가 전송돼요' : '내 카드를 상대 카드 위로 끌어보세요'}
         </p>
 
         {/* 레이더에 올라온 카드를 뒷순위로 새로 채운다. 답변을 기다리는 카드는 남는다. */}
@@ -664,6 +628,25 @@ export function Home() {
         </div>
       </div>
 
+      {/*
+        내 카드를 펼친 층. <b>화면 전체를 덮는다.</b> 예전에는 레이더 무대(정사각형) 안에만
+        깔려서 헤더도 바텀시트도 덮지 못했고, 카드 뒤에 회색 네모 한 장이 떠 있는 것처럼
+        보였다. 여기가 화면 껍데기 바로 밑이라 `inset-0` 이 곧 화면 전체다.
+      */}
+      <AnimatePresence>
+        {fanOpen && (
+          <MyCardsOverlay
+            have={state.have}
+            count={haveCount}
+            onEdit={() => {
+              setFanOpen(false)
+              navigate('/have')
+            }}
+            onClose={() => setFanOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
       <NotificationSheet
         open={notifOpen}
         onClose={() => setNotifOpen(false)}
@@ -728,6 +711,58 @@ function FanGridCard({ selection, index }: { selection: Selection; index: number
       <ItemCard item={item} size="sm" className="shadow-[0_4px_16px_rgba(0,0,0,0.10)]">
         <QtyBadge qty={selection.qty} />
       </ItemCard>
+    </motion.div>
+  )
+}
+
+/**
+ * 내 카드를 펼쳤을 때 화면을 덮는 층.
+ *
+ * <b>덮는 범위가 화면 전체다.</b> 펼친 동안에는 내 카드만 보여야 하는데, 이 층이 레이더
+ * 무대 안에 있으면 헤더와 바텀시트가 그대로 남고 무대 크기의 회색 네모만 한 장 뜬다.
+ * 그래서 화면 껍데기 바로 밑에 두고 `inset-0` 으로 깐다. 바텀시트가 `z-30` 이라 그보다 위다.
+ *
+ * 카드와 글자는 클릭을 받지 않는다. 카드든 카드 사이 빈 곳이든 누르면 그대로 뒤에 깔린
+ * 접기 판으로 떨어져서 접힌다. 되살리는 것은 `FanActions` 의 버튼 둘뿐이다.
+ */
+function MyCardsOverlay({
+  have,
+  count,
+  onEdit,
+  onClose,
+}: {
+  have: Selection[]
+  /** 들고 있는 총 장수. 종류 수는 `have.length` 다. */
+  count: number
+  onEdit: () => void
+  onClose: () => void
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={springSnap}
+      className="absolute inset-0 z-40 flex items-center justify-center bg-neutral-100/90 backdrop-blur-[3px]"
+    >
+      <button
+        type="button"
+        aria-label="내 카드 접기"
+        onClick={onClose}
+        className="absolute inset-0"
+      />
+
+      <div className="pointer-events-none relative flex flex-col items-center">
+        <p className="mb-1 text-center text-[11px] font-bold text-ink md:text-[14px]">
+          내 카드 {have.length}종 {count}장
+        </p>
+
+        <MyCardsFan have={have} onEdit={onEdit} onClose={onClose} />
+
+        <p className="mt-6 text-center text-[12px] text-neutral-400 md:text-[14px]">
+          아무 곳이나 누르면 닫혀요
+        </p>
+      </div>
     </motion.div>
   )
 }
