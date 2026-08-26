@@ -54,9 +54,12 @@ public class BoothHaveItemService {
      *       받아 봐야 교환이 되지 않기 때문이다
      * </ul>
      *
-     * <p>순서는 교환이 바로 성립하는 것(줄 수 있는 카드가 있음) → {@code haveItemId}
-     * 오름차순이다. <b>마지막 기준이 없으면 안 된다.</b> 앞 기준이 같은 행끼리 순서가 매번
-     * 달라져서, 페이지를 넘길 때 같은 줄이 두 번 나오거나 빠진다.
+     * <p>순서는 <b>내가 찾는 카드를 등록한 순서</b> → {@code haveItemId} 오름차순이다. 가장 먼저
+     * 찾겠다고 적은 카드가 목록 맨 위에 온다. 희망 카드를 등록하지 않았으면 순위가 전부 같아져서
+     * {@code haveItemId} 오름차순, 즉 먼저 등록된 순으로 떨어진다 (시안 desc 165:3500 5번).
+     *
+     * <p><b>마지막 기준이 없으면 안 된다.</b> 앞 기준이 같은 행끼리 순서가 매번 달라져서,
+     * 페이지를 넘길 때 같은 줄이 두 번 나오거나 빠진다.
      */
     public PageResponse<BoothHaveItemResponseDto> findByBooth(
             Long boothId, UUID userId, int page, int size) {
@@ -88,13 +91,15 @@ public class BoothHaveItemService {
 
         Set<UUID> matchedOwnerIds = matchedOwnerIds(userId);
         Predicate<UserHaveItem> keep = keepRule(myWantItemIds, myHaveItemNames.keySet());
+        Map<Long, Integer> wantRank = wantRank(myWantItemIds);
 
         List<BoothHaveItemResponseDto> sorted = rows.stream()
                 .filter(keep)
                 .map(row -> toDto(row, myWantItemIds, myHaveItemNames, matchedOwnerIds,
                         wantNamesByOwner, wantItemIdsByOwner))
                 .sorted(Comparator
-                        .comparing(BoothHaveItemResponseDto::exchangeable).reversed()
+                        .comparingInt((BoothHaveItemResponseDto dto) ->
+                                wantRank.getOrDefault(dto.item().id(), Integer.MAX_VALUE))
                         .thenComparing(BoothHaveItemResponseDto::haveItemId))
                 .toList();
 
@@ -112,6 +117,22 @@ public class BoothHaveItemService {
             return row -> !myHaveItemIds.contains(row.getItem().getId());
         }
         return row -> myWantItemIds.contains(row.getItem().getId());
+    }
+
+    /**
+     * 내가 찾는 카드의 등록 순위. 목록을 이 순서로 세운다.
+     *
+     * <p>{@code myWantItemIds} 가 {@link LinkedHashSet} 이고 그 원본 쿼리가 {@code id} 오름차순
+     * 이라, 담긴 순서가 곧 내가 등록한 순서다. 여기서 다시 정렬하지 않는다.
+     *
+     * <p>목록에 없는 카드는 부르는 쪽이 {@link Integer#MAX_VALUE} 로 받아 맨 뒤로 간다.
+     */
+    private Map<Long, Integer> wantRank(Set<Long> myWantItemIds) {
+        Map<Long, Integer> rank = new LinkedHashMap<>();
+        for (Long itemId : myWantItemIds) {
+            rank.put(itemId, rank.size());
+        }
+        return rank;
     }
 
     private BoothHaveItemResponseDto toDto(

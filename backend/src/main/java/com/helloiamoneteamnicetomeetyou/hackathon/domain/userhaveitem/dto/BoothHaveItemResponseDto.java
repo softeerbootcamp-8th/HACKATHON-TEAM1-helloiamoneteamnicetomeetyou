@@ -63,7 +63,7 @@ public record BoothHaveItemResponseDto(
                 ownerWantedItemNames);
     }
 
-    /** 줄 수 있는 카드가 있으면 교환이 바로 성립한다. 정렬에서 위로 올리는 기준이다. */
+    /** 줄 수 있는 카드가 있으면 교환이 바로 성립한다. 화면의 "교환 가능" 배지 기준이다. */
     public boolean exchangeable() {
         return !givableItemNames.isEmpty();
     }
