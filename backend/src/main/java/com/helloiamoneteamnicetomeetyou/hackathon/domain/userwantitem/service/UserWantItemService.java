@@ -60,7 +60,7 @@ public class UserWantItemService {
         // 내놓기로 한 카드를 동시에 찾을 수는 없다. 화면이 그 카드를 비활성으로 막고 있지만,
         // 화면 제어만으로는 보장되지 않는다. 두 목록에 같은 카드가 들어가면 매칭이 그 카드를
         // 주면서 동시에 받는 교환을 만든다.
-        if (userHaveItemRepository.existsByUserIdAndItemId(userId, itemId)) {
+        if (userHaveItemRepository.existsByUserIdAndItemIdAndQuantityLeftGreaterThan(userId, itemId, 0)) {
             throw new ApplicationException(ErrorCode.ITEM_ALREADY_IN_HAVE);
         }
 
