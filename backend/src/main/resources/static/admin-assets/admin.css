@@ -1517,7 +1517,8 @@ dialog.sheet .sheet-actions {
   transition: border-color var(--out), background var(--out), transform var(--snap);
 }
 
-.tile input {
+/* 고르는 체크박스만 숨긴다. 타일 안에는 수량 칸도 있어서 input 전체를 잡으면 그것까지 사라진다. */
+.tile > input[type='checkbox'] {
   position: absolute;
   opacity: 0;
   pointer-events: none;
@@ -1614,6 +1615,39 @@ dialog.sheet .sheet-actions {
 
 .tile:has(input:focus-visible) {
   box-shadow: 0 0 0 4px var(--brand-ring);
+}
+
+/* 고른 카드의 장수. 고르기 전에는 자리를 차지하지 않는다. */
+.tile-qty {
+  display: none;
+  align-items: center;
+  gap: 3px;
+}
+
+.tile:has(input:checked) .tile-qty {
+  display: flex;
+}
+
+/* 타일 폭이 104px 이라 스테퍼를 목록의 것보다 한 단계 작게 둔다. */
+.tile-qty .icon-btn {
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+}
+
+/* 칸이 좁아서 브라우저 기본 화살표를 띄우면 숫자가 가린다. +/- 로 대신한다. */
+.tile-qty .input.qty {
+  width: 34px;
+  height: 22px;
+  font-size: 12px;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.tile-qty .input.qty::-webkit-outer-spin-button,
+.tile-qty .input.qty::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
 }
 
 /* 검색에 안 걸린 것 */

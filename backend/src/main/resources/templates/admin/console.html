@@ -678,7 +678,7 @@
               <header>
                 <div>
                   <p class="pick-title">내놓는 카드</p>
-                  <p class="pick-desc">남에게 줄 수 있는 카드</p>
+                  <p class="pick-desc">남에게 줄 수 있는 카드. 고르면 장수를 정할 수 있다</p>
                 </div>
                 <input class="input sm search" type="search" placeholder="카드 또는 부스 검색" data-filter="#have-grid" />
               </header>
@@ -696,6 +696,25 @@
                   <span class="tile-name" th:text="${i.name}">카드</span>
                   <span class="tile-booth" th:text="${i.boothName}">부스</span>
                   <span class="tile-check">✓</span>
+                  <!--/*
+                    고른 카드의 장수. 고르기 전에는 안 보이고, 안 고른 타일의 칸은 disabled 라
+                    폼에 실리지 않는다. 그래서 서버가 받는 수량 목록은 고른 카드와 같은 순서,
+                    같은 길이가 된다. 스크립트가 안 뜨면 수량이 통째로 빠지고 전부 1 장이 되는데,
+                    그건 이 화면이 원래 하던 동작이라 부스에서 사람을 못 만드는 일은 없다.
+                  */-->
+                  <span class="tile-qty">
+                    <button class="icon-btn" type="button" data-tile-step="-1" aria-label="내놓는 카드 한 장 빼기">−</button>
+                    <input
+                      class="input qty"
+                      type="number"
+                      name="haveQuantities"
+                      value="1"
+                      min="1"
+                      disabled
+                      aria-label="내놓는 카드 장수"
+                    />
+                    <button class="icon-btn" type="button" data-tile-step="1" aria-label="내놓는 카드 한 장 더">+</button>
+                  </span>
                 </label>
               </div>
             </section>
@@ -722,6 +741,25 @@
                   <span class="tile-name" th:text="${i.name}">카드</span>
                   <span class="tile-booth" th:text="${i.boothName}">부스</span>
                   <span class="tile-check">✓</span>
+                  <!--/*
+                    고른 카드의 장수. 고르기 전에는 안 보이고, 안 고른 타일의 칸은 disabled 라
+                    폼에 실리지 않는다. 그래서 서버가 받는 수량 목록은 고른 카드와 같은 순서,
+                    같은 길이가 된다. 스크립트가 안 뜨면 수량이 통째로 빠지고 전부 1 장이 되는데,
+                    그건 이 화면이 원래 하던 동작이라 부스에서 사람을 못 만드는 일은 없다.
+                  */-->
+                  <span class="tile-qty">
+                    <button class="icon-btn" type="button" data-tile-step="-1" aria-label="찾는 카드 한 장 빼기">−</button>
+                    <input
+                      class="input qty"
+                      type="number"
+                      name="wantQuantities"
+                      value="1"
+                      min="1"
+                      disabled
+                      aria-label="찾는 카드 장수"
+                    />
+                    <button class="icon-btn" type="button" data-tile-step="1" aria-label="찾는 카드 한 장 더">+</button>
+                  </span>
                 </label>
               </div>
             </section>

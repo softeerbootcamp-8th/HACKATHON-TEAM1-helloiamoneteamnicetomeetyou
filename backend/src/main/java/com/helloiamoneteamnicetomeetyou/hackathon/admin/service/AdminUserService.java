@@ -22,9 +22,9 @@ import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseConnectionManage
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -155,21 +155,46 @@ public class AdminUserService {
      * 사람이 지금 하나 더 필요하다" 가 되는 경우가 더 많다. 그때 만들고 나서 카드를 따로 붙이면
      * 손이 두 번 가고, 그 사이에 관람객이 기다린다.
      *
+     * <p>수량은 고른 카드와 같은 순서로 온다. 화면이 고르지 않은 타일의 수량 칸을 꺼서 보내기
+     * 때문에 두 목록의 길이가 같다. 그래도 어긋난 채로 오면 그 자리는 1 로 본다. 수량이 하나
+     * 틀린 것보다 사용자가 아예 안 만들어지는 쪽이 부스에서 더 곤란하다.
+     *
      * @param haveItemIds 내놓는 카드. 비어 있어도 된다
+     * @param haveQuantities 내놓는 카드의 장수. 비어 있으면 전부 1 장이다
      * @param wantItemIds 찾는 카드. 비어 있어도 된다
+     * @param wantQuantities 찾는 카드의 장수. 비어 있으면 전부 1 장이다
      */
     @Transactional
-    public UUID createDummy(String username, List<Long> haveItemIds, List<Long> wantItemIds) {
+    public UUID createDummy(
+            String username,
+            List<Long> haveItemIds,
+            List<Integer> haveQuantities,
+            List<Long> wantItemIds,
+            List<Integer> wantQuantities) {
+
         UUID userId = createDummy(username);
 
-        if (haveItemIds != null) {
-            haveItemIds.stream().filter(Objects::nonNull).forEach(itemId -> addHaveItem(userId, itemId, 1));
-        }
-        if (wantItemIds != null) {
-            wantItemIds.stream().filter(Objects::nonNull).forEach(itemId -> addWantItem(userId, itemId));
-        }
+        forEachPicked(haveItemIds, haveQuantities, (itemId, quantity) -> addHaveItem(userId, itemId, quantity));
+        forEachPicked(wantItemIds, wantQuantities, (itemId, quantity) -> addWantItem(userId, itemId, quantity));
 
         return userId;
+    }
+
+    /** 고른 카드를 하나씩 훑는다. 짝이 없거나 1 보다 작은 수량은 1 로 본다. */
+    private void forEachPicked(List<Long> itemIds, List<Integer> quantities, BiConsumer<Long, Integer> action) {
+        if (itemIds == null) {
+            return;
+        }
+
+        for (int i = 0; i < itemIds.size(); i++) {
+            Long itemId = itemIds.get(i);
+            if (itemId == null) {
+                continue;
+            }
+
+            Integer quantity = quantities != null && i < quantities.size() ? quantities.get(i) : null;
+            action.accept(itemId, quantity == null || quantity < 1 ? 1 : quantity);
+        }
     }
 
     @Transactional
@@ -227,12 +252,17 @@ public class AdminUserService {
     /**
      * 찾는 카드를 붙인다. 이미 있으면 개수만 덮어쓴다.
      *
-     * <p>{@link #addHaveItem} 과 같은 이유로 사용자 화면과 같은 서비스를 부른다. 어드민에는
-     * 찾는 개수를 넣는 자리가 없어서 1 로 만든다.
+     * <p>{@link #addHaveItem} 과 같은 이유로 사용자 화면과 같은 서비스를 부른다.
      */
     @Transactional
+    public void addWantItem(UUID userId, Long itemId, int quantity) {
+        userWantItemService.register(userId, itemId, quantity);
+    }
+
+    /** 카드 화면처럼 수량을 고를 자리가 없는 곳에서 부른다. */
+    @Transactional
     public void addWantItem(UUID userId, Long itemId) {
-        userWantItemService.register(userId, itemId, 1);
+        addWantItem(userId, itemId, 1);
     }
 
     @Transactional
