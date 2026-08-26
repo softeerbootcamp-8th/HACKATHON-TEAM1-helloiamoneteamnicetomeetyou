@@ -20,33 +20,41 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum PushMessage {
 
-    // 자동 매칭. 문구는 시안(204:5163)을 그대로 옮겼다.
+    // 자동 매칭. 문구는 UX 라이팅 정리판을 따른다.
     MATCH_SUGGESTED(
-            SseEventType.MATCH_SUGGESTED, "내가 원하는 굿즈로 교환할 수 있어요!", "탭하여 확인해 보세요", "/match"),
+            SseEventType.MATCH_SUGGESTED, "딱 맞는 교환 상대를 찾았어요! 🎯", "탭하여 확인해 보세요", "/match"),
     MATCH_ACCEPTED(SseEventType.MATCH_ACCEPTED, "교환이 성사됐어요", "만날 자리를 정해 주세요", "/match"),
-    MATCH_REJECTED(SseEventType.MATCH_REJECTED, "상대가 교환을 거절했어요", "다시 상대를 찾아볼까요", "/home"),
-    // 찔러보기. 문구는 시안(204:5032, 204:5154)을 그대로 옮겼다.
-    POKE_RECEIVED(SseEventType.POKE_RECEIVED, "교환 신청이 왔어요~", "탭하여 확인해 보세요", "/poke/received"),
-    POKE_ACCEPTED(SseEventType.POKE_ACCEPTED, "상대방이 내 신청을 받아들였어요!", "만날 자리를 정해 주세요", "/match"),
-    POKE_REJECTED(SseEventType.POKE_REJECTED, "상대가 교환을 거절했어요", "다른 상대를 찾아보세요", "/home"),
+    MATCH_REJECTED(SseEventType.MATCH_REJECTED, "상대가 이번엔 패스했어요", "새 상대를 찾아볼까요", "/home"),
+    // 찔러보기. 문구는 UX 라이팅 정리판을 따른다.
+    POKE_RECEIVED(
+            SseEventType.POKE_RECEIVED, "누가 나를 찔러봤어요! 👀", "탭하여 확인해 보세요", "/poke/received"),
+    POKE_ACCEPTED(
+            SseEventType.POKE_ACCEPTED, "상대가 내 찔러보기를 받아줬어요! 🙌", "만날 자리를 정해 주세요", "/match"),
+    POKE_REJECTED(SseEventType.POKE_REJECTED, "상대가 이번엔 패스했어요", "다른 상대를 찾아보세요", "/home"),
 
-    EXCHANGE_CREATED(SseEventType.EXCHANGE_CREATED, "교환 약속이 잡혔어요", "장소와 시간을 확인해 주세요", "/appointment"),
+    EXCHANGE_CREATED(
+            SseEventType.EXCHANGE_CREATED, "교환 약속이 잡혔어요!", "장소와 시간을 확인해 주세요", "/appointment"),
     /*
-      시간 조율 셋은 시안(204:5172, 225:27731, 204:5181)의 문구를 그대로 옮겼다. 여는 화면이
+      시간 조율 셋은 UX 라이팅 정리판의 문구를 따른다. 여는 화면이
       /appointment 가 아니라 /time 인 것에 주의한다. 셋 다 시간을 다시 고르러 가는 알림이다.
     */
     EXCHANGE_TIME_REQUESTED(
-            SseEventType.EXCHANGE_TIME_REQUESTED, "혹시... 다른 시간도 가능하세요?", "시간을 다시 골라 주세요", "/time"),
+            SseEventType.EXCHANGE_TIME_REQUESTED, "혹시… 다른 시간도 될까요?", "시간을 다시 골라 주세요", "/time"),
     EXCHANGE_TIME_MATCHED(
-            SseEventType.EXCHANGE_TIME_MATCHED, "시간 매칭이 완료되었어요!", "맞는 시간을 확인해 주세요", "/time"),
+            SseEventType.EXCHANGE_TIME_MATCHED, "만날 시간이 정해졌어요! ⏰", "맞는 시간을 확인해 주세요", "/time"),
     EXCHANGE_TIME_MISMATCHED(
-            SseEventType.EXCHANGE_TIME_MISMATCHED, "시간 매칭에 실패했어요", "시간을 다시 골라 주세요", "/time"),
+            SseEventType.EXCHANGE_TIME_MISMATCHED, "겹치는 시간을 못 찾았어요", "시간을 다시 골라 주세요", "/time"),
 
-    EXCHANGE_TIME_UPDATED(SseEventType.EXCHANGE_TIME_UPDATED, "약속 시간이 정해졌어요", "새 시간을 확인해 주세요", "/appointment"),
-    EXCHANGE_PLACE_UPDATED(SseEventType.EXCHANGE_PLACE_UPDATED, "만나는 자리가 바뀌었어요", "어디서 만나는지 다시 확인해 주세요", "/appointment"),
+    EXCHANGE_TIME_UPDATED(
+            SseEventType.EXCHANGE_TIME_UPDATED, "약속 시간이 정해졌어요!", "새 시간을 확인해 주세요", "/appointment"),
+    EXCHANGE_PLACE_UPDATED(
+            SseEventType.EXCHANGE_PLACE_UPDATED,
+            "만나는 자리가 바뀌었어요",
+            "어디서 만나는지 다시 확인해 주세요",
+            "/appointment"),
     EXCHANGE_CANCELLED(
             SseEventType.EXCHANGE_CANCELLED,
-            "약속이 취소되었어요... 다른 사람과 교환하시겠어요?",
+            "약속이 취소됐어요… 새 상대를 찾아볼까요?",
             "다시 상대를 찾아보세요",
             "/home");
 

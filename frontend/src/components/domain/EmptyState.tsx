@@ -13,7 +13,7 @@ export function EmptyState({
   title,
   description,
   icon,
-  actionLabel = '교환 대기장으로',
+  actionLabel = '교환 대기존으로',
   onAction,
 }: {
   title: string

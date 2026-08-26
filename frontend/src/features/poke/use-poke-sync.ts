@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 
+import { objectParticle } from '@/store/identity-mark'
 import { useStore } from '@/store/useStore'
 
 import type { SentPoke } from './api'
@@ -78,9 +79,10 @@ export function usePokeSync() {
     const last = latestOf(fresh)
     if (!last) return
 
+    const name = last.requestedItem.name
     dispatch({
       type: 'toast',
-      message: `${last.requestedItem.name} 교환이 거절되었어요`,
+      message: `${name}${objectParticle(name)} 교환할 수 없어요`,
     })
   }, [loaded, sent, dispatch])
 }

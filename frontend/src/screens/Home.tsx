@@ -403,7 +403,7 @@ export function Home() {
             ? '아무 곳이나 누르면 닫혀요'
             : dragging
               ? '놓아주면 찔러보기가 전송돼요'
-              : '내 카드 묶음을 상대 카드 위에 끌어서 놓아보세요'}
+              : '내 카드를 상대 카드 위로 끌어보세요'}
         </p>
 
         {/* 레이더에 올라온 카드를 뒷순위로 새로 채운다. 답변을 기다리는 카드는 남는다. */}
@@ -477,7 +477,7 @@ export function Home() {
                   </div>
 
                   <p className="mt-0.5 text-[10px] font-medium text-[#aeaeb2]">
-                    내가 줄 수 있는 카드
+                    내가 건넬 수 있는 카드
                   </p>
                   <p className="truncate text-[11px] text-[#8b8b8b]">
                     {row.givableItemNames.length > 0
@@ -509,15 +509,17 @@ export function Home() {
   const listHeader = (
     <div className="flex items-end justify-between">
       {/* 시안 desc 165:3500 5번 — 접힌 머리에는 제목과 전체 개수만 있다. */}
-      <span className="text-[17px] font-extrabold text-ink">전체리스트</span>
-      <span className="text-[12px] text-neutral-400">전체 {listCount}개</span>
+      <span className="text-[17px] font-extrabold text-ink">지금 대기존에 올라온 카드</span>
+      <span className="text-[12px] text-neutral-400">{listCount}개 대기 중</span>
     </div>
   )
 
   return (
     <div className="relative flex h-full flex-col">
       <header className="flex shrink-0 items-center justify-between px-5 pt-2 md:px-10 md:pt-4">
-        <h1 className="pl-1 text-[23px] font-extrabold tracking-[-0.02em] text-ink">교환 대기장</h1>
+        <h1 className="pl-1 text-[23px] font-extrabold tracking-[-0.02em] text-ink">
+          교환 대기존 🎡
+        </h1>
         <div className="flex items-center gap-1">
           <motion.button
             type="button"
@@ -568,7 +570,7 @@ export function Home() {
                 className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-1.5 text-[12px] font-bold text-white"
               >
                 <span className="anim-blink size-1.5 rounded-full bg-alarm" />
-                자동 매칭 중
+                교환 상대 찾는 중...
               </motion.span>
             )
           )}

@@ -49,7 +49,10 @@ export function MatchResult() {
       dispatch({ type: 'exchange-synced', exchange, myUserId, match, activate: true })
       navigate('/place')
     } catch {
-      dispatch({ type: 'toast', message: '교환 장소를 열지 못했어요. 잠시 후 다시 시도해주세요' })
+      dispatch({
+        type: 'toast',
+        message: '만날 장소를 열지 못했어요. 잠시 뒤에 다시 시도해 주세요',
+      })
     } finally {
       setAccepting(false)
     }
@@ -59,7 +62,7 @@ export function MatchResult() {
     return (
       <EmptyState
         title="진행 중인 매칭이 없어요"
-        description={'교환 대기장에서 원하는 카드를\n먼저 찔러보세요.'}
+        description={'교환 대기존에서 원하는 카드를\n먼저 찔러보세요.'}
         onAction={() => navigate('/home')}
       />
     )
@@ -68,15 +71,13 @@ export function MatchResult() {
   const fromPoke = match.origin === 'poke'
 
   const headline = fromPoke
-    ? '이렇게 교환할게요'
+    ? '이렇게 교환해요!'
     : match.kind === 'ONE_TO_ONE'
-      ? '서로 원하는 카드가\n정확히 맞았어요'
-      : '셋이 교환하면\n모두 원하는 걸 얻어요'
+      ? '딱 맞는 상대를\n찾았어요! 🎯'
+      : '셋이 모이니\n모두 원하는 걸 얻어요!'
 
   const sub =
-    match.kind === 'ONE_TO_ONE'
-      ? '상대와 교환할 카드를 확인하세요.'
-      : '아래와 같이 카드가 교환돼요.'
+    match.kind === 'ONE_TO_ONE' ? '서로 주고받을 카드를 확인해요' : '이렇게 카드가 이어져요'
 
   return (
     <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
@@ -117,9 +118,11 @@ export function MatchResult() {
 
       <div className="shrink-0 px-6 pt-4 pb-8">
         <Button disabled={accepting} onClick={() => void goToPlace()}>
-          {accepting ? '교환 장소를 여는 중' : '교환 장소 확인하기'}
+          {accepting ? '만날 장소 여는 중' : fromPoke ? '만날 장소 확인하기' : '만날 장소 정하기'}
         </Button>
-        {!fromPoke && <TextButton onClick={() => setRejectOpen(true)}>거절하기</TextButton>}
+        {!fromPoke && (
+          <TextButton onClick={() => setRejectOpen(true)}>이번엔 패스할게요</TextButton>
+        )}
       </div>
 
       <RejectDialog

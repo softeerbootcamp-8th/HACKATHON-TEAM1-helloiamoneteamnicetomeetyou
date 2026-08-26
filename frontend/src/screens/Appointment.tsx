@@ -11,7 +11,7 @@ import { TopBar } from '@/components/ui/TopBar'
 import { arriveAtExchange } from '@/lib/exchange'
 import { springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
-import { identityMarkAt, objectParticle, usePrefetchMark } from '@/store/identity-mark'
+import { identityMarkAt, usePrefetchMark } from '@/store/identity-mark'
 import { useCancelAppointment } from '@/store/use-cancel-appointment'
 import { getDeviceId } from '@/store/identity'
 import { activeAppointment } from '@/store/reducer'
@@ -77,7 +77,7 @@ export function Appointment() {
           transition={springSnap}
           className="text-[26px] font-extrabold tracking-[-0.02em] text-ink"
         >
-          {remainingLabel(appt.confirmedLabel)}
+          {remainingLabel(appt.confirmedLabel, identityMarkAt(appt.identityMark).emoji)}
         </motion.h1>
 
         <motion.div
@@ -136,10 +136,9 @@ export function Appointment() {
 
       <div className="shrink-0 px-6 pt-4 pb-8">
         <Button disabled={busy} onClick={() => void goIdentify()}>
-          ‘{identityMarkAt(appt.identityMark).name}’
-          {objectParticle(identityMarkAt(appt.identityMark).name)} 찾아볼까요
+          ‘{identityMarkAt(appt.identityMark).name}’ 찾기 {identityMarkAt(appt.identityMark).emoji}
         </Button>
-        <TextButton onClick={() => setCancelOpen(true)}>약속 취소하기</TextButton>
+        <TextButton onClick={() => setCancelOpen(true)}>약속 취소</TextButton>
       </div>
 
       <BreakupDialog
@@ -158,13 +157,19 @@ export function Appointment() {
 }
 
 /**
- * 약속까지 남은 시간. 시안이 30분을 기준으로 문구를 가른다.
- * 30분보다 가까우면 몇 분 남았는지 적고, 그보다 멀면 "잠시 뒤에 만나요" 로 뭉뚱그린다.
+ * 약속까지 남은 시간. UX 라이팅 정리판의 `{남은시간}분 뒤에 만나요` 규칙이다.
+ *
+ * 아직 먼 약속에 분을 세어 주면 "97분 뒤" 같은 읽기 어려운 수가 나와서, 한 시간이 넘으면
+ * 그냥 약속 시각을 적는다. 반대로 코앞이면 분을 세는 것보다 고개를 드는 것이 먼저라
+ * 과일과 함께 "곧 만나요" 로 바꾼다.
  */
-function remainingLabel(confirmedLabel: string | null): string {
+function remainingLabel(confirmedLabel: string | null, emoji: string): string {
   const minutes = minutesUntil(confirmedLabel)
-  if (minutes === null || minutes >= 30) return '잠시 뒤에 만나요'
-  return `${Math.max(minutes, 1)}분 뒤에 만나요`
+  if (minutes === null) return '잠시 뒤에 만나요'
+  if (minutes < 0) return '지금 만나는 중이에요'
+  if (minutes <= 2) return `곧 만나요! ${emoji}`
+  if (minutes <= 60) return `${minutes}분 뒤에 만나요`
+  return `${confirmedLabel}에 만나요`
 }
 
 /** "2:45" 같은 라벨을 오늘 그 시각으로 읽고 지금까지 몇 분 남았는지 센다. */

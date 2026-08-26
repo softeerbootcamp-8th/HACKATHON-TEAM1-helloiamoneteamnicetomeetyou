@@ -218,7 +218,7 @@ export function reducer(state: State, action: Action): State {
         ...state,
         match: action.match,
         autoMatching: false,
-        notifications: notify(state, 'match', '내가 원하는 굿즈로 교환할 수 있어요!', NOTICE_BODY),
+        notifications: notify(state, 'match', '딱 맞는 교환 상대를 찾았어요! 🎯', NOTICE_BODY),
       }
     }
 
@@ -257,8 +257,8 @@ export function reducer(state: State, action: Action): State {
         ...state,
         match: null,
         autoMatching: state.appointments.length === 0,
-        notifications: notify(state, 'match-rejected', '상대가 교환을 거절했어요', NOTICE_BODY),
-        toast: '상대가 거절해서 다시 상대를 찾을게요.',
+        notifications: notify(state, 'match-rejected', '상대가 이번엔 패스했어요', NOTICE_BODY),
+        toast: '상대가 패스했어요. 새 상대를 찾아드릴게요',
       }
     }
 
@@ -271,7 +271,7 @@ export function reducer(state: State, action: Action): State {
         ...state,
         match: null,
         autoMatching: state.appointments.length === 0,
-        toast: '교환을 거절했어요. 다시 상대를 찾을게요.',
+        toast: '이번 교환은 패스했어요. 새 상대를 찾아드릴게요',
       }
     }
 
@@ -317,7 +317,7 @@ export function reducer(state: State, action: Action): State {
         activeAppointmentId: action.activate ? next.exchangeId : state.activeAppointmentId,
         autoMatching: false,
         notifications: overlapAppeared
-          ? notify(state, 'time-matched', '시간 매칭이 완료되었어요!', NOTICE_BODY)
+          ? notify(state, 'time-matched', '만날 시간이 정해졌어요! ⏰', NOTICE_BODY)
           : state.notifications,
       }
     }
@@ -335,13 +335,8 @@ export function reducer(state: State, action: Action): State {
     case 'request-time-again':
       return {
         ...state,
-        notifications: notify(
-          state,
-          'time-request',
-          '혹시... 다른 시간도 가능하세요?',
-          NOTICE_BODY,
-        ),
-        toast: '상대에게 시간 조율을 요청했어요',
+        notifications: notify(state, 'time-request', '혹시… 다른 시간도 될까요?', NOTICE_BODY),
+        toast: '상대에게 다른 시간을 물어봤어요',
       }
 
     case 'complete': {
