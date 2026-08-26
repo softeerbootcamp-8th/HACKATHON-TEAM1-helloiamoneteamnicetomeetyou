@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { RejectDialog } from '@/components/domain/ConfirmDialogs'
@@ -36,20 +36,27 @@ export function PlaceSelect() {
   const here = appt?.zone ?? null
   const zones = state.zones
   const [moving, setMoving] = useState(false)
+  const myUserId = useMemo(() => getDeviceId(), [])
 
   /**
    * 핀을 눌러 자리를 옮긴다.
    *
    * 이미 그 자리면 서버를 부르지 않는다. 같은 값을 저장해 봐야 상대에게 "자리가 바뀌었어요"
    * 알림만 한 번 더 가고 화면은 그대로다.
+   *
+   * <b>응답으로 화면을 맞춘다.</b> 서버는 자리를 바꾼 본인에게는 일부러 실시간 알림을 보내지
+   * 않는다(`ExchangeService.updateZone`). 방금 자기가 한 행동이 자기 알림함에 쌓이기 때문인데,
+   * 그래서 누른 사람의 화면을 갱신할 길이 이 응답뿐이다. 전에는 이걸 버려서 핀을 눌러도
+   * 서버에만 저장되고 아래 자리 카드와 진한 핀은 옛 자리에 그대로 있었다. 상대 화면은
+   * 알림을 받아 옮겨졌기 때문에, 정작 자리를 옮긴 사람만 다른 곳을 보고 있었다.
    */
   const moveTo = async (zoneId: number) => {
     if (!appt || moving || zoneId === here?.id) return
 
     setMoving(true)
     try {
-      // 저장하면 서버가 참가자 전원에게 알리고, 그 신호를 받아 store 가 다시 읽는다.
-      await updateExchangeZone(appt.exchangeId, getDeviceId(), zoneId)
+      const exchange = await updateExchangeZone(appt.exchangeId, myUserId, zoneId)
+      dispatch({ type: 'exchange-synced', exchange, myUserId })
     } catch (error) {
       dispatch({ type: 'toast', message: messageOf(error) })
     } finally {
@@ -62,9 +69,7 @@ export function PlaceSelect() {
       <TopBar onBack={() => navigate('/home')} onClose={() => setRejectOpen(true)} />
 
       <div className="flex-1 overflow-y-auto px-6 no-scrollbar">
-        <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink">
-          교환 장소를 정해주세요
-        </h1>
+        <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink">어디서 만날까요?</h1>
         <p className="mt-2 text-[13px] text-neutral-400">핀을 누르면 만날 자리가 바뀌어요</p>
 
         <div className="relative mt-6 h-[230px] overflow-hidden rounded-2xl bg-neutral-100">
@@ -131,7 +136,7 @@ export function PlaceSelect() {
           </span>
           <div>
             <p className="text-[15px] font-bold text-ink">
-              {here?.name ?? '교환 장소를 불러오는 중'}
+              {here?.name ?? '만날 자리를 불러오는 중'}
             </p>
             <p className="text-[12px] text-neutral-400">{here?.location ?? ''}</p>
           </div>
@@ -139,7 +144,7 @@ export function PlaceSelect() {
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
-        <Button onClick={() => navigate('/time')}>시간 선택하기</Button>
+        <Button onClick={() => navigate('/time')}>시간 정하러 가기</Button>
       </div>
 
       <RejectDialog

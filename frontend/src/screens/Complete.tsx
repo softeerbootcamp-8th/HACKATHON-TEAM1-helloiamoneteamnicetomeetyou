@@ -36,7 +36,7 @@ export function Complete() {
           transition={springSnap}
           className="text-center text-[26px] font-extrabold tracking-[-0.02em] text-ink"
         >
-          교환이 완료되었어요!
+          교환 완료! 🎉
         </motion.h1>
         <motion.div
           initial={{ opacity: 0, scale: 0.7, rotate: -12 }}
@@ -78,7 +78,7 @@ export function Complete() {
             navigate('/')
           }}
         >
-          교환 끝 ~
+          교환 끝~
         </TextButton>
       </div>
     </div>

@@ -138,6 +138,41 @@
   }
 
   /* ------------------------------------------------------------------
+     타일에 붙은 장수.
+
+     고른 카드에만 칸을 열어 준다. 안 고른 타일의 칸은 disabled 로 둬서 폼에 실리지
+     않게 하는데, 그래야 서버가 받는 수량 목록이 고른 카드와 같은 순서, 같은 길이가 된다.
+     체크박스만으로는 무엇을 골랐는지가 오고 수량은 안 오기 때문에 둘을 이렇게 맞춘다.
+
+     타일이 label 이라 안에서 누르는 것이 전부 체크를 뒤집을 수 있다. 수량을 만지려다
+     골라 둔 카드가 풀리면 안 되므로 여기서 이벤트를 잡아 둔다.
+     ------------------------------------------------------------------ */
+  function tileQuantities() {
+    document.querySelectorAll('.tile-qty').forEach(function (box) {
+      var tile = box.closest('.tile');
+      var pick = tile.querySelector('input[type="checkbox"]');
+      var input = box.querySelector('input[type="number"]');
+
+      pick.addEventListener('change', function () {
+        input.disabled = !pick.checked;
+        if (!pick.checked) input.value = '1';
+      });
+
+      box.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-tile-step]');
+        if (button) {
+          var next = Number(input.value) + Number(button.dataset.tileStep);
+          if (next >= 1) input.value = next;
+        }
+
+        // 타일(label)까지 올라가면 카드 선택이 뒤집힌다.
+        event.preventDefault();
+        event.stopPropagation();
+      });
+    });
+  }
+
+  /* ------------------------------------------------------------------
      줄을 통째로 누르면 링크로 간다.
 
      행 안에 버튼이 있어서 <a> 로 감쌀 수 없다. 버튼을 누른 것인지 빈 곳을 누른 것인지
@@ -227,6 +262,7 @@
     guardForms();
     lockOnSubmit();
     steppers();
+    tileQuantities();
     linkedRows();
   });
 })();

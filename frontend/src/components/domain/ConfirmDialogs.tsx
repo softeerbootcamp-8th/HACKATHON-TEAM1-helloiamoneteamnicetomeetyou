@@ -19,10 +19,10 @@ export function RejectDialog({
   return (
     <Dialog
       open={open}
-      title="교환을 거절할까요?"
-      description="거절하면 다시 상대를 찾습니다."
+      title="이번 교환은 패스할까요?"
+      description="괜찮아요, 새 교환 상대를 찾아드릴게요"
       primary={{ label: '아니요', onClick: onKeep }}
-      secondary={{ label: '거절할게요', onClick: onReject }}
+      secondary={{ label: '패스할게요', onClick: onReject }}
       onDismiss={onKeep}
     />
   )
@@ -45,9 +45,9 @@ export function BreakupDialog({
   return (
     <Dialog
       open={open}
-      title="새로운 상대를 찾으시겠어요?"
-      description="지금 약속은 취소되고 상대에게도 알려 드려요."
-      primary={{ label: '네', onClick: onFindNew, tone: 'brand' }}
+      title="새 상대를 찾아볼까요?"
+      description="이번 교환은 아쉽지만, 바로 다음 상대를 찾아드릴게요"
+      primary={{ label: '네, 찾아주세요', onClick: onFindNew, tone: 'brand' }}
       secondary={{ label: '아니오', onClick: onKeep }}
       onDismiss={onKeep}
     />

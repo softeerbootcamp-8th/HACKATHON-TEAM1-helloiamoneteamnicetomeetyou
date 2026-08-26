@@ -15,8 +15,9 @@ export function NeedsSelect() {
   return (
     <SelectScreen
       title="내가 찾는 굿즈"
-      heading="찾는 굿즈를 선택하세요"
-      ctaLabel="교환하러 가기"
+      heading="찾고 있는 굿즈를 골라주세요"
+      ctaLabel="상대 찾으러 가기"
+      countSuffix="담았어요"
       allowEmpty
       disabledItemIds={state.have.map((s) => s.itemId)}
       selections={state.needs}

@@ -49,7 +49,7 @@ export function getPermission(): NotificationPermission | null {
 export async function fetchVapidPublicKey(): Promise<string> {
   const res = await api<CommonResponse<VapidPublicKeyResponseDto>>('/api/push/vapid-public-key')
 
-  if (!res.data?.publicKey) throw new Error('VAPID 공개키를 받지 못했습니다.')
+  if (!res.data?.publicKey) throw new Error('VAPID 공개키를 받지 못했어요')
 
   return res.data.publicKey
 }
@@ -94,7 +94,7 @@ export async function enablePush(userId: string, vapidPublicKey: string): Promis
   const permission = await Notification.requestPermission()
 
   if (permission !== 'granted') {
-    throw new Error('알림 권한이 허용되지 않았습니다.')
+    throw new Error('알림 권한이 꺼져 있어요')
   }
 
   const registration = await navigator.serviceWorker.ready

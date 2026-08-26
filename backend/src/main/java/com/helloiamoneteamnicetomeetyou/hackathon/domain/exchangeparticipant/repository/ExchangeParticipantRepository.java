@@ -76,6 +76,19 @@ public interface ExchangeParticipantRepository extends JpaRepository<ExchangePar
 
     List<ExchangeParticipant> findByUserId(UUID userId);
 
+    /**
+     * 지금 교환에 묶여 있는 사람 전부.
+     *
+     * <p>대기 더미를 채울 때 "이미 짝이 있는 사람" 을 빼려고 쓴다. 사람마다
+     * {@link #existsActiveExchange} 를 부르면 더미 수만큼 쿼리가 나가는데, 진행 중인 교환은
+     * 부스 규모에서 많아야 몇 건이라 한 번에 읽는 편이 훨씬 싸다.
+     */
+    @Query("""
+            select ep.user.id from ExchangeParticipant ep
+            where ep.exchange.status in ('PENDING', 'IN_PROGRESS')
+            """)
+    List<UUID> findActiveUserIds();
+
     /** 부스 초기화에서 쓴다. 교환을 지우기 전에 참가자 줄부터 없애야 FK 에 걸리지 않는다. */
     void deleteByExchangeIdIn(List<Long> exchangeIds);
 

@@ -116,11 +116,17 @@
             <span class="badge brand" th:if="${user.adminManaged}">더미</span>
             <span class="badge" th:unless="${user.adminManaged}">실제 사용자</span>
 
+            <!--/*
+              실제 참가자도 지운다. 부스에서 잘못 등록된 사람을 치울 방법이 어드민에 없어서
+              운영자가 DB 를 직접 열어야 했다. 다만 지워진 사람의 화면은 그때부터 아무것도
+              못 하게 되므로, 더미와 같은 문구로 묻지 않고 그 사실을 확인 문구에 적는다.
+            */-->
             <form
-              th:if="${user.adminManaged}"
               method="post"
               th:action="@{'/admin/users/' + ${user.id} + '/delete'}"
-              th:data-confirm="'이 더미를 지웁니다. 이 사람이 낀 교환과 찔러보기, 등록한 카드, 알림도 같이 지워집니다.'"
+              th:data-confirm="${user.adminManaged}
+                ? '이 더미를 지웁니다. 이 사람이 낀 교환과 찔러보기, 등록한 카드, 알림도 같이 지워집니다.'
+                : '실제 참가자 ' + ${user.username ?: '이름 없음'} + ' 을(를) 지웁니다. 이 사람이 낀 교환과 찔러보기, 등록한 카드, 알림도 같이 지워지고, 지금 앱을 쓰고 있다면 그 화면은 아무것도 할 수 없게 됩니다.'"
             >
               <button class="btn danger sm" type="submit">삭제</button>
             </form>
@@ -678,7 +684,7 @@
               <header>
                 <div>
                   <p class="pick-title">내놓는 카드</p>
-                  <p class="pick-desc">남에게 줄 수 있는 카드</p>
+                  <p class="pick-desc">남에게 줄 수 있는 카드. 고르면 장수를 정할 수 있다</p>
                 </div>
                 <input class="input sm search" type="search" placeholder="카드 또는 부스 검색" data-filter="#have-grid" />
               </header>
@@ -696,6 +702,25 @@
                   <span class="tile-name" th:text="${i.name}">카드</span>
                   <span class="tile-booth" th:text="${i.boothName}">부스</span>
                   <span class="tile-check">✓</span>
+                  <!--/*
+                    고른 카드의 장수. 고르기 전에는 안 보이고, 안 고른 타일의 칸은 disabled 라
+                    폼에 실리지 않는다. 그래서 서버가 받는 수량 목록은 고른 카드와 같은 순서,
+                    같은 길이가 된다. 스크립트가 안 뜨면 수량이 통째로 빠지고 전부 1 장이 되는데,
+                    그건 이 화면이 원래 하던 동작이라 부스에서 사람을 못 만드는 일은 없다.
+                  */-->
+                  <span class="tile-qty">
+                    <button class="icon-btn" type="button" data-tile-step="-1" aria-label="내놓는 카드 한 장 빼기">−</button>
+                    <input
+                      class="input qty"
+                      type="number"
+                      name="haveQuantities"
+                      value="1"
+                      min="1"
+                      disabled
+                      aria-label="내놓는 카드 장수"
+                    />
+                    <button class="icon-btn" type="button" data-tile-step="1" aria-label="내놓는 카드 한 장 더">+</button>
+                  </span>
                 </label>
               </div>
             </section>
@@ -722,6 +747,25 @@
                   <span class="tile-name" th:text="${i.name}">카드</span>
                   <span class="tile-booth" th:text="${i.boothName}">부스</span>
                   <span class="tile-check">✓</span>
+                  <!--/*
+                    고른 카드의 장수. 고르기 전에는 안 보이고, 안 고른 타일의 칸은 disabled 라
+                    폼에 실리지 않는다. 그래서 서버가 받는 수량 목록은 고른 카드와 같은 순서,
+                    같은 길이가 된다. 스크립트가 안 뜨면 수량이 통째로 빠지고 전부 1 장이 되는데,
+                    그건 이 화면이 원래 하던 동작이라 부스에서 사람을 못 만드는 일은 없다.
+                  */-->
+                  <span class="tile-qty">
+                    <button class="icon-btn" type="button" data-tile-step="-1" aria-label="찾는 카드 한 장 빼기">−</button>
+                    <input
+                      class="input qty"
+                      type="number"
+                      name="wantQuantities"
+                      value="1"
+                      min="1"
+                      disabled
+                      aria-label="찾는 카드 장수"
+                    />
+                    <button class="icon-btn" type="button" data-tile-step="1" aria-label="찾는 카드 한 장 더">+</button>
+                  </span>
                 </label>
               </div>
             </section>
@@ -733,6 +777,44 @@
 
           <button class="btn brand" type="submit" style="margin-top: 20px">이 사람 만들기</button>
         </form>
+      </div>
+
+      <!--/*
+        아직 짝이 없는 대기 관람객을 채운다. 부스를 열 때 제일 먼저 누르는 버튼이라 위에 둔다.
+
+        아래의 매칭 케이스와 헷갈리면 안 된다. 케이스로 만든 더미는 이미 짝이 있어서 관람객의
+        후보에서 통째로 빠지고, 그러면 첫 관람객이 카드를 넣어도 상대가 하나도 안 뜬다.
+
+        인원을 입력받지 않는 것은 카드 종류마다 몇 명이 서 있어야 어떤 조합이 들어와도 매칭이
+        붙는지가 계산으로 정해지는 값이라서다. 부스에서 운영자가 고를 일이 아니다.
+      */-->
+      <div class="box">
+        <div class="box-head">부스 열기</div>
+        <div class="box-body">
+          <form method="post" th:action="@{/admin/seed/waiting}">
+            <p class="policy" style="margin-top: 0">
+              카드마다 <b>아직 짝이 없는 대기 관람객</b>을 세웁니다. 관람객이 어떤 카드를 내놓고
+              어떤 카드를 찾든 매칭이 하나는 붙도록 희망 카드를 나눠 배분합니다.
+            </p>
+            <p class="policy">
+              모자란 자리만 채우므로 <b>여러 번 눌러도 됩니다.</b> 매칭이 성사돼 대기자가
+              빠지면 다시 눌러 보충하세요.
+            </p>
+
+            <div class="form-row" style="margin-top: 14px">
+              <div class="field">
+                <label for="waiting-booth">부스</label>
+                <select class="input" id="waiting-booth" name="boothId" required>
+                  <option th:each="b : ${booths}" th:value="${b.id}" th:text="${b.name}"></option>
+                </select>
+              </div>
+              <div class="field" style="flex: 0 0 auto; min-width: 0">
+                <label>&nbsp;</label>
+                <button class="btn brand" type="submit">대기 관람객 채우기</button>
+              </div>
+            </div>
+          </form>
+        </div>
       </div>
 
       <!--/*

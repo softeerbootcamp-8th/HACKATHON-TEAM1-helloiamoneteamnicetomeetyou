@@ -52,23 +52,38 @@ public class Notification {
     @Column(nullable = false, length = 255)
     private String body;
 
+    /**
+     * 이 알림을 만든 교환. 교환과 무관한 알림(찔러보기 수신처럼 아직 교환이 없는 것)은 비어 있다.
+     *
+     * <p><b>이걸 남기는 이유는 지우기 위해서다.</b> 알림은 사람이 탭하거나 스와이프할 때만
+     * 사라진다. 그래서 약속이 끝나거나 취소돼도 "시간 매칭에 실패했어요" 같은 중간 단계 알림이
+     * 대기 화면에 계속 남고, 눌러 봐야 이미 없는 약속 화면으로 간다. 교환 번호가 있어야 그
+     * 교환이 끝나는 순간 딸린 알림을 한 번에 읽음 처리할 수 있다.
+     *
+     * <p>연관관계가 아니라 값으로 둔다. 알림은 교환이 살아 있든 아니든 남는 기록이라 붙잡고
+     * 있을 이유가 없고, 목록 조회가 교환까지 끌고 오게 만들 이유도 없다.
+     */
+    private Long exchangeId;
+
     @Column(nullable = false)
     private boolean isRead;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    private Notification(User recipient, SseEventType type, String title, String body) {
+    private Notification(User recipient, SseEventType type, String title, String body, Long exchangeId) {
         this.recipient = recipient;
         this.type = type;
         this.title = title;
         this.body = body;
+        this.exchangeId = exchangeId;
         this.isRead = false;
         this.createdAt = LocalDateTime.now();
     }
 
-    public static Notification of(User recipient, SseEventType type, String title, String body) {
-        return new Notification(recipient, type, title, body);
+    public static Notification of(
+            User recipient, SseEventType type, String title, String body, Long exchangeId) {
+        return new Notification(recipient, type, title, body, exchangeId);
     }
 
     public void markAsRead() {

@@ -53,7 +53,7 @@ export function MoveStatusBadge({ arrived }: { arrived: boolean }) {
         arrived ? 'bg-brand' : 'bg-neutral-400',
       )}
     >
-      {arrived ? '도착' : '이동중..'}
+      {arrived ? '도착!' : '가는 중..'}
     </span>
   )
 }
@@ -74,7 +74,7 @@ export function OneToOneView({
   if (pairs.length <= 1) {
     return (
       <div className="mt-10 flex items-start justify-center gap-3 md:mt-0">
-        <ExchangeCard itemId={pairs[0].giveItemId} label="내가 주는 카드" badge={giveBadge} />
+        <ExchangeCard itemId={pairs[0].giveItemId} label="내가 건넬 카드" badge={giveBadge} />
         <span className="anim-breathe mt-[86px] text-[20px] text-brand">⇄</span>
         <ExchangeCard itemId={pairs[0].receiveItemId} label="내가 받는 카드" badge={receiveBadge} />
       </div>
@@ -84,7 +84,7 @@ export function OneToOneView({
   return (
     <div className="mt-6 md:mt-0">
       <div className="flex justify-center gap-3">
-        <p className="w-[124px] text-center text-[12px] font-bold text-ink">내가 주는 카드</p>
+        <p className="w-[124px] text-center text-[12px] font-bold text-ink">내가 건넬 카드</p>
         <span className="w-[20px]" />
         <p className="w-[124px] text-center text-[12px] font-bold text-ink">내가 받는 카드</p>
       </div>

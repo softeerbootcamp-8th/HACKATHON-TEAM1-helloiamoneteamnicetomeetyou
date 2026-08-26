@@ -16,7 +16,7 @@ import { useStore } from '@/store/useStore'
  * 로딩 중이나 서버가 끊겼을 때 이 자리를 비우면 첫 화면 맨 위가 잠깐 무너진다.
  */
 const FALLBACK_BOOTH_NAME = '현대자동차 팝업'
-const FALLBACK_BOOTH_DESCRIPTION = '자동차 포토카드 교환'
+const FALLBACK_BOOTH_DESCRIPTION = '포토카드 교환존'
 
 export function Onboarding() {
   const navigate = useNavigate()
@@ -107,11 +107,11 @@ export function Onboarding() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...springPage, delay: 0.12 }}
-          className="mt-8 text-[30px] leading-[1.32] font-extrabold tracking-[-0.02em] text-ink"
+          className="mt-8 text-[clamp(26px,7.4vw,30px)] leading-[1.32] font-extrabold tracking-[-0.02em] text-ink"
         >
-          내 굿즈를 올리면
+          원하는 굿즈를 알려주세요,
           <br />
-          교환 상대를 찾아드려요
+          상대는 NearLy가 찾아줄게요
         </motion.h1>
 
         <motion.p
@@ -120,9 +120,9 @@ export function Onboarding() {
           transition={{ ...springPage, delay: 0.19 }}
           className="mt-4 text-[13px] leading-[1.6] text-neutral-400"
         >
-          현장에서 쉽고 빠르게
+          떠나기 전에, 원하는
           <br />
-          {boothName} 굿즈를 교환하세요
+          {boothName} 굿즈로 바꿔가요
         </motion.p>
 
         <div className="relative mt-6 flex h-[280px] items-center justify-center">
@@ -144,13 +144,13 @@ export function Onboarding() {
           transition={{ ...springPage, delay: 0.34 }}
           className="mx-auto w-fit rounded-full bg-neutral-100 px-4 py-2 text-[12px] font-medium text-neutral-500"
         >
-          지금 {cardCount}종의 카드를 교환하고 있어요
+          지금 {cardCount}종의 카드를 교환 중! 🎪
         </motion.p>
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
         <Button variant="brand" onClick={start}>
-          교환하러 가기
+          교환하러 출발!
         </Button>
       </div>
 

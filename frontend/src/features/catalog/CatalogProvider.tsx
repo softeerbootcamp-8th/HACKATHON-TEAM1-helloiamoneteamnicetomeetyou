@@ -64,7 +64,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         setBooths(list)
         if (list.length === 0) {
           setBooth(null)
-          setState({ status: 'empty', reason: '아직 열린 부스가 없습니다.' })
+          setState({ status: 'empty', reason: '아직 열린 부스가 없어요' })
           return
         }
 
@@ -101,7 +101,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         if (signal.aborted) return
 
         if (serverItems.length === 0) {
-          setState({ status: 'empty', reason: `${target.name} 에 등록된 카드가 아직 없습니다.` })
+          setState({ status: 'empty', reason: `${target.name}에 등록된 카드가 아직 없어요` })
           return
         }
 

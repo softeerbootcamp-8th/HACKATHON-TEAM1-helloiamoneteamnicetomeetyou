@@ -62,6 +62,22 @@ public interface UserWantItemRepository extends JpaRepository<UserWantItem, Long
             """)
     List<UserWantItem> findAllByUserId(UUID userId);
 
+    /**
+     * 한 부스 안에서 내가 찾는 카드다.
+     *
+     * <p>대기장 목록이 부스 하나만 보여 주기 때문에 견주는 내 카드도 그 부스 것만 본다. 부스를
+     * 안 가리고 읽으면, 앞 부스에서 희망 카드를 등록해 둔 사람이 다음 부스에 들어갔을 때 목록이
+     * 통째로 빈다. 카드가 부스 하나에만 속해서 앞 부스 희망 카드와는 하나도 안 맞기 때문이다.
+     */
+    @Query("""
+            select w from UserWantItem w
+            join fetch w.item i
+            where w.user.id = :userId
+              and i.booth.id = :boothId
+            order by w.id asc
+            """)
+    List<UserWantItem> findAllByUserIdAndBoothId(UUID userId, Long boothId);
+
     boolean existsByUserIdAndItemId(UUID userId, Long itemId);
 
     Optional<UserWantItem> findByUserIdAndItemId(UUID userId, Long itemId);
