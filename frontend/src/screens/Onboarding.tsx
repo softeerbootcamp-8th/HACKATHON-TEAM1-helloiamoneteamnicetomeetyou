@@ -8,33 +8,52 @@ import { RadarRings } from '@/components/domain/Radar'
 import { Button } from '@/components/ui/Button'
 import { useCatalog } from '@/features/catalog/useCatalog'
 import { springPage, springSnap } from '@/lib/motion'
-import { ALL_WAITING } from '@/mocks/data'
 import { useStore } from '@/store/useStore'
 
 /**
  * 서버에서 부스 이름을 받기 전까지 세워 둘 이름.
  *
- * 로딩 중이나 서버가 끊겼을 때 이 자리를 비우면 첫 화면 맨 위가 잠깐 무너진다. 이 앱은
- * 서버가 없어도 목업으로 도는 것이 전제라, 대표 부스 이름을 그대로 세워 둔다.
+ * 로딩 중이나 서버가 끊겼을 때 이 자리를 비우면 첫 화면 맨 위가 잠깐 무너진다.
  */
 const FALLBACK_BOOTH_NAME = '현대자동차 팝업'
+const FALLBACK_BOOTH_DESCRIPTION = '자동차 포토카드 교환'
 
 export function Onboarding() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
-  const { booths, booth, selectBooth } = useCatalog()
+  const { state: catalog, booths, booth, selectBooth } = useCatalog()
   const [pickerOpen, setPickerOpen] = useState(false)
 
   const boothName = booth?.name ?? FALLBACK_BOOTH_NAME
 
+  /*
+    첫 화면의 장식용 카드다. 부스에 실제로 있는 카드 중 첫 장을 세운다. 목록을 아직 못 받았으면
+    빈 묶음이 뜨는데, 아무 카드나 세워 두면 그 부스에 없는 카드를 보여주게 된다.
+  */
+  const cardCount = catalog.status === 'ready' ? catalog.items.length : 0
+  const topItemId = catalog.status === 'ready' ? (catalog.items[0]?.id ?? null) : null
+
   /**
-   * 부스를 바꿀 수 있는 것은 여기, 그리고 카드를 등록하기 전까지다.
+   * 부스를 바꾸는 곳은 여기 하나뿐이다.
    *
-   * `/` 는 주소로 바로 들어올 수 있어서 카드를 등록한 뒤에도 돌아올 길이 있다. 그때 부스를
-   * 바꾸면 화면에는 등록한 카드가 남아 있는데 서버의 새 부스에는 아무것도 없는 상태가 된다.
-   * 부스가 하나뿐이면 고를 것이 없으니 이름만 보여준다. 시연 중에 헛되이 열리지 않게.
+   * 예전에는 `booths.length > 1 && !state.setupDone` 이었는데, 운영 DB 에 부스가 하나라
+   * 이름만 나오고 누를 곳이 없었다. 어드민에서 부스를 새로 만들어도 앱에서는 그 사실을
+   * 알 방법이 없어서, 부스가 하나여도 열리게 둔다. 목록을 아직 못 받았을 때만 글자로 둔다.
    */
-  const canSwitch = booths.length > 1 && !state.setupDone
+  const canSwitch = booths.length > 0
+
+  /**
+   * 다른 부스로 옮기면 등록해 둔 것을 비운다.
+   *
+   * `/` 는 주소로 바로 들어올 수 있어서 카드를 등록한 뒤에도 돌아올 길이 있다. 그대로 부스만
+   * 바꾸면 화면에는 앞 부스에서 고른 카드가 남아 있는데 서버의 새 부스에는 아무것도 없어서,
+   * 매칭이 영영 안 되는 상태로 시연을 하게 된다. 같은 부스를 다시 고른 것은 그냥 닫는다.
+   */
+  const pickBooth = (boothId: number) => {
+    if (boothId !== booth?.id && state.setupDone) dispatch({ type: 'reset' })
+    selectBooth(boothId)
+    setPickerOpen(false)
+  }
 
   const start = () => {
     dispatch({ type: 'onboarded' })
@@ -68,7 +87,10 @@ export function Onboarding() {
               <span className="truncate">{boothName}</span>
             </p>
           )}
-          <p className="mt-0.5 pl-4 text-[11px] text-neutral-400">자동차 포토카드 교환</p>
+          {/* 부스를 바꾸면 이 줄도 같이 바뀌어야 한다. 이름만 바뀌고 설명이 남으면 안 옮겨진 것처럼 보인다. */}
+          <p className="mt-0.5 pl-4 text-[11px] text-neutral-400">
+            {booth?.description ?? FALLBACK_BOOTH_DESCRIPTION}
+          </p>
         </motion.div>
 
         <motion.h1
@@ -101,7 +123,7 @@ export function Onboarding() {
             transition={{ ...springSnap, delay: 0.24 }}
           >
             <div className="anim-float">
-              <CardStack topItemId="avn" count={3} className="w-[168px]" />
+              <CardStack topItemId={topItemId} count={3} className="w-[168px]" />
             </div>
           </motion.div>
         </div>
@@ -112,7 +134,7 @@ export function Onboarding() {
           transition={{ ...springPage, delay: 0.34 }}
           className="mx-auto w-fit rounded-full bg-neutral-100 px-4 py-2 text-[12px] font-medium text-neutral-500"
         >
-          지금 {ALL_WAITING.length + 6}명이 교환 중이에요
+          지금 {cardCount}종의 카드를 교환하고 있어요
         </motion.p>
       </div>
 
@@ -126,10 +148,7 @@ export function Onboarding() {
         open={pickerOpen}
         booths={booths}
         selectedId={booth?.id ?? null}
-        onSelect={(id) => {
-          selectBooth(id)
-          setPickerOpen(false)
-        }}
+        onSelect={pickBooth}
         onDismiss={() => setPickerOpen(false)}
       />
     </div>

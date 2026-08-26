@@ -58,6 +58,16 @@ public class Item {
         return item;
     }
 
+    /**
+     * 그림이 비어 있던 카드에 주소를 붙인다. 시더가 이미 들어 있는 DB 를 채울 때 쓴다.
+     *
+     * <p>{@link #update} 를 쓰지 않는 것은 그쪽이 이름과 설명까지 같이 덮어쓰기 때문이다.
+     * 운영자가 어드민에서 고쳐 둔 이름을 시더가 되돌리면 안 된다.
+     */
+    public void attachImage(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
+
     /** 어드민 화면에서 카드 정보를 고친다. 소속 부스는 바꾸지 않는다. */
     public void update(String name, String description, String imageUrl) {
         this.name = name;

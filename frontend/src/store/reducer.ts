@@ -1,9 +1,8 @@
 import type { Exchange, Zone } from '@/lib/exchange'
-import { ALL_WAITING, itemById } from '@/mocks/data'
 
 import { toAppointment } from './appointment'
-import type { ExchangePair, MatchResult } from './matching'
-import type { ActiveMatch, Appointment, IncomingPoke, State } from './types'
+import type { ExchangePair, MatchPartner, MatchResult } from './matching'
+import type { ActiveMatch, Appointment, Selection, State } from './types'
 
 /**
  * 알림 문구는 시안의 `교환 대기장소 알림 정리` 를 그대로 옮긴 것이다.
@@ -20,10 +19,6 @@ export const initialState: State = {
   needs: [],
   autoMatching: false,
   match: null,
-  declined: [],
-  outgoingPoke: null,
-  incomingPoke: null,
-  heldIncoming: null,
   appointments: [],
   activeAppointmentId: null,
   notifications: [],
@@ -33,23 +28,42 @@ export const initialState: State = {
 
 export type Action =
   | { type: 'onboarded' }
-  | { type: 'toggle-have'; itemId: string }
-  | { type: 'set-have-qty'; itemId: string; qty: number }
-  | { type: 'toggle-need'; itemId: string }
-  | { type: 'set-need-qty'; itemId: string; qty: number }
-  | { type: 'clear-have'; itemId: string }
-  | { type: 'clear-need'; itemId: string }
+  | { type: 'toggle-have'; itemId: number }
+  | { type: 'set-have-qty'; itemId: number; qty: number }
+  | { type: 'toggle-need'; itemId: number }
+  | { type: 'set-need-qty'; itemId: number; qty: number }
+  | { type: 'clear-have'; itemId: number }
+  | { type: 'clear-need'; itemId: number }
+  | {
+      /**
+       * 서버에 이미 등록해 둔 카드를 화면으로 되살린다.
+       *
+       * 화면 상태는 새로고침에 통째로 사라지는데 서버 등록은 남아 있다. 되살리지 않으면
+       * 등록 화면이 아무것도 안 고른 것처럼 뜨고, 그대로 "교환하러 가기" 를 누르면
+       * 등록 동기화가 서버에 있던 카드를 전부 해제해 버린다.
+       */
+      type: 'registrations-loaded'
+      have: Selection[]
+      needs: Selection[]
+    }
   | { type: 'enter-home' }
   | { type: 'server-match-arrived'; match: ActiveMatch }
   | { type: 'server-match-rejected'; exchangeId: number }
+  | {
+      /**
+       * 서버에서 찔러보기가 성사됐다. 시안 `7. 찔러보기 성사` 를 세우는 자리다.
+       */
+      type: 'server-poke-matched'
+      exchangeId: number
+      /** 내가 상대에게 주는 카드 */
+      giveItemId: number
+      /** 내가 상대에게 받는 카드 */
+      receiveItemId: number
+      partnerUserId: string
+      partnerName?: string
+    }
   | { type: 'open-match' }
   | { type: 'decline-match' }
-  | { type: 'send-poke'; targetUserId: string }
-  | { type: 'poke-answered'; accepted: boolean; chosenItemId?: string }
-  | { type: 'receive-poke'; poke: IncomingPoke }
-  | { type: 'release-held-poke' }
-  | { type: 'accept-incoming'; chosenItemId: string }
-  | { type: 'reject-incoming' }
   | { type: 'booth-loaded'; boothId: number; zones: Zone[] }
   | {
       type: 'exchange-synced'
@@ -68,7 +82,6 @@ export type Action =
   | { type: 'reset' }
   | { type: 'toast'; message: string | null }
   | { type: 'read-notification'; id: string }
-  | { type: 'seed-demo'; kind: 'three-way' | 'incoming' }
 
 let notifSeq = 0
 function notify(
@@ -81,7 +94,7 @@ function notify(
   return [{ id: `n${notifSeq}`, kind, title, body }, ...state.notifications].slice(0, 12)
 }
 
-function bump(list: State['have'], itemId: string, delta: number): State['have'] {
+function bump(list: State['have'], itemId: number, delta: number): State['have'] {
   const found = list.find((s) => s.itemId === itemId)
   if (!found) return delta > 0 ? [...list, { itemId, qty: 1 }] : list
   const qty = found.qty + delta
@@ -89,14 +102,15 @@ function bump(list: State['have'], itemId: string, delta: number): State['have']
   return list.map((s) => (s.itemId === itemId ? { ...s, qty } : s))
 }
 
-function setQty(list: State['have'], itemId: string, qty: number): State['have'] {
+function setQty(list: State['have'], itemId: number, qty: number): State['have'] {
   if (qty <= 0) return list.filter((s) => s.itemId !== itemId)
   if (!list.some((s) => s.itemId === itemId)) return [...list, { itemId, qty }]
   return list.map((s) => (s.itemId === itemId ? { ...s, qty } : s))
 }
 
-function partnersOf(match: MatchResult): string[] {
-  return match.kind === 'ONE_TO_ONE' ? [match.partner.id] : [match.giver.id, match.receiver.id]
+/** 서버에서 온 상대. 이름을 안 보낸 사용자는 "상대" 로 들어간다. */
+function partnerOf(userId: string, name: string | undefined): MatchPartner {
+  return { id: userId, nickname: name ?? '상대' }
 }
 
 /** 이 교환에서 실제로 주고받는 카드 쌍. 삼자 교환은 언제나 한 쌍이다. */
@@ -165,6 +179,15 @@ export function reducer(state: State, action: Action): State {
     case 'clear-need':
       return { ...state, needs: state.needs.filter((s) => s.itemId !== action.itemId) }
 
+    /**
+     * 이번 방문에 이미 고른 것이 있으면 건드리지 않는다. 서버 응답이 늦게 도착했을 때
+     * 방금 고른 카드를 옛 등록으로 덮으면 사용자가 한 일이 사라진다.
+     */
+    case 'registrations-loaded': {
+      if (state.have.length > 0 || state.needs.length > 0) return state
+      return { ...state, have: action.have, needs: action.needs }
+    }
+
     case 'enter-home': {
       /*
         시안 desc 165:3500 1번 — 태그를 가르는 것은 <b>진행 중인 약속이 있는지 하나</b>다.
@@ -192,6 +215,29 @@ export function reducer(state: State, action: Action): State {
     }
 
     /**
+     * 서버 찔러보기 성사. 수락한 쪽은 응답을 받자마자, 보낸 쪽은 보낸 목록이 `ACCEPTED` 로
+     * 바뀐 것을 보고 부른다.
+     *
+     * <b>`exchangeId` 로 `교환 장소 확인하기` 가 서버 교환을 수락하러 간다.</b>
+     */
+    case 'server-poke-matched': {
+      // 같은 교환을 이미 세워 뒀으면 그대로 둔다. 목록을 다시 읽을 때마다 새 객체를
+      // 만들면 화면이 매번 처음부터 다시 그려진다.
+      if (state.match?.exchangeId === action.exchangeId) return state
+
+      const match: ActiveMatch = {
+        kind: 'ONE_TO_ONE',
+        partner: partnerOf(action.partnerUserId, action.partnerName),
+        pairs: [{ giveItemId: action.giveItemId, receiveItemId: action.receiveItemId }],
+        giveItemId: action.giveItemId,
+        receiveItemId: action.receiveItemId,
+        origin: 'poke',
+        exchangeId: action.exchangeId,
+      }
+      return { ...state, match, autoMatching: false }
+    }
+
+    /**
      * 상대가 이 매칭을 거절했다는 서버 알림. 내가 거절한 게 아니라 상대 쪽에서 온 거라
      * `decline-match` 와는 다른 자리다. `exchangeId` 가 지금 뜬 매칭과 다르면(이미 다른
      * 매칭으로 넘어갔거나 약속을 잡은 뒤) 조용히 무시한다 — 뒤늦게 도착한 알림이 엉뚱한
@@ -213,124 +259,13 @@ export function reducer(state: State, action: Action): State {
 
     case 'decline-match': {
       if (!state.match) return state
-      const declined = [...state.declined, ...partnersOf(state.match)]
       return {
         ...state,
         match: null,
-        declined,
         autoMatching: state.appointments.length === 0,
         toast: '교환을 거절했어요. 다시 상대를 찾을게요.',
       }
     }
-
-    case 'send-poke': {
-      const target = ALL_WAITING.find((u) => u.id === action.targetUserId)
-      if (!target) return state
-      return {
-        ...state,
-        outgoingPoke: { targetUserId: target.id, wantItemId: target.itemId, status: 'pending' },
-        toast: `${itemById(target.itemId).name} 교환을 제안했어요\n답변 기다리는 중`,
-      }
-    }
-
-    case 'poke-answered': {
-      const poke = state.outgoingPoke
-      if (!poke || poke.status !== 'pending') return state
-      const target = ALL_WAITING.find((u) => u.id === poke.targetUserId)
-      if (!target) return state
-
-      if (!action.accepted) {
-        return {
-          ...state,
-          outgoingPoke: null,
-          notifications: notify(
-            state,
-            'poke-rejected',
-            `${itemById(target.itemId).name} 교환이 거절되었어요`,
-            NOTICE_BODY,
-          ),
-          toast: `${itemById(target.itemId).name} 교환이 거절되었어요`,
-        }
-      }
-
-      // 상대가 내 묶음에서 무엇을 골랐는지는 고른 쪽만 안다.
-      //
-      // 전에는 wantedFromMe 로 짐작했는데, 찔러보기는 정의상 "상대 희망 ∩ 내 보유" 가
-      // 비어 있어서 그 계산이 늘 빈 배열이었다. 그래서 항상 have[0] 으로 떨어져 보낸 사람
-      // 화면에 엉뚱한 카드가 떴다. 고른 카드를 받아 쓰고, 없을 때만 첫 장으로 떨어진다.
-      const giveItemId = action.chosenItemId ?? state.have[0]?.itemId ?? target.needsItemIds[0]
-
-      const match: ActiveMatch = {
-        kind: 'ONE_TO_ONE',
-        partner: target,
-        pairs: [{ giveItemId, receiveItemId: target.itemId }],
-        giveItemId,
-        receiveItemId: target.itemId,
-        origin: 'poke',
-        exchangeId: null,
-      }
-      return {
-        ...state,
-        outgoingPoke: { ...poke, status: 'accepted' },
-        match,
-        autoMatching: false,
-        notifications: notify(
-          state,
-          'poke-accepted',
-          '상대방이 내 신청을 받아들였어요!',
-          NOTICE_BODY,
-        ),
-        toast: null,
-      }
-    }
-
-    case 'receive-poke': {
-      // 매칭이 도는 중에는 알리지 않고 붙잡아 둔다.
-      if (state.autoMatching) return { ...state, heldIncoming: action.poke }
-      return {
-        ...state,
-        incomingPoke: action.poke,
-        notifications: notify(state, 'poke-received', '교환 신청이 왔어요~', NOTICE_BODY),
-      }
-    }
-
-    case 'release-held-poke': {
-      const held = state.heldIncoming
-      if (!held) return state
-      // 요청받은 카드의 잔여 수량이 없으면 알리지 않고 조용히 거절 처리한다.
-      const left = state.have.find((s) => s.itemId === held.wantItemId)?.qty ?? 0
-      if (left <= 0) return { ...state, heldIncoming: null }
-      return {
-        ...state,
-        heldIncoming: null,
-        incomingPoke: held,
-        notifications: notify(state, 'poke-received', '교환 신청이 왔어요~', NOTICE_BODY),
-      }
-    }
-
-    case 'accept-incoming': {
-      const incoming = state.incomingPoke
-      if (!incoming) return state
-      const from = ALL_WAITING.find((u) => u.id === incoming.fromUserId)
-      if (!from) return state
-      const match: ActiveMatch = {
-        kind: 'ONE_TO_ONE',
-        partner: from,
-        pairs: [{ giveItemId: incoming.wantItemId, receiveItemId: action.chosenItemId }],
-        giveItemId: incoming.wantItemId,
-        receiveItemId: action.chosenItemId,
-        origin: 'poke',
-        exchangeId: null,
-      }
-      return { ...state, incomingPoke: null, match, autoMatching: false }
-    }
-
-    case 'reject-incoming':
-      return {
-        ...state,
-        incomingPoke: null,
-        toast: '교환 요청을 거절했어요',
-      }
 
     case 'booth-loaded':
       return { ...state, boothId: action.boothId, zones: action.zones }
@@ -412,8 +347,6 @@ export function reducer(state: State, action: Action): State {
         ...next,
         appointments,
         activeAppointmentId: null,
-        outgoingPoke: null,
-        declined: [],
         // 성사 이후 다른 약속이 없으면 자동 매칭을 다시 돌린다.
         autoMatching: appointments.length === 0,
       }
@@ -428,64 +361,8 @@ export function reducer(state: State, action: Action): State {
         appointments,
         activeAppointmentId: null,
         match: null,
-        outgoingPoke: null,
         autoMatching: appointments.length === 0,
         toast: '약속을 취소했어요',
-      }
-    }
-
-    case 'seed-demo': {
-      // 특정 화면을 바로 열어 볼 수 있게 상태를 심어 준다. 주소로만 들어올 수 있고
-      // 실제 흐름에서는 쓰이지 않는다.
-      const have = state.have.length > 0 ? state.have : [{ itemId: 'avn', qty: 2 }]
-
-      if (action.kind === 'three-way') {
-        const giver = ALL_WAITING.find((u) => u.id === 'u3')
-        const receiver = ALL_WAITING.find((u) => u.id === 'u6')
-        if (!giver || !receiver) return state
-        return {
-          ...state,
-          onboarded: true,
-          setupDone: true,
-          have,
-          needs: state.needs.length > 0 ? state.needs : [{ itemId: 'i5n', qty: 1 }],
-          autoMatching: false,
-          appointments: [],
-          activeAppointmentId: null,
-          match: {
-            kind: 'THREE_WAY',
-            giver,
-            receiver,
-            giveItemId: 'avn',
-            receiveItemId: 'i5n',
-            middleItemId: 'i30f',
-            origin: 'auto',
-            exchangeId: null,
-          },
-          notifications: notify(
-            state,
-            'match',
-            '내가 원하는 굿즈로 교환할 수 있어요!',
-            NOTICE_BODY,
-          ),
-        }
-      }
-
-      const from = ALL_WAITING.find((u) => u.id === 'u1')
-      if (!from) return state
-      return {
-        ...state,
-        onboarded: true,
-        setupDone: true,
-        have,
-        autoMatching: false,
-        match: null,
-        incomingPoke: {
-          fromUserId: from.id,
-          wantItemId: have[0].itemId,
-          offeredItemIds: ['i5n', 'i30f', 'kona'],
-        },
-        notifications: notify(state, 'poke-received', '교환 신청이 왔어요~', NOTICE_BODY),
       }
     }
 

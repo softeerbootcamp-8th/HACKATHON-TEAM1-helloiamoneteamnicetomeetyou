@@ -6,7 +6,17 @@
     <meta name="theme-color" content="#2cb3ed" />
     <title>NearLy 어드민</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/admin-assets/admin.css" />
+    <!--/*
+      주소에 파일 내용 해시가 붙는다(`admin-<md5>.css`). `application.yml` 의
+      `spring.web.resources.chain.strategy.content` 가 붙여 준다.
+
+      그냥 `/admin-assets/admin.css` 로 두었더니 운영자 브라우저가 옛 파일을 계속 썼다.
+      스프링이 이 경로에 Cache-Control 을 안 붙여서, 브라우저가 Last-Modified 를 보고
+      제 나름대로 유효기간을 잡는다(휴리스틱 캐싱). 그래서 시간 격자를 새로 넣은 뒤에도
+      격자 CSS 가 없는 옛 파일이 적용돼서, 어드민 교환 탭이 글자만 줄줄이 나왔다.
+      내용이 바뀌면 주소가 바뀌므로 강력 새로고침을 부탁할 일이 없어진다.
+    */-->
+    <link rel="stylesheet" th:href="@{/admin-assets/admin.css}" href="/admin-assets/admin.css" />
   </head>
   <body>
     <!--/*
@@ -51,8 +61,9 @@
               부스에서 알고 싶은 것은 몇 장인지가 아니라 무엇을 들고 있는지다. UUID 는 상세
               화면에 있으니 목록에서는 뺐다.
 
-              배지는 실제 사용자에게만 붙인다. 대부분이 더미라서 더미마다 배지를 달면 아무
-              의미가 없고, 정작 건드리면 안 되는 사람이 묻힌다.
+              실제인지 더미인지는 양쪽 다 붙인다. 예전에는 실제 사용자에게만 붙였는데, 배지가
+              없는 줄이 더미인지 아직 안 읽은 줄인지 구분이 안 돼서 매번 상세를 열게 됐다.
+              대신 더미 배지는 옅게 둬서, 건드리면 안 되는 실제 사용자가 먼저 눈에 띄게 한다.
             */-->
             <a
               th:each="u : ${users}"
@@ -63,6 +74,7 @@
               <span class="pick-row">
                 <b th:text="${u.displayName()}">이름</b>
                 <span class="tag-real" th:unless="${u.dummy}">실제</span>
+                <span class="tag-dummy" th:if="${u.dummy}">더미</span>
                 <span class="live-dot" th:if="${u.online}" title="접속 중"></span>
               </span>
 
@@ -108,7 +120,7 @@
               th:if="${user.adminManaged}"
               method="post"
               th:action="@{'/admin/users/' + ${user.id} + '/delete'}"
-              th:data-confirm="'이 더미를 지웁니다.'"
+              th:data-confirm="'이 더미를 지웁니다. 이 사람이 낀 교환과 찔러보기, 등록한 카드, 알림도 같이 지워집니다.'"
             >
               <button class="btn danger sm" type="submit">삭제</button>
             </form>
@@ -265,6 +277,24 @@
           <div class="pane-head">
             카드 <b th:text="${#lists.size(items)}">0</b>종
           </div>
+
+          <!--/*
+            부스로 거른다. 부스가 하나뿐이면 고를 것이 없어서 띄우지 않는다.
+
+            카드 이름만 늘어놓으면 어느 부스 것인지 알 수 없어서, 부스를 둘 놓고 시연할 때
+            방금 만든 카드를 목록에서 못 찾았다.
+          */-->
+          <div class="pane-filter" th:if="${#lists.size(booths) > 1}">
+            <a th:href="@{/admin(tab='items')}" th:classappend="${boothId == null} ? 'on'">전체</a>
+            <a
+              th:each="b : ${booths}"
+              th:href="@{/admin(tab='items', boothId=${b.id})}"
+              th:classappend="${boothId != null and boothId == b.id} ? 'on'"
+              th:text="${b.name}"
+              >부스</a
+            >
+          </div>
+
           <div class="pick-list">
             <a
               th:each="i : ${items}"
@@ -280,6 +310,7 @@
 
               <span class="item-body">
                 <b th:text="${i.item.name}">카드</b>
+                <span class="item-booth" th:text="${i.item.boothName}">부스</span>
                 <span class="counts">
                   <!--/*
                     사람 수가 아니라 지금 교환에 쓸 수 있는 수를 센다. 셋이 내놨어도 전부
@@ -308,6 +339,12 @@
               <span th:text="${item.item.code}">N74</span>
             </div>
             <h1 class="grow" th:text="${item.item.name}">카드</h1>
+            <a
+              class="badge"
+              th:href="@{/admin(tab='zones', boothId=${item.item.boothId})}"
+              th:text="${item.item.boothName}"
+              >부스</a
+            >
             <span class="badge danger" th:if="${item.deadEnd}">매칭 안 됨</span>
           </div>
 
@@ -407,7 +444,7 @@
           <form
             method="post"
             th:action="@{'/admin/items/' + ${item.item.id} + '/delete'}"
-            th:data-confirm="'카드 ' + ${item.item.name} + ' 을(를) 지웁니다.'"
+            th:data-confirm="'카드 ' + ${item.item.name} + ' 을(를) 지웁니다. 이 카드를 내놓거나 찾는 등록, 이 카드가 오간 교환과 찔러보기도 같이 지워집니다.'"
             style="margin-top: 14px"
           >
             <button class="btn danger sm" type="submit">이 카드 삭제</button>
@@ -530,7 +567,7 @@
                 <form
                   method="post"
                   th:action="@{'/admin/booths/' + ${booth.id} + '/zones/' + ${z.id} + '/delete'}"
-                  th:data-confirm="'구역 ' + ${z.name} + ' 을(를) 지웁니다. 되돌릴 수 없습니다.'"
+                  th:data-confirm="'구역 ' + ${z.name} + ' 을(를) 지웁니다. 여기서 만나기로 한 약속은 장소 미정이 됩니다.'"
                 >
                   <button class="icon-btn danger" type="submit" aria-label="삭제">×</button>
                 </form>
@@ -540,34 +577,77 @@
               구역이 없으면 만날 자리를 고르는 화면이 비어 버립니다.
             </div>
             <p class="zone-hint" th:if="${!#lists.isEmpty(zones)}">
-              X, Y 는 약도 위 자리입니다. 왼쪽 위가 0, 오른쪽 아래가 100 입니다. 이 구역에서 만나기로 한 약속이 남아
-              있으면 지워지지 않습니다.
+              X, Y 는 약도 위 자리입니다. 왼쪽 위가 0, 오른쪽 아래가 100 입니다. 구역을 지우면 여기서 만나기로 한
+              약속은 장소 미정으로 돌아갑니다.
             </p>
           </div>
 
+          <!--/*
+            이 부스의 카드. 여기서 바로 고치고 지운다.
+
+            예전에는 추가만 여기서 하고 고치는 것은 카드 탭이었는데, 카드 탭은 모든 부스의
+            카드가 한 줄로 섞여 있어서 이 부스 것을 다시 찾아야 했다. 부스를 손보는 사람은
+            그 부스 카드만 보면 된다.
+          */-->
           <div class="box">
             <div class="box-head">
-              카드 추가
-              <span class="hint">카드를 고치거나 지우는 것은 카드 탭에서 합니다.</span>
-            </div>
-            <div class="box-body">
-              <form method="post" th:action="@{'/admin/booths/' + ${booth.id} + '/items'}" class="form-row">
-                <div class="field">
-                  <label>이름</label>
-                  <input class="input" name="name" placeholder="N Vision 74" required />
-                </div>
-                <div class="field">
-                  <label>설명</label>
-                  <input class="input" name="description" />
-                </div>
-                <div class="field">
-                  <label>이미지 주소</label>
-                  <input class="input" name="imageUrl" placeholder="https://..." />
-                </div>
-                <button class="btn brand" type="submit">추가</button>
+              <!--/* box-head 가 flex 라 글자 조각을 그대로 두면 조각마다 gap 이 벌어진다. */-->
+              <span>카드 <b th:text="${#lists.size(boothItems)}">0</b>종</span>
+              <form method="post" th:action="@{'/admin/booths/' + ${booth.id} + '/items'}" class="inline-form">
+                <input class="input sm" name="name" placeholder="N Vision 74" required />
+                <input class="input sm" name="description" placeholder="설명" />
+                <input class="input sm" name="imageUrl" placeholder="https://..." />
+                <button class="btn sm" type="submit">추가</button>
               </form>
             </div>
+
+            <div class="rows">
+              <div class="row" th:each="i : ${boothItems}">
+                <span class="chip-card xs">
+                  <img th:if="${i.imageUrl}" th:src="${i.imageUrl}" th:alt="${i.name}" />
+                  <span th:text="${i.code}">N74</span>
+                </span>
+                <form
+                  method="post"
+                  th:action="@{'/admin/booths/' + ${booth.id} + '/items/' + ${i.id}}"
+                  class="grow inline-form"
+                >
+                  <input class="input sm" name="name" th:value="${i.name}" required style="flex: 2" />
+                  <input class="input sm" name="description" th:value="${i.description}" placeholder="설명" style="flex: 2" />
+                  <input class="input sm" name="imageUrl" th:value="${i.imageUrl}" placeholder="https://..." style="flex: 3" />
+                  <button class="btn outline sm" type="submit">저장</button>
+                </form>
+                <form
+                  method="post"
+                  th:action="@{'/admin/booths/' + ${booth.id} + '/items/' + ${i.id} + '/delete'}"
+                  th:data-confirm="'카드 ' + ${i.name} + ' 을(를) 지웁니다. 이 카드를 내놓거나 찾는 등록, 이 카드가 오간 교환과 찔러보기도 같이 지워집니다.'"
+                >
+                  <button class="icon-btn danger" type="submit" aria-label="삭제">×</button>
+                </form>
+              </div>
+            </div>
+
+            <div class="empty sm" th:if="${#lists.isEmpty(boothItems)}">
+              카드가 없으면 이 부스에 붙은 사람이 등록할 것이 없습니다.
+            </div>
           </div>
+
+          <!--/*
+            부스를 통째로 지운다.
+
+            마지막 남은 부스에는 띄우지 않는다. 부스가 하나도 없으면 서비스 첫 화면이
+            "아직 열린 부스가 없습니다" 로 굳어서 아무도 아무것도 못 한다. 갈아 끼우려면
+            새 부스를 먼저 만들고 지우면 된다.
+          */-->
+          <form
+            method="post"
+            th:if="${#lists.size(booths) > 1}"
+            th:action="@{'/admin/booths/' + ${booth.id} + '/delete'}"
+            th:data-confirm="'부스 ' + ${booth.name} + ' 을(를) 지웁니다. 이 부스의 카드 ' + ${#lists.size(boothItems)} + '종과 구역 ' + ${#lists.size(zones)} + '개, 그 카드가 오간 교환도 같이 지워집니다.'"
+            style="margin-top: 14px"
+          >
+            <button class="btn danger sm" type="submit">이 부스 삭제</button>
+          </form>
         </section>
       </th:block>
     </main>
@@ -600,16 +680,21 @@
                   <p class="pick-title">내놓는 카드</p>
                   <p class="pick-desc">남에게 줄 수 있는 카드</p>
                 </div>
-                <input class="input sm search" type="search" placeholder="카드 검색" data-filter="#have-grid" />
+                <input class="input sm search" type="search" placeholder="카드 또는 부스 검색" data-filter="#have-grid" />
               </header>
               <div class="tile-grid" id="have-grid">
-                <label class="tile" th:each="i : ${allItems}" th:data-name="${#strings.toLowerCase(i.name)}">
+                <label
+                  class="tile"
+                  th:each="i : ${allItems}"
+                  th:data-name="${#strings.toLowerCase(i.name + ' ' + i.boothName)}"
+                >
                   <input type="checkbox" name="haveItemIds" th:value="${i.id}" />
                   <span class="tile-face">
                     <img th:if="${i.imageUrl}" th:src="${i.imageUrl}" th:alt="${i.name}" />
                     <span th:text="${i.code}">N74</span>
                   </span>
                   <span class="tile-name" th:text="${i.name}">카드</span>
+                  <span class="tile-booth" th:text="${i.boothName}">부스</span>
                   <span class="tile-check">✓</span>
                 </label>
               </div>
@@ -621,16 +706,21 @@
                   <p class="pick-title">찾는 카드</p>
                   <p class="pick-desc">받고 싶어 하는 카드. 매칭 규칙이 보는 값</p>
                 </div>
-                <input class="input sm search" type="search" placeholder="카드 검색" data-filter="#want-grid" />
+                <input class="input sm search" type="search" placeholder="카드 또는 부스 검색" data-filter="#want-grid" />
               </header>
               <div class="tile-grid" id="want-grid">
-                <label class="tile" th:each="i : ${allItems}" th:data-name="${#strings.toLowerCase(i.name)}">
+                <label
+                  class="tile"
+                  th:each="i : ${allItems}"
+                  th:data-name="${#strings.toLowerCase(i.name + ' ' + i.boothName)}"
+                >
                   <input type="checkbox" name="wantItemIds" th:value="${i.id}" />
                   <span class="tile-face">
                     <img th:if="${i.imageUrl}" th:src="${i.imageUrl}" th:alt="${i.name}" />
                     <span th:text="${i.code}">N74</span>
                   </span>
                   <span class="tile-name" th:text="${i.name}">카드</span>
+                  <span class="tile-booth" th:text="${i.boothName}">부스</span>
                   <span class="tile-check">✓</span>
                 </label>
               </div>
@@ -966,6 +1056,6 @@
       </div>
     </dialog>
 
-    <script src="/admin-assets/admin.js"></script>
+    <script th:src="@{/admin-assets/admin.js}" src="/admin-assets/admin.js"></script>
   </body>
 </html>

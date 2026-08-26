@@ -30,6 +30,7 @@ export function PokeProvider({ children }: { children: ReactNode }) {
   const [sent, setSent] = useState<SentPoke[]>([])
   const [waiting, setWaiting] = useState<BoothHaveItem[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
   const [attempt, setAttempt] = useState(0)
 
   const boothId = catalog.status === 'ready' ? catalog.boothId : null
@@ -57,6 +58,7 @@ export function PokeProvider({ children }: { children: ReactNode }) {
         setReceived(receivedPage.content)
         setSent(sentPage.content)
         setWaiting(waitingPage.content)
+        setLoaded(true)
       } catch (err) {
         if (signal.aborted) return
         setError(messageOf(err))
@@ -88,13 +90,16 @@ export function PokeProvider({ children }: { children: ReactNode }) {
   const busy = useRef(false)
 
   const run = useCallback(
-    async (action: () => Promise<void>) => {
-      if (busy.current) return
+    async <T,>(action: () => Promise<T>): Promise<T> => {
+      // 겹친 요청은 앞선 것이 끝나기를 기다리지 않고 그 자리에서 접는다. 호출한 쪽이
+      // 결과를 쓰기 때문에, 조용히 undefined 를 돌려주면 화면이 빈 값으로 그려진다.
+      if (busy.current) throw new Error('이미 처리 중입니다')
       busy.current = true
       setError(null)
       try {
-        await action()
+        const result = await action()
         refresh()
+        return result
       } catch (err) {
         setError(messageOf(err))
         throw err
@@ -115,9 +120,7 @@ export function PokeProvider({ children }: { children: ReactNode }) {
 
   const accept = useCallback(
     (pokeId: number, chosenItemId: number) =>
-      run(async () => {
-        await answerPoke(pokeId, userId, 'ACCEPTED', chosenItemId)
-      }),
+      run(() => answerPoke(pokeId, userId, 'ACCEPTED', chosenItemId)),
     [run, userId],
   )
 
@@ -135,6 +138,7 @@ export function PokeProvider({ children }: { children: ReactNode }) {
       sent,
       waiting,
       ready,
+      loaded,
       refresh,
       send,
       accept,
@@ -142,7 +146,7 @@ export function PokeProvider({ children }: { children: ReactNode }) {
       error,
       clearError,
     }),
-    [received, sent, waiting, ready, refresh, send, accept, reject, error, clearError],
+    [received, sent, waiting, ready, loaded, refresh, send, accept, reject, error, clearError],
   )
 
   return <PokeContext.Provider value={value}>{children}</PokeContext.Provider>

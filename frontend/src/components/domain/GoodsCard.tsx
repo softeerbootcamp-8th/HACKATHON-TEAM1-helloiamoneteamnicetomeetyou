@@ -3,7 +3,7 @@ import { useRef, useState, type ReactNode } from 'react'
 
 import { cn } from '@/lib/cn'
 import { springSnap } from '@/lib/motion'
-import type { Item } from '@/mocks/data'
+import type { Item } from '@/features/catalog/api'
 
 export type Size = 'sm' | 'md' | 'lg' | 'fill'
 
@@ -60,6 +60,10 @@ export function GoodsFace({
 }) {
   const [failed, setFailed] = useState(false)
 
+  // 주소가 아예 없는 카드도 있다. 어드민에서 그림을 아직 안 넣은 경우인데, 빈 src 로 img 를
+  // 걸면 브라우저가 현재 페이지를 다시 받으러 가므로 처음부터 약칭으로 그린다.
+  const showCode = failed || !item.imageUrl
+
   return (
     <div
       className={cn(
@@ -74,15 +78,20 @@ export function GoodsFace({
         className="absolute size-[58%] rounded-full blur-[11px]"
         style={{ background: 'radial-gradient(circle, #2cb3edd9 0%, #2cb3ed00 74%)' }}
       />
-      {failed ? (
+      {showCode ? (
         <span className="relative">{item.code}</span>
       ) : (
         <img
-          src={item.image}
+          src={item.imageUrl}
           alt=""
           aria-hidden
           loading="lazy"
           draggable={false}
+          /*
+            서비스 워커가 이 버킷을 캐시한다(`sw.ts`). crossOrigin 이 없으면 응답이 opaque 로
+            와서 성공·실패를 가릴 수 없어 캐시에 못 넣는다. 버킷이 CORS 를 열어 두어서 붙인다.
+          */
+          crossOrigin="anonymous"
           onError={() => setFailed(true)}
           className="absolute -top-[9%] -left-[9%] h-[118%] w-[118%] max-w-none object-contain select-none"
         />

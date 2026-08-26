@@ -42,4 +42,12 @@ public interface ExchangeTimeSlotRepository extends JpaRepository<ExchangeTimeSl
     @Modifying(flushAutomatically = true)
     @Query("delete from ExchangeTimeSlot s where s.exchange.id = :exchangeId")
     void deleteAllByExchangeId(@Param("exchangeId") Long exchangeId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from ExchangeTimeSlot s where s.exchange.id in :exchangeIds")
+    void deleteAllByExchangeIdIn(@Param("exchangeIds") List<Long> exchangeIds);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from ExchangeTimeSlot s where s.user.id = :userId")
+    void deleteAllByUserId(@Param("userId") UUID userId);
 }

@@ -144,6 +144,8 @@ export function Identify() {
                 src={mark.src}
                 alt=""
                 aria-hidden
+                /* 미리 받아 둔 것과 같은 요청이어야 캐시가 맞는다. `identity-mark.ts` 참고. */
+                crossOrigin="anonymous"
                 animate={pokes > 0 ? { rotate: [0, -9, 7, -4, 0], scale: [1, 1.08, 0.98, 1] } : {}}
                 transition={{ duration: 0.7, ease: 'easeOut' }}
                 className="anim-fruit w-[260px] max-w-[70vw] select-none"

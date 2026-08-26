@@ -30,3 +30,17 @@ export function getDeviceId(): string {
     return memoryFallback
   }
 }
+
+/**
+ * 서버에 등록할 내 이름. 상대 화면에서 내 줄의 라벨이 된다.
+ *
+ * **기기마다 달라야 한다.** 고정값으로 두면 두 기기를 붙였을 때 상대 줄에도 내 이름과 같은
+ * 글자가 뜨는데, 그러면 누가 누구인지 화면에서 가릴 수가 없다.
+ *
+ * 식별 화면의 "레몬 28" 과는 다른 값이다. 그쪽은 교환마다 서버가 정해 준다.
+ */
+export function myUsername(deviceId: string): string {
+  let hash = 0
+  for (const ch of deviceId) hash = (hash * 31 + ch.charCodeAt(0)) | 0
+  return `손님 ${String((Math.abs(hash) % 90) + 10)}`
+}

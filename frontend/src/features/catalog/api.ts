@@ -1,16 +1,5 @@
 import { apiData, apiVoid } from '@/lib/api'
 
-/**
- * 내가 지금 서버에 등록해 둔 카드 한 줄. `GET /api/have-items`, `GET /api/want-items`
- *
- * `reserved` 는 내놓을 카드에만 있다. 찾는 카드에는 예약 개념이 없다.
- */
-export type RegisteredItem = {
-  itemId: number
-  quantity: number
-  reserved?: boolean
-}
-
 /** 서버가 내려주는 부스. `GET /api/booths` */
 export type ServerBooth = {
   id: number
@@ -18,20 +7,36 @@ export type ServerBooth = {
   description?: string
 }
 
-/** 서버가 내려주는 카드. `GET /api/booths/{boothId}/items` */
-export type ServerItem = {
+/**
+ * 카드 한 장. `GET /api/booths/{boothId}/items` 가 내려주는 그대로다.
+ *
+ * 화면 전체가 이 한 종류만 쓴다. 전에는 목업 카드와 서버 카드가 따로 있어서 카드 이름으로
+ * 둘을 이어 붙였는데, 같은 이름이 둘이면 뒤엣것만 남아 등록이 엉뚱한 카드로 갔다.
+ */
+export type Item = {
+  /** 서버가 매긴 값. 등록과 찔러보기와 매칭이 전부 이 값 하나로 돈다. */
   id: number
   name: string
+  /** 한글 이름이 들어 있다. 카드 밑에 작게 붙는다. */
   description?: string
   imageUrl?: string
+  /** 카드 앞면 약칭. 이미지가 없거나 안 뜰 때 이 글자가 대신 보인다. */
+  code: string
+}
+
+/** 내가 지금 등록해 둔 카드 한 줄. `reserved` 는 찾는 카드에는 없다. */
+export type RegisteredItem = {
+  itemId: number
+  quantity: number
+  reserved?: boolean
 }
 
 export function fetchBooths(signal?: AbortSignal): Promise<ServerBooth[]> {
   return apiData<ServerBooth[]>('/api/booths', { signal })
 }
 
-export function fetchBoothItems(boothId: number, signal?: AbortSignal): Promise<ServerItem[]> {
-  return apiData<ServerItem[]>(`/api/booths/${boothId}/items`, { signal })
+export function fetchBoothItems(boothId: number, signal?: AbortSignal): Promise<Item[]> {
+  return apiData<Item[]>(`/api/booths/${boothId}/items`, { signal })
 }
 
 /**
@@ -88,19 +93,14 @@ export function registerWantItem(
   })
 }
 
-/**
- * 지금 서버에 등록해 둔 내놓을 카드를 읽는다.
- *
- * 등록 화면이 제출 직전에 부른다. 화면 상태는 새로고침에 사라지기 때문에, 무엇을 해제해야
- * 하는지는 서버가 들고 있는 목록과 견줘야만 알 수 있다.
- */
 export function fetchMyHaveItems(userId: string, signal?: AbortSignal): Promise<RegisteredItem[]> {
-  return apiData<RegisteredItem[]>(`/api/have-items?userId=${userId}`, { signal })
+  const query = new URLSearchParams({ userId })
+  return apiData<RegisteredItem[]>(`/api/have-items?${query}`, { signal })
 }
 
-/** 지금 서버에 등록해 둔 찾는 카드를 읽는다. */
 export function fetchMyWantItems(userId: string, signal?: AbortSignal): Promise<RegisteredItem[]> {
-  return apiData<RegisteredItem[]>(`/api/want-items?userId=${userId}`, { signal })
+  const query = new URLSearchParams({ userId })
+  return apiData<RegisteredItem[]>(`/api/want-items?${query}`, { signal })
 }
 
 /**
@@ -113,14 +113,16 @@ export function removeHaveItem(
   itemId: number,
   signal?: AbortSignal,
 ): Promise<void> {
-  return apiVoid(`/api/have-items/${itemId}?userId=${userId}`, { method: 'DELETE', signal })
+  const query = new URLSearchParams({ userId })
+  return apiVoid(`/api/have-items/${itemId}?${query}`, { method: 'DELETE', signal })
 }
 
-/** 찾는 카드 등록을 해제한다. */
+/** 찾는 카드 등록을 해제한다. 내놓을 카드와 동작이 같다. */
 export function removeWantItem(
   userId: string,
   itemId: number,
   signal?: AbortSignal,
 ): Promise<void> {
-  return apiVoid(`/api/want-items/${itemId}?userId=${userId}`, { method: 'DELETE', signal })
+  const query = new URLSearchParams({ userId })
+  return apiVoid(`/api/want-items/${itemId}?${query}`, { method: 'DELETE', signal })
 }
