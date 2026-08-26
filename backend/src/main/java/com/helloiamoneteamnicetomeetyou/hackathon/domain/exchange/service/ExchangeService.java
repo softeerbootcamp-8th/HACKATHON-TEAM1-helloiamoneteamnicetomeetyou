@@ -2,12 +2,12 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeStatus;
-import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.event.ExchangeRejectedEvent;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.repository.ExchangeItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.repository.ExchangeParticipantRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.event.MatchTriggerEvent;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.repository.UserHaveItemRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
@@ -58,9 +58,9 @@ public class ExchangeService {
      * 매칭 결과를 거절한다. 이 교환은 참가자 전원에게 끝난 거래가 되고, 거절한 사람을 뺀
      * 나머지는 다시 상대를 찾아야 한다.
      *
-     * <p>재매칭은 여기서 바로 부르지 않는다. {@code runMatching} 이 비동기라 이 트랜잭션의
-     * 커밋보다 먼저 다른 스레드에서 돌 수 있는데, 그러면 방금 풀어 준 카드가 아직 예약 중인
-     * 채로 재매칭에 잡혀 후보에서 빠진다. 커밋 뒤로 미루기 위해 이벤트로 감싼다.
+     * <p>재매칭은 {@link MatchTriggerEvent} 로 미룬다. 카드 등록 때와 같은 이유다 —
+     * {@code runMatching} 이 비동기라 이 트랜잭션의 커밋보다 먼저 돌면 방금 풀어 준 카드가
+     * 아직 예약 중인 채로 재매칭에 잡혀 후보에서 빠진다.
      */
     @Transactional
     public void reject(Long exchangeId, UUID userId) {
@@ -78,14 +78,13 @@ public class ExchangeService {
                     .ifPresent(UserHaveItem::cancelReservation);
         }
 
-        List<UUID> everyone = participants.stream().map(p -> p.getUser().getId()).toList();
-        for (UUID participantId : everyone) {
+        for (ExchangeParticipant participant : participants) {
+            UUID participantId = participant.getUser().getId();
             if (!participantId.equals(userId)) {
                 sseEventPublisher.toUser(participantId, SseEventType.MATCH_REJECTED, Map.of("exchangeId", exchangeId));
             }
+            eventPublisher.publishEvent(new MatchTriggerEvent(participantId));
         }
-
-        eventPublisher.publishEvent(new ExchangeRejectedEvent(everyone));
     }
 
     private Exchange findExchange(Long exchangeId) {

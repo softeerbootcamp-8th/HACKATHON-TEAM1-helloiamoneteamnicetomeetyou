@@ -49,6 +49,9 @@ public class MatchingService {
     @Async("matchingExecutor")
     @Transactional
     public void runMatching(UUID userId) {
+        // 한 사람은 동시에 하나의 매칭만 가진다. 이미 진행 중인 교환이 있으면 새로 찾지 않는다.
+        if (exchangeParticipantRepository.existsActiveExchange(userId)) return;
+
         Map<UUID, Long> earliestReg = new HashMap<>();
         Map<UUID, Map<Long, Integer>> toThem = buildToThem(userId, earliestReg);
         Map<UUID, Map<Long, Integer>> toMe   = buildToMe(userId);

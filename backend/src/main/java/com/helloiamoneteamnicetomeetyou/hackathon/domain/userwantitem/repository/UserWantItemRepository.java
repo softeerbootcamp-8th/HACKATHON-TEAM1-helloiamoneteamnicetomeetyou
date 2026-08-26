@@ -35,7 +35,7 @@ public interface UserWantItemRepository extends JpaRepository<UserWantItem, Long
           AND uwi.user_id NOT IN (
               SELECT ep.user_id FROM exchange_participants ep
               JOIN exchanges e ON e.id = ep.exchange_id
-              WHERE e.status = 'PENDING'
+              WHERE e.status IN ('PENDING', 'IN_PROGRESS')
           )
           AND NOT EXISTS (
               SELECT 1 FROM exchange_items ei

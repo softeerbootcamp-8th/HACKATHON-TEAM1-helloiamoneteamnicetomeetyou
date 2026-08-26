@@ -2,6 +2,7 @@ package com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.service;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.repository.ItemRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.event.MatchTriggerEvent;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.repository.UserRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.UserHaveItem;
@@ -11,6 +12,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +24,7 @@ public class UserHaveItemService {
     private final UserHaveItemRepository userHaveItemRepository;
     private final UserRepository userRepository;
     private final ItemRepository itemRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 내놓을 카드를 등록한다. 이미 등록한 카드면 개수를 덮어쓴다.
@@ -49,6 +52,7 @@ public class UserHaveItemService {
                 userHaveItemRepository.findByUserIdAndItemId(userId, itemId);
         if (existing.isPresent()) {
             existing.get().changeQuantity(quantity);
+            eventPublisher.publishEvent(new MatchTriggerEvent(userId));
             return false;
         }
 
@@ -58,6 +62,7 @@ public class UserHaveItemService {
                 .orElseThrow(() -> new ApplicationException(ErrorCode.ITEM_NOT_FOUND));
 
         userHaveItemRepository.save(UserHaveItem.of(user, item, quantity));
+        eventPublisher.publishEvent(new MatchTriggerEvent(userId));
 
         return true;
     }
