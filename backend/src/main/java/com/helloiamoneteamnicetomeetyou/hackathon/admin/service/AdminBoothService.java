@@ -76,6 +76,44 @@ public class AdminBoothService {
     }
 
     /**
+     * 부스를 통째로 지운다. 그 안의 카드와 구역까지 같이 사라진다.
+     *
+     * <p><b>마지막 남은 부스는 막는다.</b> 부스가 하나도 없으면 서비스 첫 화면이
+     * "아직 열린 부스가 없습니다" 로 굳어서 아무도 아무것도 못 한다. 부스를 갈아 끼우려면 새
+     * 부스를 먼저 만들고 지우면 된다.
+     *
+     * <p>카드는 {@link AdminCleanupService#deleteItemDeep} 로 딸린 것까지 걷어낸 뒤 지우고,
+     * 구역은 약속에서 자리만 떼고 지운다. 카드 하나하나를 도는 것이 느려 보이지만 부스 하나에
+     * 카드가 열 몇 장이고 부스를 지우는 일은 시연 준비 때 몇 번 있는 일이라, 삭제 규칙을 한 곳에
+     * 두는 편이 낫다고 봤다.
+     */
+    @Transactional
+    public BoothRemoval deleteBooth(Long boothId) {
+        Booth booth = findBooth(boothId);
+        if (boothRepository.count() <= 1) {
+            throw new ApplicationException(ErrorCode.LAST_BOOTH);
+        }
+
+        List<Item> items = itemRepository.findByBoothIdOrderByIdAsc(boothId);
+        int removedExchanges = 0;
+        for (Item item : items) {
+            removedExchanges += adminCleanupService.deleteItemDeep(item.getId());
+        }
+        itemRepository.deleteAll(items);
+
+        List<Zone> zones = zoneRepository.findByBoothIdOrderByIdAsc(boothId);
+        zones.forEach(zone -> adminCleanupService.detachZone(zone.getId()));
+        zoneRepository.deleteAll(zones);
+
+        boothRepository.delete(booth);
+
+        return new BoothRemoval(items.size(), zones.size(), removedExchanges);
+    }
+
+    /** 부스를 지우면서 같이 사라진 것들. 화면이 운영자에게 그대로 읽어 준다. */
+    public record BoothRemoval(int items, int zones, int exchanges) {}
+
+    /**
      * 구역을 만든다. 약도 위 자리까지 여기서 받는다.
      *
      * <p><b>자리를 안 받으면 만든 구역이 전부 약도 한가운데에 겹쳐 뜬다.</b> 기본값이 50/50

@@ -1321,15 +1321,31 @@ dialog.sheet .sheet-actions {
   white-space: nowrap;
 }
 
-/* 실제 사용자에게만 붙인다. 대부분이 더미라 더미마다 달면 아무 의미가 없다. */
-.tag-real {
+/*
+  누가 실제 참가자이고 누가 더미인지.
+
+  예전에는 실제 사용자에게만 붙였다. 대부분이 더미라 더미마다 달면 의미가 없다고 봤는데,
+  배지가 없는 줄이 "더미" 인지 "아직 안 읽었다" 인지 구분이 안 돼서 매번 상세를 열어 확인하게
+  됐다. 양쪽 다 붙이되 색을 갈라서, 건드리면 안 되는 실제 사용자가 여전히 먼저 눈에 띄게 한다.
+*/
+.tag-real,
+.tag-dummy {
   flex: 0 0 auto;
   padding: 1px 6px;
   border-radius: 5px;
-  background: var(--warn-soft);
-  color: var(--warn-text);
   font-size: 11px;
   font-weight: 600;
+}
+
+.tag-real {
+  background: var(--warn-soft);
+  color: var(--warn-text);
+}
+
+/* 더미는 눈에 덜 띄어야 한다. 목록 대부분이 이것이라 진하면 화면이 배지로 가득 찬다. */
+.tag-dummy {
+  background: var(--tile);
+  color: var(--muted);
 }
 
 .pick .live-dot {

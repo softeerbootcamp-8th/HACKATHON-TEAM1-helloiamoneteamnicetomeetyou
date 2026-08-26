@@ -48,6 +48,23 @@ public class AdminBoothController {
     }
 
     /**
+     * 부스를 지운다. 그 안의 카드와 구역도 같이 사라진다.
+     *
+     * <p>지운 뒤에는 어느 부스도 고르지 않은 채로 돌아간다. 방금 지운 id 를 그대로 들고 가면
+     * "부스를 찾을 수 없습니다" 가 뜬다. 목록의 첫 부스가 대신 열린다.
+     */
+    @PostMapping("/{boothId}/delete")
+    public String deleteBooth(@PathVariable Long boothId, RedirectAttributes redirectAttributes) {
+        AdminBoothService.BoothRemoval removed = adminBoothService.deleteBooth(boothId);
+        redirectAttributes.addFlashAttribute("toast", "부스를 지웠습니다. 카드 " + removed.items()
+                + "종, 구역 " + removed.zones() + "개"
+                + (removed.exchanges() == 0 ? "" : ", 교환 " + removed.exchanges() + "건")
+                + "도 같이 지웠습니다.");
+
+        return "redirect:/admin?tab=zones";
+    }
+
+    /**
      * 구역을 추가한다.
      *
      * <p>약도 위 자리({@code mapX}, {@code mapY})는 안 넣어도 되게 둔다. 급할 때는 이름만

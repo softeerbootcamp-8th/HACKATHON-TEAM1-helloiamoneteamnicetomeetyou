@@ -61,8 +61,9 @@
               부스에서 알고 싶은 것은 몇 장인지가 아니라 무엇을 들고 있는지다. UUID 는 상세
               화면에 있으니 목록에서는 뺐다.
 
-              배지는 실제 사용자에게만 붙인다. 대부분이 더미라서 더미마다 배지를 달면 아무
-              의미가 없고, 정작 건드리면 안 되는 사람이 묻힌다.
+              실제인지 더미인지는 양쪽 다 붙인다. 예전에는 실제 사용자에게만 붙였는데, 배지가
+              없는 줄이 더미인지 아직 안 읽은 줄인지 구분이 안 돼서 매번 상세를 열게 됐다.
+              대신 더미 배지는 옅게 둬서, 건드리면 안 되는 실제 사용자가 먼저 눈에 띄게 한다.
             */-->
             <a
               th:each="u : ${users}"
@@ -73,6 +74,7 @@
               <span class="pick-row">
                 <b th:text="${u.displayName()}">이름</b>
                 <span class="tag-real" th:unless="${u.dummy}">실제</span>
+                <span class="tag-dummy" th:if="${u.dummy}">더미</span>
                 <span class="live-dot" th:if="${u.online}" title="접속 중"></span>
               </span>
 
@@ -629,6 +631,23 @@
               카드가 없으면 이 부스에 붙은 사람이 등록할 것이 없습니다.
             </div>
           </div>
+
+          <!--/*
+            부스를 통째로 지운다.
+
+            마지막 남은 부스에는 띄우지 않는다. 부스가 하나도 없으면 서비스 첫 화면이
+            "아직 열린 부스가 없습니다" 로 굳어서 아무도 아무것도 못 한다. 갈아 끼우려면
+            새 부스를 먼저 만들고 지우면 된다.
+          */-->
+          <form
+            method="post"
+            th:if="${#lists.size(booths) > 1}"
+            th:action="@{'/admin/booths/' + ${booth.id} + '/delete'}"
+            th:data-confirm="'부스 ' + ${booth.name} + ' 을(를) 지웁니다. 이 부스의 카드 ' + ${#lists.size(boothItems)} + '종과 구역 ' + ${#lists.size(zones)} + '개, 그 카드가 오간 교환도 같이 지워집니다.'"
+            style="margin-top: 14px"
+          >
+            <button class="btn danger sm" type="submit">이 부스 삭제</button>
+          </form>
         </section>
       </th:block>
     </main>
