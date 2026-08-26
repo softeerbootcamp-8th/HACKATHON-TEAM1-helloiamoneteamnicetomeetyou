@@ -273,7 +273,7 @@ class ExchangeServiceTest {
     @Test
     @DisplayName("시간 조율을 요청하면 상대에게만 알린다")
     void 시간_조율을_요청하면_상대에게만_알린다() {
-        exchangeService.resetTimeSlots(EXCHANGE_ID, ME);
+        exchangeService.requestTimeCoordination(EXCHANGE_ID, ME);
 
         verify(sseEventPublisher).toUser(eq(PARTNER), eq(SseEventType.EXCHANGE_TIME_REQUESTED), any());
         verify(sseEventPublisher, never()).toUser(eq(ME), any(), any());
@@ -548,13 +548,19 @@ class ExchangeServiceTest {
         verify(userWantItemRepository).delete(partnerWant);
     }
 
+    /**
+     * 조율을 요청해도 고른 칸이 남아 있어야 한다. 비우면 요청한 사람과 받은 사람 모두 이미 고른
+     * 시간을 잃고, 격자 시작점까지 다시 잡히면 돌아왔을 때 칸이 가리키는 시각도 달라진다.
+     */
     @Test
-    @DisplayName("시간 조율을 요청하면 전원의 선택을 비운다")
-    void 시간_조율은_전원의_선택을_비운다() {
-        exchangeService.resetTimeSlots(EXCHANGE_ID, ME);
+    @DisplayName("시간 조율을 요청해도 고른 칸과 격자를 그대로 둔다")
+    void 시간_조율은_고른_칸을_지우지_않는다() {
+        LocalDateTime baseTimeBefore = exchange.getSlotBaseTime();
 
-        verify(timeSlotRepository).deleteAllByExchangeId(EXCHANGE_ID);
-        assertThat(exchange.getExchangeTime()).isNull();
+        exchangeService.requestTimeCoordination(EXCHANGE_ID, ME);
+
+        verify(timeSlotRepository, never()).deleteAllByExchangeId(EXCHANGE_ID);
+        assertThat(exchange.getSlotBaseTime()).isEqualTo(baseTimeBefore);
     }
 
     @Test

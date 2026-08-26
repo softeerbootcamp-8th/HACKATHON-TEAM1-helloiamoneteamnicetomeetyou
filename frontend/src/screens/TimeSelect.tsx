@@ -11,7 +11,7 @@ import { cn } from '@/lib/cn'
 import {
   confirmExchangeTime,
   fetchExchange,
-  resetTimeSlots,
+  requestTimeCoordination,
   updateTimeSlots,
   type Exchange,
 } from '@/lib/exchange'
@@ -243,6 +243,9 @@ export function TimeSelect() {
           시안의 CTA 는 세 갈래다. 상대가 아직 시간을 안 넣었으면 아무것도 할 수 없고,
           넣었는데 겹치는 시간이 없으면 조율을 요청하고, 겹치면 그 자리에서 확정한다.
           내가 시간을 안 골랐어도 상대가 골랐으면 조율 요청은 보낼 수 있다.
+
+          조율 요청은 상대에게 알림을 보내는 것뿐이다(시안 204:5026 "시간 변경 요청").
+          양쪽이 고른 칸은 그대로 남아서, 돌아온 사람은 자기 선택 위에 칸을 더하면 된다.
         */}
         {!answered && <Button disabled>상대의 시간을 기다리는 중이에요</Button>}
 
@@ -256,7 +259,7 @@ export function TimeSelect() {
           <Button
             disabled={busy}
             onClick={() => {
-              void run(() => resetTimeSlots(appt.exchangeId, myUserId)).then((ok) => {
+              void run(() => requestTimeCoordination(appt.exchangeId, myUserId)).then((ok) => {
                 if (!ok) {
                   dispatch({ type: 'toast', message: '잠시 뒤에 다시 시도해 주세요' })
                   return

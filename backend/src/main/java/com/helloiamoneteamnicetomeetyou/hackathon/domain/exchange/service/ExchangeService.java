@@ -338,18 +338,21 @@ public class ExchangeService {
     }
 
     /**
-     * 시간을 처음부터 다시 고른다. 화면의 "시간 조율 요청하기" 다.
+     * 시간 조율을 요청한다. 화면의 "다른 시간 물어보기" 다.
      *
-     * <p>내 것만 지우면 안 된다. 겹치는 칸이 없다는 것은 상대의 선택도 함께 봐야 알 수 있는
-     * 결론이라, 한 명만 다시 고르면 여전히 안 맞을 가능성이 크다.
+     * <p><b>하는 일은 상대에게 알리는 것 하나다.</b> 시안(204:5026)의 "시간 변경 요청" 알림은
+     * 노출 조건이 "상대 사용자가 시간 변경 요청 버튼을 클릭한 경우" 이고, 받은 쪽이 시간 선택
+     * 화면으로 돌아가 칸을 더 고르면 되는 흐름이다.
+     *
+     * <p><b>고른 칸을 지우지 않는다.</b> 예전에는 전원의 선택을 비우고 격자 시작점까지 지금
+     * 기준으로 다시 잡았는데, 그러면 요청한 사람과 받은 사람 모두 이미 고른 시간을 잃는다.
+     * 안 맞은 것은 겹치는 칸이지 각자의 선택이 아니라서, 남겨 두면 돌아온 사람이 자기가
+     * 고른 것 위에 칸을 더할 수 있다.
      */
     @Transactional
-    public ExchangeResponseDto resetTimeSlots(Long exchangeId, UUID userId) {
+    public ExchangeResponseDto requestTimeCoordination(Long exchangeId, UUID userId) {
         Exchange exchange = getExchange(exchangeId);
         getParticipant(exchangeId, userId);
-
-        timeSlotRepository.deleteAllByExchangeId(exchangeId);
-        exchange.resetTime();
 
         notifyOthers(exchangeId, userId, SseEventType.EXCHANGE_TIME_REQUESTED);
 
