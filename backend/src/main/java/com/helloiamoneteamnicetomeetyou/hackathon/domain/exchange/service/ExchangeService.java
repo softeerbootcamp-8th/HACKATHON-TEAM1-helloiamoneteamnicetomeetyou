@@ -85,15 +85,6 @@ public class ExchangeService {
     private final ApplicationEventPublisher eventPublisher;
 
     /**
-     * 교환을 만든다.
-     *
-     * <p>장소는 부스의 첫 구역으로 정해 둔다. 이번 행사는 교환 자리가 한 곳이라 고르는 화면이
-     * 아니라 확인하는 화면이다. 자리가 여러 곳이 되면 여기에 고르는 규칙이 들어온다.
-     *
-     * <p>격자 시작점을 여기서 한 번 정하는 것이 이 메서드의 핵심이다. 참가자들이 각자 자기 시계로
-     * 격자를 만들면 같은 칸 번호가 서로 다른 시각을 뜻하게 된다.
-     */
-    /**
      * 교환을 만들고 엔티티를 돌려준다.
      *
      * <p>만든 교환에 곧바로 다른 것을 붙여야 하는 쪽이 쓴다. 찔러보기가 성사되면 교환을 만든 뒤
@@ -101,6 +92,13 @@ public class ExchangeService {
      *
      * <p><b>교환을 만드는 길은 여기 하나다.</b> 장소와 격자 시작점, 식별자가 전부 여기서 붙는다.
      * 다른 데서 {@code Exchange} 를 직접 만들면 그것들이 비어서 약속 화면이 깨진다.
+     *
+     * <p><b>장소는 부스의 첫 구역으로 정해 둔다.</b> 만나는 자리는 팝업 운영자가 미리 정해 둔
+     * 한 곳이고, 사용자 화면은 그 자리를 고르는 것이 아니라 확인하는 것이다. 옮길 수 있는 길은
+     * 어드민 콘솔뿐이다({@link #updateZoneByAdmin}).
+     *
+     * <p>격자 시작점을 여기서 한 번 정하는 것도 이 메서드의 몫이다. 참가자들이 각자 자기 시계로
+     * 격자를 만들면 같은 칸 번호가 서로 다른 시각을 뜻하게 된다.
      */
     @Transactional
     public Exchange createExchange(Long boothId, ExchangeType type, List<UUID> participantUserIds) {
@@ -297,7 +295,11 @@ public class ExchangeService {
     }
 
     /**
-     * 만날 자리를 바꾼다.
+     * 만날 자리를 옮긴다. <b>어드민 전용이다.</b>
+     *
+     * <p>만나는 자리는 팝업 운영자가 미리 정해 둔 한 곳이고, 사용자 화면은 그 자리를 고르는
+     * 것이 아니라 확인하는 것이다. 그래서 자리를 옮기는 길은 어드민 콘솔 하나뿐이다.
+     * 원래 자리가 붐비거나 막혔을 때 운영자가 옮겨 준다.
      *
      * <p>구역은 어드민이 만들고 고치고 지운다. 그래서 화면이 보낸 이름이나 좌표를 믿지 않고
      * {@code zoneId} 로 다시 읽는다. 화면이 목록을 받아 둔 사이에 어드민이 이름을 바꿨을 수
@@ -306,16 +308,13 @@ public class ExchangeService {
      * <p><b>같은 부스의 구역만 고를 수 있다.</b> 약도는 부스마다 다른 그림이고 좌표도 그 그림
      * 안에서의 비율이라, 다른 부스의 구역을 넣으면 핀이 엉뚱한 자리를 가리킨다.
      *
-     * <p>바꾼 사람만 알면 소용없어서 나머지 참가자에게 알린다. 상대가 옛 자리에서 기다리는 것이
-     * 이 기능에서 제일 나쁜 결과다. 바꾼 본인은 응답으로 최신 자리를 이미 받았고, 알림까지 가면
-     * 자기가 방금 한 행동이 자기 알림함에 쌓인다.
+     * <p><b>참가자 전원에게 알린다.</b> 옮긴 사람이 참가자가 아니라 운영자라, 알림에서 뺄 사람이
+     * 없다. 한 명이라도 못 받으면 그 사람만 옛 자리에서 기다리게 되는데, 그게 이 기능에서
+     * 제일 나쁜 결과다.
      */
     @Transactional
-    public ExchangeResponseDto updateZone(Long exchangeId, UUID userId, Long zoneId) {
+    public ExchangeResponseDto updateZoneByAdmin(Long exchangeId, Long zoneId) {
         Exchange exchange = getExchange(exchangeId);
-
-        // 참가자인지를 먼저 본다. 남의 약속을 건드린 사람에게 그 약속의 상태를 알려 주면 안 된다.
-        getParticipant(exchangeId, userId);
 
         // 아직 아무도 수락하지 않은 교환은 자리가 안 붙어 있다. 그대로 두면 어느 부스인지 알 길이
         // 없어서 아래 부스 대조에서 터진다. 수락 전에는 옮길 자리 자체가 없다고 답하는 것이 맞다.
@@ -333,7 +332,7 @@ public class ExchangeService {
 
         exchange.changeZone(zone);
 
-        notifyOthers(exchangeId, userId, SseEventType.EXCHANGE_PLACE_UPDATED);
+        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_PLACE_UPDATED);
 
         return toResponse(exchange);
     }

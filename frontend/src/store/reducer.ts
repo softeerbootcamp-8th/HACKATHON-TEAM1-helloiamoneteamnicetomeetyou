@@ -1,4 +1,4 @@
-import type { Exchange, Zone } from '@/lib/exchange'
+import type { Exchange } from '@/lib/exchange'
 
 import { toAppointment } from './appointment'
 import type { ExchangePair, MatchPartner, MatchResult } from './matching'
@@ -14,7 +14,6 @@ const NOTICE_BODY = '탭하여 확인'
 export const initialState: State = {
   onboarded: false,
   boothId: null,
-  zones: [],
   // 기기가 전에 홈까지 가 본 적이 있으면 온보딩을 다시 보여주지 않는다.
   setupDone: getPersistedSetupDone(),
   have: [],
@@ -66,7 +65,7 @@ export type Action =
     }
   | { type: 'open-match' }
   | { type: 'decline-match' }
-  | { type: 'booth-loaded'; boothId: number; zones: Zone[] }
+  | { type: 'booth-loaded'; boothId: number }
   | {
       type: 'exchange-synced'
       exchange: Exchange
@@ -276,7 +275,7 @@ export function reducer(state: State, action: Action): State {
     }
 
     case 'booth-loaded':
-      return { ...state, boothId: action.boothId, zones: action.zones }
+      return { ...state, boothId: action.boothId }
 
     /**
      * 서버에서 읽어 온 교환으로 약속을 갈아끼운다. 만들었을 때, 실시간 알림을 받았을 때,

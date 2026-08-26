@@ -8,7 +8,7 @@ import { Identify } from '@/screens/Identify'
 import { MatchResult } from '@/screens/MatchResult'
 import { NeedsSelect } from '@/screens/NeedsSelect'
 import { Onboarding } from '@/screens/Onboarding'
-import { PlaceSelect } from '@/screens/PlaceSelect'
+import { PlaceView } from '@/screens/PlaceView'
 import { PokeConfirm } from '@/screens/PokeConfirm'
 import { PokeReceived } from '@/screens/PokeReceived'
 import { TimeSelect } from '@/screens/TimeSelect'
@@ -27,7 +27,7 @@ export const router = createBrowserRouter([
       { path: 'poke/confirm', element: <PokeConfirm /> },
       { path: 'poke/received', element: <PokeReceived /> },
       { path: 'match', element: <MatchResult /> },
-      { path: 'place', element: <PlaceSelect /> },
+      { path: 'place', element: <PlaceView /> },
       { path: 'time', element: <TimeSelect /> },
       { path: 'appointment', element: <Appointment /> },
       { path: 'identify', element: <Identify /> },

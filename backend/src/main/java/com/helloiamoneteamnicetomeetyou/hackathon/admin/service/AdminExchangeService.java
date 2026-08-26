@@ -211,14 +211,15 @@ public class AdminExchangeService {
     /**
      * 만날 자리를 옮긴다. 부스에서 원래 자리가 붐비거나 막혔을 때 운영자가 옮겨 준다.
      *
-     * <p>{@link ExchangeService#updateZone} 을 그대로 부른다. 같은 부스의 구역인지 확인하는 것과
-     * 참가자 전원에게 {@code EXCHANGE_PLACE_UPDATED} 를 보내는 것이 전부 그쪽에 있다.
+     * <p><b>자리를 옮길 수 있는 곳은 여기뿐이다.</b> 사용자 화면은 미리 정해 둔 자리를 확인만
+     * 한다. {@link ExchangeService#updateZoneByAdmin} 을 그대로 부르고, 같은 부스의 구역인지
+     * 확인하는 것과 참가자 전원에게 {@code EXCHANGE_PLACE_UPDATED} 를 보내는 것이 전부 그쪽에 있다.
      *
      * <p>아직 아무도 수락하지 않은 교환은 자리가 안 붙어 있어서 거절된다. 옮길 자리 자체가 없다.
      */
     @Transactional
     public void updatePlace(Long exchangeId, Long zoneId) {
-        exchangeService.updateZone(exchangeId, anyParticipantId(exchangeId), zoneId);
+        exchangeService.updateZoneByAdmin(exchangeId, zoneId);
     }
 
     /**
