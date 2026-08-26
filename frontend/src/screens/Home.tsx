@@ -11,6 +11,7 @@ import { RadarRings } from '@/components/domain/Radar'
 import { RadarUser } from '@/components/domain/RadarUser'
 import { BellIcon } from '@/components/ui/icons'
 import { useCatalog } from '@/features/catalog/useCatalog'
+import { useNotification } from '@/features/notification/useNotification'
 import { usePoke } from '@/features/poke/usePoke'
 import { cn } from '@/lib/cn'
 import { tick } from '@/lib/haptics'
@@ -35,6 +36,11 @@ export function Home() {
     ready: pokeReady,
   } = usePoke()
   const { state: catalog } = useCatalog()
+  const {
+    notifications: serverNotifications,
+    unreadCount,
+    markRead: markNotificationRead,
+  } = useNotification()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   // 앱을 닫아 둔 사이의 알림. 여는 자리는 알림 목록 위다.
@@ -610,7 +616,7 @@ export function Home() {
             className="relative flex size-10 items-center justify-center text-ink"
           >
             <BellIcon className="size-[22px]" />
-            {state.notifications.length > 0 && (
+            {unreadCount > 0 && (
               <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-brand" />
             )}
           </motion.button>
@@ -745,15 +751,37 @@ export function Home() {
       <NotificationSheet
         open={notifOpen}
         onClose={() => setNotifOpen(false)}
-        notifications={state.notifications}
+        notifications={serverNotifications.map((n) => ({
+          id: String(n.id),
+          kind: n.type,
+          title: n.title,
+          body: n.body,
+        }))}
         pushState={pushState}
         onEnablePush={enablePush}
-        onDismiss={(id) => dispatch({ type: 'read-notification', id })}
+        onDismiss={(id) => void markNotificationRead(Number(id))}
         onSelect={(kind) => {
           setNotifOpen(false)
-          if (kind === 'poke-received') navigate('/poke/received')
-          else if (kind === 'match' || kind === 'poke-accepted') navigate('/match')
-          else if (kind === 'time-request' || kind === 'time-matched') navigate('/time')
+          // 문구와 열리는 화면의 짝은 백엔드 PushMessage 와 같은 것을 쓴다.
+          if (kind === 'POKE_RECEIVED') navigate('/poke/received')
+          else if (
+            kind === 'MATCH_SUGGESTED' ||
+            kind === 'MATCH_ACCEPTED' ||
+            kind === 'POKE_ACCEPTED'
+          )
+            navigate('/match')
+          else if (
+            kind === 'EXCHANGE_CREATED' ||
+            kind === 'EXCHANGE_TIME_UPDATED' ||
+            kind === 'EXCHANGE_PLACE_UPDATED'
+          )
+            navigate('/appointment')
+          else if (
+            kind === 'MATCH_REJECTED' ||
+            kind === 'POKE_REJECTED' ||
+            kind === 'EXCHANGE_CANCELLED'
+          )
+            navigate('/home')
         }}
       />
     </div>

@@ -139,6 +139,10 @@ public class ExchangeService {
         if (exchange.getStatus() == ExchangeStatus.PENDING) {
             exchange.startProgress();
         }
+
+        // 매칭은 만날 자리도 시간도 모른 채 교환을 만든다. 약속 화면이 필요한 것은 여기서 붙는다.
+        // 먼저 수락한 사람이 정하고, 늦게 수락한 사람은 같은 값을 그대로 본다.
+        prepareAppointment(exchange, boothIdOf(exchange));
     }
 
     /**
@@ -178,8 +182,18 @@ public class ExchangeService {
         }
     }
 
+    /**
+     * 약속 화면이 보는 교환 하나.
+     *
+     * <p>아직 아무도 수락하지 않은 교환은 만날 자리가 없어서 약속으로 읽을 수 없다. 그때
+     * {@code null} 필드로 내려보내면 화면이 뒤늦게 깨지므로, 여기서 끊고 알려준다.
+     */
     public ExchangeResponseDto find(Long exchangeId) {
-        return toResponse(getExchange(exchangeId));
+        Exchange exchange = getExchange(exchangeId);
+        if (!exchange.hasAppointment()) {
+            throw new ApplicationException(ErrorCode.EXCHANGE_NOT_ACCEPTED);
+        }
+        return toResponse(exchange);
     }
 
     /**
@@ -191,6 +205,9 @@ public class ExchangeService {
      */
     public ExchangeResponseDto findActiveOf(UUID userId) {
         return exchangeRepository.findActiveByUserId(userId, ACTIVE_STATUSES).stream()
+                // 매칭이 방금 제안한 교환은 아직 자리도 시간도 없다. 그건 매칭 화면이 다룰 몫이라
+                // 여기서는 건너뛴다. 수락해서 약속이 잡힌 것만 돌려준다.
+                .filter(Exchange::hasAppointment)
                 .findFirst()
                 .map(this::toResponse)
                 .orElse(null);

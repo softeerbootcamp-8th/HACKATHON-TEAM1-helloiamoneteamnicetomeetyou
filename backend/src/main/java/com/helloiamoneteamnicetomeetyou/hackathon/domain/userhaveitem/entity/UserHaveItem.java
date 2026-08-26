@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "user_have_items", indexes = {
@@ -54,6 +55,14 @@ public class UserHaveItem {
     @Version
     private Long version;
 
+    /**
+     * 매칭이 먼저 등록한 사람을 먼저 짝지어 주는 데 쓴다.
+     *
+     * <p>기본값을 박아 둔 것은 이미 보유 카드가 들어 있는 DB 때문이다. {@code ddl-auto: update}
+     * 가 행이 있는 테이블에 {@code NOT NULL} 컬럼을 그냥 붙이려다 실패하면, 컬럼만 없는 채로
+     * 서버가 떠서 매칭 쿼리가 조용히 죽는다.
+     */
+    @ColumnDefault("CURRENT_TIMESTAMP(6)")
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
