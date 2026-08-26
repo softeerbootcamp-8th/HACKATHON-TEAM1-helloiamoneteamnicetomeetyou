@@ -97,13 +97,20 @@ public class ExchangeController {
         return ResponseEntity.ok(CommonResponse.ok(exchange, "시간을 저장했습니다."));
     }
 
-    /** "시간 조율 요청하기". 참가자 전원의 선택을 비우고 격자를 지금 기준으로 다시 잡는다. */
+    /**
+     * "시간 조율 요청하기". <b>상대에게 알림만 보낸다.</b> 고른 칸은 양쪽 모두 그대로 남는다.
+     *
+     * <p>경로에 남아 있는 {@code reset} 은 전원의 선택을 비우던 예전 동작에서 온 이름이다.
+     * 프론트가 이미 이 경로를 부르고 있어서 이름만 바꾸지 않았다. 팀에서 합의되면
+     * {@code /time-request} 로 옮긴다.
+     */
     @PostMapping("/{exchangeId}/time-slots/reset")
-    public ResponseEntity<CommonResponse<ExchangeResponseDto>> resetTimeSlots(
+    public ResponseEntity<CommonResponse<ExchangeResponseDto>> requestTimeCoordination(
             @PathVariable Long exchangeId,
             @RequestBody ExchangeActorRequestDto request) {
 
-        ExchangeResponseDto exchange = exchangeService.resetTimeSlots(exchangeId, request.userId());
+        ExchangeResponseDto exchange =
+                exchangeService.requestTimeCoordination(exchangeId, request.userId());
 
         return ResponseEntity.ok(CommonResponse.ok(exchange, "시간 조율을 요청했습니다."));
     }
