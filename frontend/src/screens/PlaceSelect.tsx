@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { RejectDialog } from '@/components/domain/ConfirmDialogs'
@@ -36,20 +36,27 @@ export function PlaceSelect() {
   const here = appt?.zone ?? null
   const zones = state.zones
   const [moving, setMoving] = useState(false)
+  const myUserId = useMemo(() => getDeviceId(), [])
 
   /**
    * 핀을 눌러 자리를 옮긴다.
    *
    * 이미 그 자리면 서버를 부르지 않는다. 같은 값을 저장해 봐야 상대에게 "자리가 바뀌었어요"
    * 알림만 한 번 더 가고 화면은 그대로다.
+   *
+   * <b>응답으로 화면을 맞춘다.</b> 서버는 자리를 바꾼 본인에게는 일부러 실시간 알림을 보내지
+   * 않는다(`ExchangeService.updateZone`). 방금 자기가 한 행동이 자기 알림함에 쌓이기 때문인데,
+   * 그래서 누른 사람의 화면을 갱신할 길이 이 응답뿐이다. 전에는 이걸 버려서 핀을 눌러도
+   * 서버에만 저장되고 아래 자리 카드와 진한 핀은 옛 자리에 그대로 있었다. 상대 화면은
+   * 알림을 받아 옮겨졌기 때문에, 정작 자리를 옮긴 사람만 다른 곳을 보고 있었다.
    */
   const moveTo = async (zoneId: number) => {
     if (!appt || moving || zoneId === here?.id) return
 
     setMoving(true)
     try {
-      // 저장하면 서버가 참가자 전원에게 알리고, 그 신호를 받아 store 가 다시 읽는다.
-      await updateExchangeZone(appt.exchangeId, getDeviceId(), zoneId)
+      const exchange = await updateExchangeZone(appt.exchangeId, myUserId, zoneId)
+      dispatch({ type: 'exchange-synced', exchange, myUserId })
     } catch (error) {
       dispatch({ type: 'toast', message: messageOf(error) })
     } finally {
