@@ -114,6 +114,13 @@ spring:
       hibernate:
         format_sql: false
 
+# 앞에 Caddy 가 리버스 프록시로 있다. 이 값이 없으면 서버가 자기 주소를 http://...:8080 으로
+# 알고 있어서, 브라우저가 https 로 보낸 요청을 남의 오리진에서 온 것으로 본다. 어드민 화면이
+# 자기 자신에게 보내는 POST 가 그것 때문에 403 Invalid CORS request 로 막혔다.
+# Caddy 가 붙여 주는 X-Forwarded-* 를 읽어서 실제 스킴과 호스트를 알게 한다.
+server:
+  forward-headers-strategy: framework
+
 # 기본값을 주지 않는다. 값이 빠지면 부팅이 실패하는 편이,
 # 배포된 서버가 admin/admin1234 로 열려 있는 것보다 낫다.
 admin:
