@@ -15,6 +15,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -136,6 +137,21 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(ErrorCode.RESOURCE_NOT_FOUND.getHttpStatus())
                 .body(CommonResponse.error(ErrorCode.RESOURCE_NOT_FOUND));
+    }
+
+    /**
+     * SSE(구독) 처럼 끝나지 않는 요청에서 클라이언트가 이미 나간 뒤 서버가 쓰기를 시도하면 난다.
+     *
+     * <p>이 시점엔 연결이 끊긴 뒤라 응답 바디를 쓸 곳이 없다. 몸체를 채워 돌려주면(=아래
+     * {@code handleException} 처럼) {@code text/event-stream} 으로 이미 커밋된 응답에 JSON 을
+     * 쓰려다 {@code HttpMessageNotWritableException} 이 한 번 더 나면서 정상적인 연결 종료가
+     * 오류처럼 로그에 두 번 찍힌다. 여기서는 반환값 없이 조용히 흘려보낸다.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsableException(
+            AsyncRequestNotUsableException e, HttpServletRequest request) {
+
+        log.debug("비동기 연결이 이미 끊어짐 - [{}] {}", request.getMethod(), request.getRequestURI());
     }
 
     @ExceptionHandler(Exception.class)
