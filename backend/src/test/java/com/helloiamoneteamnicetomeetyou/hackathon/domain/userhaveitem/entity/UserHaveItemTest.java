@@ -32,7 +32,7 @@ class UserHaveItemTest {
         UserHaveItem haveItem = UserHaveItem.of(user, item, 3);
         haveItem.reserve(1);
 
-        haveItem.completeExchange();
+        haveItem.completeExchange(1);
 
         assertThat(haveItem.getQuantityLeft()).isEqualTo(2);
         assertThat(haveItem.getStatus()).isEqualTo(ItemStatus.LEFT);
@@ -44,7 +44,7 @@ class UserHaveItemTest {
         UserHaveItem haveItem = UserHaveItem.of(user, item, 1);
         haveItem.reserve(1);
 
-        haveItem.completeExchange();
+        haveItem.completeExchange(1);
 
         assertThat(haveItem.getQuantityLeft()).isZero();
         assertThat(haveItem.getStatus()).isEqualTo(ItemStatus.OUT);
@@ -60,5 +60,42 @@ class UserHaveItemTest {
 
         assertThat(haveItem.getQuantityLeft()).isEqualTo(3);
         assertThat(haveItem.isReserved()).isFalse();
+    }
+
+    @Test
+    @DisplayName("완료되면 넘긴 만큼 등록해 둔 총 수량도 줄어든다")
+    void 완료는_총_수량도_깎는다() {
+        UserHaveItem haveItem = UserHaveItem.of(user, item, 3);
+        haveItem.reserve(1);
+
+        haveItem.completeExchange(1);
+
+        assertThat(haveItem.getQuantity()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("다 넘긴 카드를 같은 개수로 다시 등록하면 그만큼 다시 내줄 수 있다")
+    void 다_넘긴_카드를_다시_등록할_수_있다() {
+        UserHaveItem haveItem = UserHaveItem.of(user, item, 2);
+        haveItem.reserve(2);
+        haveItem.completeExchange(2);
+
+        haveItem.changeQuantity(2);
+
+        assertThat(haveItem.getQuantityLeft()).isEqualTo(2);
+        assertThat(haveItem.getStatus()).isEqualTo(ItemStatus.LEFT);
+    }
+
+    @Test
+    @DisplayName("일부만 넘긴 뒤 남은 개수로 다시 등록해도 그 개수가 그대로 남는다")
+    void 일부만_넘긴_뒤_다시_등록해도_남은_개수가_유지된다() {
+        UserHaveItem haveItem = UserHaveItem.of(user, item, 2);
+        haveItem.reserve(1);
+        haveItem.completeExchange(1);
+
+        haveItem.changeQuantity(1);
+
+        assertThat(haveItem.getQuantityLeft()).isEqualTo(1);
+        assertThat(haveItem.getStatus()).isEqualTo(ItemStatus.LEFT);
     }
 }

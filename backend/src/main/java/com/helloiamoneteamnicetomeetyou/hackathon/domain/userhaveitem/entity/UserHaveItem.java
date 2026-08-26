@@ -125,12 +125,17 @@ public class UserHaveItem {
     }
 
     /**
-     * 예약해 둔 거래가 실제로 끝났다.
+     * 예약해 둔 거래가 실제로 끝났다. 넘긴 개수만큼 등록해 둔 총 수량에서 뺀다.
      *
      * <p>{@code quantityLeft} 는 이미 {@link #reserve} 에서 깎아 뒀으니 여기서 또 깎지 않는다.
-     * 상태만 지금 {@code quantityLeft} 에 맞게 정리한다.
+     *
+     * <p><b>{@code quantity} 를 같이 깎지 않으면 그 카드를 다시 등록할 수 없게 된다.</b>
+     * 등록은 {@link #changeQuantity} 를 타는데 그게 예전 총 수량과의 차이로 {@code quantityLeft}
+     * 를 움직이기 때문이다. 2장을 등록해 다 넘긴 뒤 다시 2장을 등록하면 차이가 0 이라 내줄 수
+     * 있는 개수가 0 에 머물고, 매칭 쿼리가 그 카드를 영영 집지 못한다.
      */
-    public void completeExchange() {
+    public void completeExchange(int amount) {
+        this.quantity = Math.max(0, this.quantity - amount);
         this.status = this.quantityLeft > 0 ? ItemStatus.LEFT : ItemStatus.OUT;
     }
 

@@ -15,6 +15,7 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.TimeSlotGrid;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeParticipantResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.dto.ExchangeResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeStatus;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.enums.ExchangeType;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
@@ -460,6 +461,40 @@ class ExchangeServiceTest {
                 .isInstanceOf(ApplicationException.class)
                 .extracting(e -> ((ApplicationException) e).getErrorType())
                 .isEqualTo(ErrorCode.EXCHANGE_ALREADY_FINISHED);
+    }
+
+    @Test
+    @DisplayName("3자 교환에서 늦게 누른 사람도 실패가 아니라 끝난 상태를 받는다")
+    void 늦게_누른_사람도_완료로_받는다() throws Exception {
+        Item item = withId(Item.of(null, "카드", null), ITEM_ID);
+        UserHaveItem meHave = UserHaveItem.of(me, item, 3);
+        meHave.reserve(1);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(userHaveItemRepository.findByUserIdAndItemId(ME, ITEM_ID)).willReturn(Optional.of(meHave));
+        exchange.confirmTime(1);
+        exchangeService.complete(EXCHANGE_ID, ME);
+
+        ExchangeResponseDto response = exchangeService.complete(EXCHANGE_ID, PARTNER);
+
+        assertThat(response.status()).isEqualTo(ExchangeStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("두 번 눌러도 재고는 한 번만 옮긴다")
+    void 두_번_눌러도_재고는_한_번만_옮긴다() throws Exception {
+        Item item = withId(Item.of(null, "카드", null), ITEM_ID);
+        UserHaveItem meHave = UserHaveItem.of(me, item, 3);
+        meHave.reserve(1);
+        given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
+                .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
+        given(userHaveItemRepository.findByUserIdAndItemId(ME, ITEM_ID)).willReturn(Optional.of(meHave));
+        exchange.confirmTime(1);
+
+        exchangeService.complete(EXCHANGE_ID, ME);
+        exchangeService.complete(EXCHANGE_ID, PARTNER);
+
+        assertThat(meHave.getQuantity()).isEqualTo(2);
     }
 
     @Test
