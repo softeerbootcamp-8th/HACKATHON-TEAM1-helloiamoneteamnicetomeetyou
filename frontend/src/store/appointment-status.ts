@@ -78,3 +78,18 @@ export function sortedAppointments(appointments: Appointment[]): Appointment[] {
     return a.confirmedTime.localeCompare(b.confirmedTime)
   })
 }
+
+/**
+ * 아직 안 끝난 약속만 남긴다. <b>"약속이 있는가" 를 세는 자리는 전부 이걸 쓴다.</b>
+ *
+ * 끝난 약속도 목록에는 남는다. 상대가 먼저 "만났어요" 를 눌렀을 때 내 화면이 완료 화면으로
+ * 따라가는 길이 `stage === 'completed'` 하나뿐이라(`Identify.tsx`), 완료를 확인하기 전에
+ * 목록에서 빼 버리면 그 사람은 완료 화면을 통째로 건너뛴다.
+ *
+ * 그래서 목록에서 실제로 빠지는 것은 완료 화면이 도는 `complete` 액션인데, 그 화면을 안 거친
+ * 사람은 끝난 약속을 계속 들고 있게 된다. 그 상태에서 길이만 세면 <b>다음 매칭 제안이 "이미
+ * 약속이 있다" 로 걸러져서</b> 그 사람만 두 번째 매칭이 영영 안 뜬다.
+ */
+export function liveAppointments(appointments: Appointment[]): Appointment[] {
+  return appointments.filter((appointment) => appointment.stage !== 'completed')
+}

@@ -18,6 +18,7 @@ import {
 import { tick } from '@/lib/haptics'
 import { springSheet, springSnap } from '@/lib/motion'
 import { useLastDefined } from '@/lib/useLastDefined'
+import { liveAppointments } from '@/store/appointment-status'
 import { getDeviceId } from '@/store/identity'
 import { activeAppointment } from '@/store/reducer'
 import { useCancelAppointment } from '@/store/use-cancel-appointment'
@@ -70,8 +71,11 @@ export function TimeSelect() {
    *
    * 다른 약속은 격자 시작점이 다를 수 있어서 칸 번호를 그대로 비교하면 안 된다. 확정된 시각을
    * 이 약속의 격자에 다시 얹어 몇 번째 칸인지 구한다.
+   *
+   * 이미 끝난 약속은 세지 않는다(`liveAppointments`). 그 시각에는 이제 갈 곳이 없는데, 끝난
+   * 약속이 목록에 남아 있으면 방금 교환한 시간대가 다음 약속에서 못 고르는 칸이 된다.
    */
-  const blocked = state.appointments
+  const blocked = liveAppointments(state.appointments)
     .filter((other) => other.exchangeId !== appt.exchangeId && other.confirmedTime !== null)
     .map((other) => slotIndexOf(baseTime, other.confirmedTime as string, appt.slotCount))
     .filter((index): index is number => index !== null)
