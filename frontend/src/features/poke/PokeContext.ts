@@ -3,11 +3,11 @@ import { createContext } from 'react'
 import type { BoothHaveItem, PokeAnswerResult, ReceivedPoke, SentPoke } from './api'
 
 /**
- * 서버에 실제로 오간 찔러보기다. 목업 흐름(`store/`)과 나란히 돈다.
+ * 서버에 실제로 오간 찔러보기다.
  *
- * 둘을 합치지 않은 이유: 목업은 카드 id 가 문자열이고 상대가 `ALL_WAITING` 의 가짜 사용자다.
- * 서버는 숫자 카드 id 와 UUID 를 쓴다. 한 상태에 섞으면 어느 쪽 값인지 따라다니며 갈라야
- * 하는데, 매칭 알고리즘(#20)이 들어오면 목업 쪽이 통째로 사라진다. 그때 이 파일만 남는다.
+ * 스토어(`store/`)와 나누어 둔 이유는 구독 위치다. 실시간 알림은 부스를 알아야 붙을 수 있어서
+ * 이쪽이 `StoreProvider` 바깥에 있고, 그래서 스토어에 직접 손대지 못한다. 둘을 잇는 일은
+ * `features/poke/use-poke-sync.ts` 가 맡는다.
  */
 export type PokeValue = {
   /** 내가 받은, 아직 답하지 않은 찔러보기 */
@@ -16,7 +16,7 @@ export type PokeValue = {
   sent: SentPoke[]
   /** 부스 안 다른 사람들이 내놓은 카드 */
   waiting: BoothHaveItem[]
-  /** 서버 연동이 준비됐는지. 아니면 화면이 목업으로 돈다 */
+  /** 부스를 정하고 목록을 읽을 수 있는 상태인지 */
   ready: boolean
   /**
    * 목록을 한 번이라도 읽었는지.

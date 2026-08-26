@@ -38,7 +38,7 @@ class ItemControllerTest {
     @DisplayName("카드 목록을 팀 응답 형식으로 내려준다")
     void 카드_목록을_내려준다() throws Exception {
         given(itemService.findByBooth(anyLong()))
-                .willReturn(List.of(new ItemResponseDto(7L, "아이오닉 5 N", null, null)));
+                .willReturn(List.of(new ItemResponseDto(7L, "아이오닉 5 N", null, null, "아5N")));
 
         mockMvc.perform(get("/api/booths/1/items"))
                 .andExpect(status().isOk())

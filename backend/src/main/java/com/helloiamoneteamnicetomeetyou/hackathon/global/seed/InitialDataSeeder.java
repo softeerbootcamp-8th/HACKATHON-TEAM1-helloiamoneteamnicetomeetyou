@@ -7,6 +7,8 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.repository.ItemRep
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.entity.Zone;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.zone.repository.ZoneRepository;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -43,20 +45,30 @@ public class InitialDataSeeder implements ApplicationRunner {
             new Object[]{"에스컬레이터", "1층 에스컬레이터 앞", 25, 68},
             new Object[]{"라운지", "휴게 라운지", 82, 60});
 
+    /** 카드 그림이 올라가 있는 스토리지. 파일 이름은 영문 카드 이름을 밑줄로 이은 것이다. */
+    private static final String IMAGE_BASE =
+            "https://sdumqvkniemiowanvsef.supabase.co/storage/v1/object/public/items";
+
     /**
-     * 프론트 목업의 카드와 <b>이름이 같아야 한다.</b> 화면이 목업 카드와 서버 카드를 이름으로
-     * 잇기 때문에(`features/catalog/match-by-name.ts`), 하나라도 어긋나면 그 카드는 등록이 안 된다.
+     * 이 부스가 내놓는 카드다. 순서대로 영문 이름, 한글 이름, 그림 파일 이름이다.
+     *
+     * <p>한글 이름은 {@code description} 자리에 들어간다. 화면이 카드 밑에 작게 붙여 쓰는
+     * 값이라 따로 컬럼을 두지 않고 설명을 그대로 쓴다.
+     *
+     * <p><b>그림 주소를 여기서 채워야 한다.</b> 화면은 이제 서버가 준 {@code imageUrl} 만
+     * 보고 카드를 그린다. 비어 있으면 그림 없이 약칭 글자만 뜬다.
      */
     private static final List<String[]> ITEMS = List.of(
-            new String[]{"IONIQ 5 N", "아이오닉 5 N"},
-            new String[]{"AVANTE N", "아반떼 N"},
-            new String[]{"VELOSTER N", "벨로스터 N"},
-            new String[]{"KONA N", "코나 N"},
-            new String[]{"i30 N", "i30 N"},
-            new String[]{"i30 Fastback", "i30 패스트백"},
-            new String[]{"i20 N", "i20 N"},
-            new String[]{"AVANTE N Facelift", "아반떼 N 페이스리프트"},
-            new String[]{"i20 N Rally1", "i20 N 랠리1"});
+            new String[]{"IONIQ 5 N", "아이오닉 5 N", "IONIQ5_N.png"},
+            new String[]{"AVANTE N", "아반떼 N", "AVANTE_N.png"},
+            new String[]{"VELOSTER N", "벨로스터 N", "VELOSTER_N.png"},
+            new String[]{"KONA N", "코나 N", "KONA_N.png"},
+            new String[]{"i30 N", "i30 N", "i30_N.png"},
+            new String[]{"i30 Fastback", "i30 패스트백", "i30_Fastback.png"},
+            new String[]{"i20 N", "i20 N", "i20_N.png"},
+            // 파일 이름에 공백이 들어 있어 그대로 두면 주소가 끊긴다.
+            new String[]{"AVANTE N Facelift", "아반떼 N 페이스리프트", "AVANTE_N%20Facelift.png"},
+            new String[]{"i20 N Rally1", "i20 N 랠리1", "i20_N_Rally1.png"});
 
     private final BoothRepository boothRepository;
     private final ZoneRepository zoneRepository;
@@ -92,8 +104,27 @@ public class InitialDataSeeder implements ApplicationRunner {
 
         int items = 0;
         if (itemRepository.count() == 0) {
-            ITEMS.forEach(item -> itemRepository.save(Item.of(booth, item[0], item[1])));
+            ITEMS.forEach(item -> itemRepository.save(
+                    Item.of(booth, item[0], item[1], IMAGE_BASE + "/" + item[2])));
             items = ITEMS.size();
+        } else {
+            /*
+              이미 카드가 들어 있는 DB 다. 그림 주소는 나중에 넣기 시작한 값이라 먼저 만들어진
+              카드는 전부 비어 있는데, 화면이 이제 서버 imageUrl 만 보고 그리기 때문에 그대로
+              두면 카드가 전부 약칭 글자로만 뜬다. 이름이 같은 카드의 빈 자리만 채운다.
+              운영자가 어드민에서 넣은 주소는 건드리지 않는다.
+            */
+            Map<String, String> imageByName = ITEMS.stream()
+                    .collect(Collectors.toMap(item -> item[0], item -> IMAGE_BASE + "/" + item[2]));
+
+            itemRepository.findByBoothIdOrderByIdAsc(booth.getId()).stream()
+                    .filter(item -> item.getImageUrl() == null)
+                    .forEach(item -> {
+                        String url = imageByName.get(item.getName());
+                        if (url != null) {
+                            item.attachImage(url);
+                        }
+                    });
         }
 
         if (zones > 0 || items > 0) {

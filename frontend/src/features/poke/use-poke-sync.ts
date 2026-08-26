@@ -1,13 +1,12 @@
 import { useEffect, useRef } from 'react'
 
-import { useCatalog } from '@/features/catalog/useCatalog'
 import { useStore } from '@/store/useStore'
 
 import type { SentPoke } from './api'
 import { usePoke } from './usePoke'
 
 /**
- * 서버에 오간 찔러보기를 목업 스토어에 이어 붙인다. 보낸 쪽에서 벌어지는 일을 맡는다.
+ * 서버에 오간 찔러보기를 스토어에 이어 붙인다. 보낸 쪽에서 벌어지는 일을 맡는다.
  *
  * <b>`PokeProvider` 는 `StoreProvider` 바깥이라 스토어에 손댈 수 없다</b>(`main.tsx`).
  * 부스를 알아야 구독할 수 있어서 그 자리에 있는 것이고, 그래서 둘을 잇는 자리가 따로
@@ -19,8 +18,6 @@ import { usePoke } from './usePoke'
 export function usePokeSync() {
   const { sent, loaded } = usePoke()
   const { dispatch } = useStore()
-  const { state: catalog } = useCatalog()
-  const mockItemOf = catalog.status === 'ready' ? catalog.mockItemOf : undefined
 
   /** 이미 성사 화면을 세워 준 교환. 목록을 다시 읽을 때마다 되살리지 않는다. */
   const seededExchanges = useRef(new Set<number>())
@@ -38,26 +35,22 @@ export function usePokeSync() {
    * 성사 화면이 빈 화면으로 뜨지 않는다.
    */
   useEffect(() => {
-    if (!loaded || !mockItemOf) return
+    if (!loaded) return
 
     const accepted = latestOf(sent.filter((p) => p.status === 'ACCEPTED'))
     if (!accepted || accepted.exchangeId === undefined || !accepted.chosenItem) return
     if (seededExchanges.current.has(accepted.exchangeId)) return
 
-    const give = mockItemOf(accepted.chosenItem.id)
-    const receive = mockItemOf(accepted.requestedItem.id)
-    if (!give || !receive) return
-
     seededExchanges.current.add(accepted.exchangeId)
     dispatch({
       type: 'server-poke-matched',
       exchangeId: accepted.exchangeId,
-      giveItemId: give.id,
-      receiveItemId: receive.id,
+      giveItemId: accepted.chosenItem.id,
+      receiveItemId: accepted.requestedItem.id,
       partnerUserId: accepted.targetUserId,
       partnerName: accepted.targetUserName,
     })
-  }, [loaded, sent, mockItemOf, dispatch])
+  }, [loaded, sent, dispatch])
 
   /**
    * 상대가 거절했다. 시안 `토스트 정리`(204:5148)의 "거절된 경우" 문구를 띄운다.
@@ -85,9 +78,11 @@ export function usePokeSync() {
     const last = latestOf(fresh)
     if (!last) return
 
-    const name = mockItemOf?.(last.requestedItem.id)?.name ?? last.requestedItem.name
-    dispatch({ type: 'toast', message: `${name} 교환이 거절되었어요` })
-  }, [loaded, sent, mockItemOf, dispatch])
+    dispatch({
+      type: 'toast',
+      message: `${last.requestedItem.name} 교환이 거절되었어요`,
+    })
+  }, [loaded, sent, dispatch])
 }
 
 /** 가장 나중에 만들어진 것. 서버가 목록 순서를 약속하지 않아서 id 로 고른다. */

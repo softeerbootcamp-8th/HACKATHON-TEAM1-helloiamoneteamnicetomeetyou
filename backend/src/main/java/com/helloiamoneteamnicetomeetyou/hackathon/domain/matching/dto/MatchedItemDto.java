@@ -1,6 +1,8 @@
 package com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeitem.entity.ExchangeItem;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.dto.ItemResponseDto;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
 
 /**
@@ -9,13 +11,29 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.item.entity.Item;
  * <p>수량이 같이 붙는다. 같은 카드를 두 장 넘기는 것과 한 장 넘기는 것이 화면에서 구분되지
  * 않으면, 만나서 카드를 세는 자리에서야 어긋난 것을 알게 된다.
  *
- * <p>카드 앞면의 약칭과 한글명은 아직 {@code Item} 에 없다. 컬럼을 늘릴지는 정해지지 않아서
- * 지금 있는 것만 내려보낸다. 정해지면 여기와 {@code Item} 을 같이 고친다.
+ * <p>카드 자체는 {@link ItemResponseDto} 와 같은 필드를 담는다. 화면이 매칭 결과에서도 카드
+ * 등록 화면과 같은 그림을 그리는데, 여기만 필드가 모자라면 그 카드만 약칭 없이 뜬다.
+ *
+ * @param description 한글 이름
+ * @param code        카드 앞면 약칭. 이미지가 안 뜰 때 대신 보인다
  */
-public record MatchedItemDto(Long id, String name, String imageUrl, Integer quantity) {
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record MatchedItemDto(
+        Long id,
+        String name,
+        String description,
+        String imageUrl,
+        String code,
+        Integer quantity) {
 
     public static MatchedItemDto from(ExchangeItem exchangeItem) {
         Item item = exchangeItem.getItem();
-        return new MatchedItemDto(item.getId(), item.getName(), item.getImageUrl(), exchangeItem.getQuantity());
+        return new MatchedItemDto(
+                item.getId(),
+                item.getName(),
+                item.getDescription(),
+                item.getImageUrl(),
+                ItemResponseDto.codeOf(item.getName()),
+                exchangeItem.getQuantity());
     }
 }

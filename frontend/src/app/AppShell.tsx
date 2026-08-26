@@ -31,8 +31,8 @@ export function AppShell() {
   usePokeSync()
 
   /**
-   * 실제 매칭 알림. 카탈로그가 준비돼야(부스 id 와 카드 이름 매핑이 있어야) 구독하고
-   * 화면에 그릴 수 있어서, 그 전에는 `useBoothEvents` 가 `null` 을 받아 연결하지 않는다.
+   * 실제 매칭 알림. 부스 id 가 있어야 구독할 수 있어서, 그 전에는 `useBoothEvents` 가
+   * `null` 을 받아 연결하지 않는다.
    *
    * 이미 매칭이나 약속이 화면에 떠 있으면 리듀서가 알아서 무시한다
    * (`server-match-arrived`). 여기서는 파싱과 dispatch 만 한다.
@@ -40,10 +40,9 @@ export function AppShell() {
   const boothId = catalog.status === 'ready' ? catalog.boothId : null
   useBoothEvents(boothId, userId, {
     MATCH_SUGGESTED: (data) => {
-      if (catalog.status !== 'ready') return
-      const match = fromServerMatch(data as ServerMatchSuggested, catalog.mockIdOf)
+      const match = fromServerMatch(data as ServerMatchSuggested)
       if (!match) {
-        console.warn('[match] 카드 매핑을 찾지 못해 알림을 무시합니다', data)
+        console.warn('[match] 주고받을 카드가 비어 있어 알림을 무시합니다', data)
         return
       }
       dispatch({ type: 'server-match-arrived', match })

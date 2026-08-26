@@ -18,17 +18,13 @@ import { cn } from '@/lib/cn'
 import { tick } from '@/lib/haptics'
 import { springSheet, springSnap, staggerChild, staggerParent } from '@/lib/motion'
 import { usePush, type PushState } from '@/lib/use-push'
-import { itemById, type Item } from '@/mocks/data'
+import type { Item } from '@/features/catalog/api'
+import { useItem } from '@/features/catalog/useItem'
 import { appointmentStatus, sortedAppointments } from '@/store/appointment-status'
 import { getDeviceId } from '@/store/identity'
-import {
-  radarUsers,
-  sortedWaitingList,
-  waitingStatus,
-  wantedFromMe,
-  type WaitingStatus,
-} from '@/store/matching'
+import type { WaitingStatus } from '@/store/matching'
 import { useTopHaveItemId } from '@/store/top-card'
+import type { Selection } from '@/store/types'
 import { useStore } from '@/store/useStore'
 
 export function Home() {
@@ -40,7 +36,6 @@ export function Home() {
     error: pokeError,
     clearError,
     refresh: refreshPokes,
-    ready: pokeReady,
   } = usePoke()
   const { state: catalog } = useCatalog()
   const {
@@ -56,8 +51,6 @@ export function Home() {
   const [dragging, setDragging] = useState(false)
   // 방금 카드를 놓은 상대. 고리가 한 번 터지고 나서 찔러보기 확인 화면으로 넘어간다.
   const [burstOn, setBurstOn] = useState<string | null>(null)
-  // "다른 카드 보기" 를 누른 횟수. 목업 레이더가 페이지 번호로 받는다.
-  const [radarPage, setRadarPage] = useState(0)
   /**
    * 서버 레이더에서 지금까지 넘긴 카드 수.
    *
@@ -101,26 +94,9 @@ export function Home() {
   // 배열을 그대로 의존성에 넣으면 렌더마다 새 참조라 매번 다시 계산한다.
   // 문자열 하나로 눌러서 값이 실제로 바뀔 때만 돌게 한다.
   const needKey = state.needs.map((s) => s.itemId).join(',')
-  const needIds = useMemo(() => (needKey ? needKey.split(',') : []), [needKey])
+  const needIds = useMemo(() => (needKey ? needKey.split(',').map(Number) : []), [needKey])
 
-  const pendingTarget =
-    state.outgoingPoke?.status === 'pending' ? state.outgoingPoke.targetUserId : null
-  const pinned = useMemo(() => (pendingTarget ? [pendingTarget] : []), [pendingTarget])
-
-  const radar = useMemo(() => radarUsers(needIds, radarPage, pinned), [needIds, radarPage, pinned])
-  const list = useMemo(() => sortedWaitingList(needIds), [needIds])
-
-  const mockItemOf = catalog.status === 'ready' ? catalog.mockItemOf : undefined
-
-  /**
-   * 서버 데이터를 쓸지, 목업으로 떨어질지.
-   *
-   * <b>목록이 비었다는 것도 서버가 준 답이다.</b> 서버가 붙어 있는데 아무도 없으면 "부스에
-   * 사람이 없다" 가 사실이고, 그 자리를 목업 대기자로 덮으면 화면이 거짓말을 한다. 게다가
-   * 그 카드는 끌어다 놓아도 서버로 나가지 않는다. 목업으로 떨어지는 것은 서버가 아직
-   * 준비되지 않았을 때뿐이다(부스나 카드가 없거나 연결 실패).
-   */
-  const useServerData = pokeReady
+  const itemById = catalog.status === 'ready' ? catalog.itemById : undefined
 
   // 답을 기다리는 상대. 그 사람 카드는 다시 보낼 수 없게 잠근다 (시안 desc 165:3514).
   const pendingOwnerIds = useMemo(
@@ -135,9 +111,7 @@ export function Home() {
    * 무엇을 담을지는 서버가 이미 정해서 준다(희망 카드가 있으면 그와 맞는 것만, 없으면 내가
    * 가진 카드를 뺀 전부). 여기서 다시 걸러내지 않는다.
    *
-   * <b>목업에 짝이 없는 카드도 세운다.</b> 카드 그림이 목업에만 있어서 그림은 못 그리지만,
-   * 그 줄을 통째로 빼면 어드민 시드 이름이 하나만 어긋나도 레이더가 비어 보인다. 전체리스트가
-   * 이미 하는 것처럼 이름만이라도 보여준다.
+   * 목록이 카드를 통째로 싣고 오기 때문에 여기서 카드를 따로 찾지 않는다.
    */
   const serverRadarPool = useMemo(() => {
     const seen = new Set<number>()
@@ -147,13 +121,13 @@ export function Home() {
       .flatMap((row) => {
         if (seen.has(row.item.id)) return []
         seen.add(row.item.id)
-        return [{ row, item: mockItemOf?.(row.item.id) }]
+        return [row]
       })
-  }, [serverWaiting, mockItemOf])
+  }, [serverWaiting])
 
   /** 답변을 기다리는 카드가 자리를 지키고 남은 칸. 커서를 미는 보폭이기도 하다. */
   const radarRoom = useMemo(() => {
-    const held = serverRadarPool.filter((s) => pendingOwnerIds.has(s.row.ownerId)).length
+    const held = serverRadarPool.filter((row) => pendingOwnerIds.has(row.ownerId)).length
     return Math.max(5 - Math.min(held, 5), 0)
   }, [serverRadarPool, pendingOwnerIds])
 
@@ -164,8 +138,8 @@ export function Home() {
    * 새로고침하지 않고 화면에 계속 표시" 라고 못박아 뒀다(desc 165:3500 4번).
    */
   const serverRadar = useMemo(() => {
-    const held = serverRadarPool.filter((s) => pendingOwnerIds.has(s.row.ownerId)).slice(0, 5)
-    const rest = serverRadarPool.filter((s) => !pendingOwnerIds.has(s.row.ownerId))
+    const held = serverRadarPool.filter((row) => pendingOwnerIds.has(row.ownerId)).slice(0, 5)
+    const rest = serverRadarPool.filter((row) => !pendingOwnerIds.has(row.ownerId))
     const rotated =
       rest.length === 0
         ? []
@@ -175,47 +149,29 @@ export function Home() {
     return [...held, ...rotated]
   }, [serverRadarPool, pendingOwnerIds, radarRoom, radarCursor])
 
-  /**
-   * 레이더 한 칸. 서버와 목업을 같은 모양으로 맞춰 두면 배치와 끌어놓기 코드가 하나로 남는다.
-   *
-   * 둘을 각각 그리면 각도 계산과 표적 처리가 두 벌이 되고, 한쪽만 고쳐서 어긋난다.
-   */
+  /** 레이더 한 칸. 배치와 끌어놓기가 이 모양 하나만 본다. */
   const radarSlots: {
     targetId: string
-    /** 목업에 짝이 없는 서버 카드면 없다. 그때는 이름만 그린다. */
-    item: Item | undefined
+    item: Item
     label: string
     pending: boolean
-  }[] = useServerData
-    ? serverRadar.map(({ row, item }) => ({
-        // 표적은 보유 등록 줄이다. 같은 사람이 여러 카드를 내놓아도 어느 카드를 달라는
-        // 것인지가 이 값으로 정해진다.
-        targetId: String(row.haveItemId),
-        item,
-        label: row.item.name,
-        pending: pendingOwnerIds.has(row.ownerId),
-      }))
-    : radar.map((user) => ({
-        targetId: user.id,
-        item: itemById(user.itemId),
-        label: user.nickname,
-        pending: pendingTarget === user.id,
-      }))
+  }[] = serverRadar.map((row) => ({
+    // 표적은 보유 등록 줄이다. 같은 사람이 여러 카드를 내놓아도 어느 카드를 달라는
+    // 것인지가 이 값으로 정해진다.
+    targetId: String(row.haveItemId),
+    item: row.item,
+    label: row.item.name,
+    pending: pendingOwnerIds.has(row.ownerId),
+  }))
 
-  const haveIds = state.have.map((h) => h.itemId)
   const haveCount = state.have.reduce((sum, s) => sum + s.qty, 0)
 
   const topItemId = useTopHaveItemId(state.have)
-  const match = state.match
-
-  // 매칭이 잡힌 상대는 전체리스트에서 "매칭됨" 으로 나온다.
-  // 이미 약속을 잡은 상대도 매칭된 상대다.
-  const matchedUserIds = [match, ...state.appointments.map((a) => a.match)]
-    .filter((m) => m !== null)
-    .flatMap((m) => (m.kind === 'ONE_TO_ONE' ? [m.partner.id] : [m.giver.id, m.receiver.id]))
 
   // 약속이 둘 이상이면 가까운 순으로 늘어놓고 가로로 밀어서 본다.
-  const statuses = sortedAppointments(state.appointments).map(appointmentStatus)
+  const statuses = sortedAppointments(state.appointments).map((appointment) =>
+    appointmentStatus(appointment, (id) => itemById?.(id)),
+  )
 
   /** 끌고 있는 좌표로 어떤 상대 위에 있는지 찾는다. */
   const hitTest = (point: { x: number; y: number }): string | null => {
@@ -453,7 +409,6 @@ export function Home() {
             type="button"
             onClick={() => {
               tick(8)
-              setRadarPage((page) => page + 1)
               setRadarCursor((cursor) => cursor + radarRoom)
             }}
             whileTap={{ scale: 0.94 }}
@@ -492,7 +447,6 @@ export function Home() {
         className="divide-y divide-neutral-100"
       >
         {serverWaiting.map((row) => {
-          const item = mockItemOf?.(row.item.id)
           const waitingReply = pendingOwnerIds.has(row.ownerId)
           const status = waitingStatusOf(row)
 
@@ -510,14 +464,7 @@ export function Home() {
                 )}
               >
                 <div className="w-[92px] shrink-0">
-                  {item ? (
-                    <GoodsFace item={item} size="md" />
-                  ) : (
-                    // 목업에 짝이 없는 카드다. 그림은 못 그려도 무엇인지는 보여야 한다.
-                    <span className="flex h-[74px] items-center justify-center rounded-xl bg-tile text-[12px] font-bold text-ink md:h-[88px]">
-                      {row.item.name}
-                    </span>
-                  )}
+                  <GoodsFace item={row.item} size="md" />
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -548,70 +495,13 @@ export function Home() {
       </motion.ul>
     )
 
-  const mockListPanel = (
-    <motion.ul
-      variants={staggerParent}
-      initial="hidden"
-      animate="show"
-      className="divide-y divide-neutral-100"
-    >
-      {list.map((user) => {
-        const item = itemById(user.itemId)
-        const givable = wantedFromMe(user, haveIds)
-        const status = waitingStatus(user, haveIds, matchedUserIds)
-        return (
-          <motion.li key={user.id} variants={staggerChild}>
-            <motion.button
-              type="button"
-              onClick={() => navigate(`/poke/confirm?to=${user.id}`)}
-              disabled={pendingTarget === user.id}
-              whileTap={pendingTarget === user.id ? undefined : { scale: 0.98 }}
-              transition={springSnap}
-              className={cn(
-                'flex w-full items-center gap-4 py-4 text-left',
-                pendingTarget === user.id && 'opacity-45',
-              )}
-            >
-              <div className="w-[92px] shrink-0">
-                <GoodsFace item={item} size="md" />
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-[14px] font-bold text-ink">{item.name}</p>
-                  <WaitingStatusTag status={status} />
-                </div>
-
-                <p className="mt-0.5 text-[10px] font-medium text-[#aeaeb2]">
-                  내가 줄 수 있는 카드
-                </p>
-                <p className="truncate text-[11px] text-[#8b8b8b]">
-                  {givable.length > 0
-                    ? givable.map((id) => itemById(id).name).join(' · ')
-                    : '아직 없어요'}
-                </p>
-              </div>
-
-              {pendingTarget === user.id && (
-                <span className="shrink-0 text-[11px] font-semibold text-neutral-400">대기 중</span>
-              )}
-            </motion.button>
-          </motion.li>
-        )
-      })}
-    </motion.ul>
-  )
-
-  // 레이더와 같은 기준이다. 서버가 붙어 있으면 비어 있는 것도 서버가 준 답이다.
-  const listPanel = useServerData ? serverListPanel : mockListPanel
+  const listPanel = serverListPanel
 
   /**
    * 머리에 적히는 개수. <b>아이템 기준으로 센다</b>(시안 desc 165:3500 5번).
    * 같은 카드를 세 사람이 내놓았어도 고를 수 있는 카드는 한 종류다.
    */
-  const listCount = useServerData
-    ? new Set(serverWaiting.map((row) => row.item.id)).size
-    : list.length
+  const listCount = new Set(serverWaiting.map((row) => row.item.id)).size
 
   const listHeader = (
     <div className="flex items-end justify-between">
@@ -814,6 +704,27 @@ function WaitingStatusTag({ status }: { status: WaitingStatus }) {
   )
 }
 
+/**
+ * 격자로 편 카드 한 장. 카드를 찾는 훅을 쓰려면 컴포넌트로 나와 있어야 한다.
+ * 부스 목록에 없는 카드면 그 자리를 비운다.
+ */
+function FanGridCard({ selection, index }: { selection: Selection; index: number }) {
+  const item = useItem(selection.itemId)
+  if (!item) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10, scale: 0.94 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ ...springSnap, delay: index * 0.03 }}
+    >
+      <ItemCard item={item} size="sm" className="shadow-[0_4px_16px_rgba(0,0,0,0.10)]">
+        <QtyBadge qty={selection.qty} />
+      </ItemCard>
+    </motion.div>
+  )
+}
+
 /** 부채꼴로 세울 종류 수. 이보다 많으면 격자로 편다. */
 const FANNED_KINDS = 3
 /** 격자에 늘어놓을 종류 수. 한 줄에 세 장씩 세 줄까지만 보여준다. */
@@ -831,7 +742,7 @@ function MyCardsFan({
   onEdit,
   onClose,
 }: {
-  have: { itemId: string; qty: number }[]
+  have: Selection[]
   onEdit: () => void
   onClose: () => void
 }) {
@@ -884,21 +795,9 @@ function MyCardsFan({
   return (
     <div className="w-[300px]">
       <div className="grid grid-cols-3 gap-2">
-        {shown.map((selection, i) => {
-          const item = itemById(selection.itemId)
-          return (
-            <motion.div
-              key={selection.itemId}
-              initial={{ opacity: 0, y: 10, scale: 0.94 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ ...springSnap, delay: i * 0.03 }}
-            >
-              <ItemCard item={item} size="sm" className="shadow-[0_4px_16px_rgba(0,0,0,0.10)]">
-                <QtyBadge qty={selection.qty} />
-              </ItemCard>
-            </motion.div>
-          )
-        })}
+        {shown.map((selection, i) => (
+          <FanGridCard key={selection.itemId} selection={selection} index={i} />
+        ))}
       </div>
 
       {hiddenKinds > 0 && (

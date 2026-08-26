@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router'
 import { GoodsFace } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
 import { springSnap } from '@/lib/motion'
-import { itemById } from '@/mocks/data'
+import { useItem } from '@/features/catalog/useItem'
 import { activeAppointment } from '@/store/reducer'
 import { useStore } from '@/store/useStore'
 
@@ -25,7 +25,7 @@ export function Complete() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const item = received ? itemById(received) : null
+  const item = useItem(received) ?? null
 
   return (
     <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
@@ -63,7 +63,7 @@ export function Complete() {
             className="mt-12 text-center"
           >
             <p className="text-[22px] font-extrabold text-ink">{item.name}</p>
-            <p className="mt-1 text-[13px] text-neutral-400">{item.nameKo}</p>
+            <p className="mt-1 text-[13px] text-neutral-400">{item.description}</p>
           </motion.div>
         )}
       </div>

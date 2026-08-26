@@ -1,4 +1,4 @@
-import { itemById } from '@/mocks/data'
+import type { Item } from '@/features/catalog/api'
 
 import type { Appointment } from './types'
 
@@ -13,12 +13,19 @@ export type AppointmentStatus = {
 /**
  * 교환 대기장소 위쪽에 뜨는 약속 상태. 시안의 `교환 대기장소 약속 상태 표시` 다.
  * 어느 단계에 있는지에 따라 문구와 눌렀을 때 가는 곳이 갈린다.
+ *
+ * 카드를 찾는 함수를 받아 쓴다. 훅이 아니라 목록을 만드는 자리에서 여러 번 불리는 함수라
+ * 컨텍스트를 직접 읽을 수 없다.
  */
-export function appointmentStatus(appointment: Appointment): AppointmentStatus {
+export function appointmentStatus(
+  appointment: Appointment,
+  itemById: (itemId: number) => Item | undefined,
+): AppointmentStatus {
   const { match } = appointment
-  // 무엇을 주고받는지는 아직 화면 목업이 아는 값이라, 없으면 상대 이름으로 대신한다.
+  // 서버는 무엇을 주고받는지 모른다. 매칭을 거치지 않고 들어온 약속이면 상대 이름으로 대신한다.
+  const nameOf = (itemId: number) => itemById(itemId)?.name ?? '알 수 없는 카드'
   const pair = match
-    ? `${itemById(match.giveItemId).name}↔${itemById(match.receiveItemId).name}`
+    ? `${nameOf(match.giveItemId)}↔${nameOf(match.receiveItemId)}`
     : appointment.partners.map((p) => p.name).join(', ')
 
   if (appointment.stage === 'confirmed' || appointment.stage === 'arrived') {

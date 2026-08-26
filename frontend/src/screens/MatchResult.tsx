@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
-import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { useState } from 'react'
+import { useNavigate } from 'react-router'
 
 import { RejectDialog } from '@/components/domain/ConfirmDialogs'
 import { EmptyState } from '@/components/domain/EmptyState'
@@ -23,7 +23,6 @@ import { useStore } from '@/store/useStore'
  */
 export function MatchResult() {
   const navigate = useNavigate()
-  const [params] = useSearchParams()
   const { state, dispatch } = useStore()
   const [rejectOpen, setRejectOpen] = useState(false)
   const match = useLastDefined(state.match)
@@ -40,12 +39,6 @@ export function MatchResult() {
   const goToPlace = async () => {
     if (!match) return
 
-    // 목업으로 심어 준 매칭은 서버에 교환이 없다. 화면만 넘긴다.
-    if (match.exchangeId === null) {
-      navigate('/place')
-      return
-    }
-
     const myUserId = getDeviceId()
     setAccepting(true)
     try {
@@ -61,13 +54,6 @@ export function MatchResult() {
       setAccepting(false)
     }
   }
-
-  const demo = params.get('demo')
-
-  // 주소로 바로 열었을 때 화면을 볼 수 있게 상태를 심어 준다.
-  useEffect(() => {
-    if (demo === '3way' && !match) dispatch({ type: 'seed-demo', kind: 'three-way' })
-  }, [demo, match, dispatch])
 
   if (!match) {
     return (
@@ -141,11 +127,9 @@ export function MatchResult() {
         onKeep={() => setRejectOpen(false)}
         onReject={() => {
           setRejectOpen(false)
-          if (match.exchangeId !== null) {
-            rejectExchange(match.exchangeId, getDeviceId()).catch((error: unknown) =>
-              console.error('[exchange] 거절 실패', error),
-            )
-          }
+          rejectExchange(match.exchangeId, getDeviceId()).catch((error: unknown) =>
+            console.error('[exchange] 거절 실패', error),
+          )
           dispatch({ type: 'decline-match' })
           navigate('/home')
         }}

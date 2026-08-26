@@ -8,24 +8,29 @@ import { RadarRings } from '@/components/domain/Radar'
 import { Button } from '@/components/ui/Button'
 import { useCatalog } from '@/features/catalog/useCatalog'
 import { springPage, springSnap } from '@/lib/motion'
-import { ALL_WAITING } from '@/mocks/data'
 import { useStore } from '@/store/useStore'
 
 /**
  * 서버에서 부스 이름을 받기 전까지 세워 둘 이름.
  *
- * 로딩 중이나 서버가 끊겼을 때 이 자리를 비우면 첫 화면 맨 위가 잠깐 무너진다. 이 앱은
- * 서버가 없어도 목업으로 도는 것이 전제라, 대표 부스 이름을 그대로 세워 둔다.
+ * 로딩 중이나 서버가 끊겼을 때 이 자리를 비우면 첫 화면 맨 위가 잠깐 무너진다.
  */
 const FALLBACK_BOOTH_NAME = '현대자동차 팝업'
 
 export function Onboarding() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
-  const { booths, booth, selectBooth } = useCatalog()
+  const { state: catalog, booths, booth, selectBooth } = useCatalog()
   const [pickerOpen, setPickerOpen] = useState(false)
 
   const boothName = booth?.name ?? FALLBACK_BOOTH_NAME
+
+  /*
+    첫 화면의 장식용 카드다. 부스에 실제로 있는 카드 중 첫 장을 세운다. 목록을 아직 못 받았으면
+    빈 묶음이 뜨는데, 아무 카드나 세워 두면 그 부스에 없는 카드를 보여주게 된다.
+  */
+  const cardCount = catalog.status === 'ready' ? catalog.items.length : 0
+  const topItemId = catalog.status === 'ready' ? (catalog.items[0]?.id ?? null) : null
 
   /**
    * 부스를 바꿀 수 있는 것은 여기, 그리고 카드를 등록하기 전까지다.
@@ -101,7 +106,7 @@ export function Onboarding() {
             transition={{ ...springSnap, delay: 0.24 }}
           >
             <div className="anim-float">
-              <CardStack topItemId="avn" count={3} className="w-[168px]" />
+              <CardStack topItemId={topItemId} count={3} className="w-[168px]" />
             </div>
           </motion.div>
         </div>
@@ -112,7 +117,7 @@ export function Onboarding() {
           transition={{ ...springPage, delay: 0.34 }}
           className="mx-auto w-fit rounded-full bg-neutral-100 px-4 py-2 text-[12px] font-medium text-neutral-500"
         >
-          지금 {ALL_WAITING.length + 6}명이 교환 중이에요
+          지금 {cardCount}종의 카드를 교환하고 있어요
         </motion.p>
       </div>
 
