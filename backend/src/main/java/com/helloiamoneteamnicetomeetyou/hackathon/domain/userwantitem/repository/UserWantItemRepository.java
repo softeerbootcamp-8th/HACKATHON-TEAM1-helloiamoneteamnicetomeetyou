@@ -45,6 +45,10 @@ public interface UserWantItemRepository extends JpaRepository<UserWantItem, Long
                 AND ei.from_user_id = :myUserId
                 AND ei.to_user_id = uwi.user_id
                 AND ei.item_id = my_uhi.item_id
+                AND EXISTS (
+                    SELECT 1 FROM exchange_participants ep2
+                    WHERE ep2.exchange_id = e2.id AND ep2.status = 'REJECTED'
+                )
           )
         ORDER BY my_uhi.created_at ASC
         """, nativeQuery = true)

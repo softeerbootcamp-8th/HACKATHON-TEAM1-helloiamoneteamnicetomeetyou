@@ -81,6 +81,11 @@ public class UserHaveItem {
         this.status = ItemStatus.RESERVED;
     }
 
+    /** 교환에 잡혀 있는가. 잡혀 있으면 등록을 해제할 수 없다. */
+    public boolean isReserved() {
+        return this.status == ItemStatus.RESERVED;
+    }
+
     public void completeExchange(int amount) {
         this.quantityLeft -= amount;
         if (this.quantityLeft <= 0) {
@@ -97,9 +102,15 @@ public class UserHaveItem {
      * <p>{@code quantityLeft} 는 건드리지 않는다. {@link #reserve()} 가 애초에 그 값을 깎지
      * 않기 때문이다(깎는 시점은 {@link #completeExchange}, 즉 실제 거래 완료 때다). 예약
      * 시점에 안 깎은 걸 여기서 더해 버리면 수량이 실제보다 부풀려진다.
+     *
+     * <p>{@code RESERVED} 일 때만 되돌린다. 상태를 보지 않고 {@code LEFT} 로 밀면 이미 다 나간
+     * ({@code OUT}) 카드까지 되살아나서, 없는 카드가 매칭 후보로 다시 올라온다.
      */
     public void cancelReservation() {
-        this.status = ItemStatus.LEFT;
+        if (this.status != ItemStatus.RESERVED) {
+            return;
+        }
+        this.status = this.quantityLeft > 0 ? ItemStatus.LEFT : ItemStatus.OUT;
     }
 
     /**
