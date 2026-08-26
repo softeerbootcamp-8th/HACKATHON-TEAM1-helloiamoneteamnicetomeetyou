@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, type ReactNode } from 'react'
 
 import { fetchMyHaveItems, fetchMyWantItems, type RegisteredItem } from '@/features/catalog/api'
 import { useCatalog } from '@/features/catalog/useCatalog'
@@ -26,10 +26,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     나머지는 목업으로 계속 돈다.
   */
   const boothId = catalog.status === 'ready' ? catalog.boothId : null
-
-  // 내 카드를 서버에서 받아 채우는 것을 한 번만 시도했는지. 온보딩을 건너뛰고 홈이든
-  // /have 든 어디로 먼저 들어오든, 새로고침 한 번에 한 번만 물으면 된다.
-  const haveNeedsHydratedRef = useRef(false)
 
   useEffect(() => {
     if (boothId === null) return
@@ -62,13 +58,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
    *
    * `state.have`, `state.needs` 는 그 두 화면을 실제로 거쳐야만 채워지는 로컬 상태라, 새로고침
    * 한 번이면 서버에는 등록이 남아 있어도 화면은 빈 채로 시작한다. 이미 뭔가 골라 둔 상태를
-   * 덮어쓰지 않도록, 아직 하나도 안 채워졌을 때 딱 한 번만 받는다.
+   * 덮어쓰지 않도록, 아직 하나도 안 채워졌을 때만 받는다.
+   *
+   * <b>"한 번만 시도했는지"를 ref 로 막지 않는다.</b> StrictMode 가 개발 모드에서 이 effect 를
+   * 마운트 → 정리 → 마운트로 두 번 돌리는데, 정리 단계가 첫 번째 요청을 그새 끊어 버린다.
+   * ref 를 먼저 세워 두면 두 번째(진짜) 마운트가 "이미 시도했다" 며 아예 다시 안 불러서,
+   * 개발 모드에서는 영영 안 채워졌다. 대신 `state.have`/`state.needs` 길이만 본다 — 채워지고
+   * 나면 길이가 바뀌어 더 이상 이 조건을 만족하지 않으므로 두 번 부를 일이 없다.
    */
   useEffect(() => {
     if (catalog.status !== 'ready') return
-    if (haveNeedsHydratedRef.current) return
     if (state.have.length > 0 || state.needs.length > 0) return
-    haveNeedsHydratedRef.current = true
 
     const { mockIdOf } = catalog
     const controller = new AbortController()
