@@ -89,6 +89,7 @@ export function fromServerMatch(
       giveItemId: pairs[0].giveItemId,
       receiveItemId: pairs[0].receiveItemId,
       origin: 'auto',
+      exchangeId: dto.exchangeId,
     }
   }
 
@@ -104,5 +105,6 @@ export function fromServerMatch(
     receiveItemId: receiveIds[0],
     middleItemId: middleId,
     origin: 'auto',
+    exchangeId: dto.exchangeId,
   }
 }

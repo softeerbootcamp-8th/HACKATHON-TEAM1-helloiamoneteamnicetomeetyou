@@ -1,6 +1,6 @@
 import { ALL_WAITING, FIXED_ZONE, itemById } from '@/mocks/data'
 
-import { findMatch, wantedFromMe, type ExchangePair, type MatchResult } from './matching'
+import { wantedFromMe, type ExchangePair, type MatchResult } from './matching'
 import { earliestOverlap } from './time'
 import type { ActiveMatch, Appointment, IncomingPoke, State } from './types'
 
@@ -37,8 +37,8 @@ export type Action =
   | { type: 'clear-have'; itemId: string }
   | { type: 'clear-need'; itemId: string }
   | { type: 'enter-home' }
-  | { type: 'auto-match-tick' }
   | { type: 'server-match-arrived'; match: ActiveMatch }
+  | { type: 'server-match-rejected'; exchangeId: number }
   | { type: 'open-match' }
   | { type: 'decline-match' }
   | { type: 'send-poke'; targetUserId: string }
@@ -164,27 +164,8 @@ export function reducer(state: State, action: Action): State {
       return { ...state, autoMatching: canMatch, setupDone: true }
     }
 
-    case 'auto-match-tick': {
-      if (!state.autoMatching || state.match || state.appointments.length > 0) return state
-      const result = findMatch(
-        state.have.map((s) => s.itemId),
-        state.needs.map((s) => s.itemId),
-      )
-      if (!result) return state
-      if (partnersOf(result).some((id) => state.declined.includes(id))) return state
-
-      const match: ActiveMatch = { ...result, origin: 'auto' }
-      return {
-        ...state,
-        match,
-        autoMatching: false,
-        notifications: notify(state, 'match', '내가 원하는 굿즈로 교환할 수 있어요!', NOTICE_BODY),
-      }
-    }
-
     /**
-     * 서버가 SSE 로 실제 매칭을 알려온 것. 목업 자동 매칭(`auto-match-tick`)과 같은 자리를
-     * 쓰지만, 이미 화면에 매칭이나 약속이 떠 있으면 덮어쓰지 않는다.
+     * 서버가 SSE 로 실제 매칭을 알려온 것. 이미 화면에 매칭이나 약속이 떠 있으면 덮어쓰지 않는다.
      */
     case 'server-match-arrived': {
       if (state.match || state.appointments.length > 0) return state
@@ -193,6 +174,23 @@ export function reducer(state: State, action: Action): State {
         match: action.match,
         autoMatching: false,
         notifications: notify(state, 'match', '내가 원하는 굿즈로 교환할 수 있어요!', NOTICE_BODY),
+      }
+    }
+
+    /**
+     * 상대가 이 매칭을 거절했다는 서버 알림. 내가 거절한 게 아니라 상대 쪽에서 온 거라
+     * `decline-match` 와는 다른 자리다. `exchangeId` 가 지금 뜬 매칭과 다르면(이미 다른
+     * 매칭으로 넘어갔거나 약속을 잡은 뒤) 조용히 무시한다 — 뒤늦게 도착한 알림이 엉뚱한
+     * 화면을 지우면 안 된다.
+     */
+    case 'server-match-rejected': {
+      if (state.match?.exchangeId !== action.exchangeId) return state
+      return {
+        ...state,
+        match: null,
+        autoMatching: state.appointments.length === 0 && state.needs.length > 0,
+        notifications: notify(state, 'match-rejected', '상대가 교환을 거절했어요', NOTICE_BODY),
+        toast: '상대가 거절해서 다시 상대를 찾을게요.',
       }
     }
 
@@ -255,6 +253,7 @@ export function reducer(state: State, action: Action): State {
         giveItemId,
         receiveItemId: target.itemId,
         origin: 'poke',
+        exchangeId: null,
       }
       return {
         ...state,
@@ -307,6 +306,7 @@ export function reducer(state: State, action: Action): State {
         giveItemId: incoming.wantItemId,
         receiveItemId: action.chosenItemId,
         origin: 'poke',
+        exchangeId: null,
       }
       return { ...state, incomingPoke: null, match, autoMatching: false }
     }
@@ -451,6 +451,7 @@ export function reducer(state: State, action: Action): State {
             receiveItemId: 'i5n',
             middleItemId: 'i30f',
             origin: 'auto',
+            exchangeId: null,
           },
           notifications: notify(
             state,

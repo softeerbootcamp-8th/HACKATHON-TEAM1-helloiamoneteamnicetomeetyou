@@ -3,7 +3,13 @@ import type { MatchResult } from './matching'
 export type Selection = { itemId: string; qty: number }
 
 export type NotificationKind =
-  'match' | 'poke-received' | 'poke-accepted' | 'poke-rejected' | 'time-request' | 'time-matched'
+  | 'match'
+  | 'poke-received'
+  | 'poke-accepted'
+  | 'poke-rejected'
+  | 'time-request'
+  | 'time-matched'
+  | 'match-rejected'
 
 export type AppNotification = {
   id: string
@@ -45,8 +51,13 @@ export type Appointment = {
   confirmedLabel: string | null
 }
 
-/** 화면에 보여줄 매칭. 자동 매칭인지 찔러보기 성사인지에 따라 제목이 달라진다. */
-export type ActiveMatch = MatchResult & { origin: 'auto' | 'poke' }
+/**
+ * 화면에 보여줄 매칭. 자동 매칭인지 찔러보기 성사인지에 따라 제목이 달라진다.
+ *
+ * `exchangeId` 가 있으면 서버가 실제로 만든 교환이라 수락·거절이 `/api/exchanges`
+ * 를 부른다. 목업(자동 매칭 시뮬레이션·찔러보기)은 서버에 아무것도 없어서 `null` 이다.
+ */
+export type ActiveMatch = MatchResult & { origin: 'auto' | 'poke'; exchangeId: number | null }
 
 export type State = {
   onboarded: boolean

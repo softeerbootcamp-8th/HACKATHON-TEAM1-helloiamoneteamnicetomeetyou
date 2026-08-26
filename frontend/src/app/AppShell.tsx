@@ -44,6 +44,10 @@ export function AppShell() {
       }
       dispatch({ type: 'server-match-arrived', match })
     },
+    MATCH_REJECTED: (data) => {
+      const { exchangeId } = data as { exchangeId: number }
+      dispatch({ type: 'server-match-rejected', exchangeId })
+    },
   })
 
   // 라우트가 바뀐 그 렌더에서 방향을 정해야 첫 프레임부터 올바른 쪽에서 들어온다.
