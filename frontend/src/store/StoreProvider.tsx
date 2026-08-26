@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, type ReactNode } from 'react'
 
-import { fetchMyHaveItems, fetchMyWantItems } from '@/features/catalog/api'
+import { fetchMyHaveItems, fetchMyWantItems, type RegisteredItem } from '@/features/catalog/api'
 import { useCatalog } from '@/features/catalog/useCatalog'
 import { fetchActiveExchange, fetchExchange, fetchZones } from '@/lib/exchange'
 import { useBoothEvents } from '@/lib/use-booth-events'
@@ -56,11 +56,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     화면에 들어가면 아무것도 안 고른 것처럼 보이고, "교환하러 가기" 를 누르는 순간 등록
     동기화가 "이번 선택에 없는 카드" 로 보고 서버에 있던 것을 전부 해제한다.
 
+    <b>지금 부스에 있는 카드만 되살린다.</b> 등록 조회는 부스를 가리지 않고 내 등록 전부를
+    돌려주는데, 부스를 옮기면 그 목록에 앞 부스 카드가 섞여 있다. 그대로 넣으면 부스를 옮길 때
+    화면을 비우는 처리(`Onboarding` 의 `pickBooth`)가 무의미해지고, 지금 부스에서는 고를 수도
+    없는 카드가 개수에만 잡힌다.
+
     실패하면 조용히 넘어간다. 되살리지 못한 것뿐이라 화면을 세울 이유가 없다.
   */
   useEffect(() => {
-    if (boothId === null) return
+    if (catalog.status !== 'ready') return
 
+    const { itemById } = catalog
     const controller = new AbortController()
     const { signal } = controller
 
@@ -72,10 +78,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ])
         if (signal.aborted) return
 
+        const inThisBooth = (rows: RegisteredItem[]) =>
+          rows
+            .filter((row) => itemById(row.itemId) !== undefined)
+            .map((row) => ({ itemId: row.itemId, qty: row.quantity }))
+
         dispatch({
           type: 'registrations-loaded',
-          have: have.map((row) => ({ itemId: row.itemId, qty: row.quantity })),
-          needs: needs.map((row) => ({ itemId: row.itemId, qty: row.quantity })),
+          have: inThisBooth(have),
+          needs: inThisBooth(needs),
         })
       } catch {
         // 되살리지 못했을 뿐이다. 고르는 것부터 다시 하면 된다.
@@ -83,7 +94,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     })()
 
     return () => controller.abort()
-  }, [boothId, myUserId])
+  }, [catalog, myUserId])
 
   /**
    * 실시간 알림을 받으면 약속을 서버에서 다시 읽는다.
