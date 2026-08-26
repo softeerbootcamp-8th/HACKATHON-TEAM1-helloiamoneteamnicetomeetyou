@@ -633,6 +633,73 @@
             </div>
           </div>
 
+          <!--/*
+            시간 칸.
+
+            사용자 화면(frontend/src/screens/TimeSelect.tsx)과 같은 8칸 격자다. 더미 줄만
+            고칠 수 있게 두는데, 실제 참가자 줄은 그 사람이 자기 화면에서 고른 것이라
+            운영자가 덮어쓰면 하지 않은 일이 그 사람 이름으로 남는다.
+
+            확정·완료·취소 상태에서는 아예 감춘다. 서버가 EXCHANGE_TIME_ALREADY_CONFIRMED
+            로 거절할 격자를 눌러 보게 두면 왜 안 되는지 화면에서 알 수 없다.
+          */-->
+          <div class="ex-time" th:if="${ex.timeGridOpen()}">
+            <div class="ex-time-head">
+              <span class="ex-time-name">시간</span>
+              <span
+                class="ex-time-label"
+                th:each="label, it : ${ex.slotLabels()}"
+                th:classappend="${ex.overlapSlot != null and ex.overlapSlot == it.index} ? 'all' : ''"
+                th:text="${label}"
+                >14:15</span
+              >
+              <span class="ex-time-act"></span>
+            </div>
+
+            <th:block th:each="p : ${ex.participants}">
+              <!--/*
+                체크박스를 display:none 으로 숨기지 않는다. 그러면 폼이 값을 안 보내고
+                키보드로도 닿지 않는다. 칸을 덮게 두고 투명하게만 만든다.
+              */-->
+              <form
+                th:if="${p.dummy}"
+                class="ex-time-row dummy"
+                method="post"
+                th:action="@{'/admin/exchanges/participants/' + ${p.id} + '/time-slots'}"
+              >
+                <span class="ex-time-name" th:text="${p.displayName()}">더미</span>
+                <label
+                  class="ex-cell"
+                  th:each="label, it : ${ex.slotLabels()}"
+                  th:classappend="${p.picked(it.index)} ? 'on' : ''"
+                  th:title="${label}"
+                >
+                  <input type="checkbox" name="slots" th:value="${it.index}" th:checked="${p.picked(it.index)}" />
+                </label>
+                <button class="btn brand sm ex-time-act" type="submit">저장</button>
+              </form>
+
+              <div th:unless="${p.dummy}" class="ex-time-row">
+                <span class="ex-time-name" th:text="${p.displayName()}">참가자</span>
+                <span
+                  class="ex-cell read"
+                  th:each="label, it : ${ex.slotLabels()}"
+                  th:classappend="${p.picked(it.index)} ? 'on' : ''"
+                  th:title="${label}"
+                ></span>
+                <span class="ex-time-act">본인 화면</span>
+              </div>
+            </th:block>
+
+            <p class="ex-time-note">
+              <span th:if="${ex.overlapSlot != null}">
+                모두 되는 가장 빠른 칸은
+                <b th:text="${ex.slotLabels()[ex.overlapSlot]}">14:15</b> 입니다. 확정은 참가자가 자기 화면에서 누릅니다.
+              </span>
+              <span th:unless="${ex.overlapSlot != null}">아직 전원이 겹치는 칸이 없습니다.</span>
+            </p>
+          </div>
+
           <footer>
             <span class="ex-meta">
               <span th:text="${ex.zoneName} ?: '장소 미정'"></span> ·

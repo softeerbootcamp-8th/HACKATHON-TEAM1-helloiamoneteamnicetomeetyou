@@ -2,17 +2,25 @@ package com.helloiamoneteamnicetomeetyou.hackathon.admin.service;
 
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ExchangeView;
 import com.helloiamoneteamnicetomeetyou.hackathon.admin.dto.ParticipantView;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.TimeSlotGrid;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.entity.Exchange;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.repository.ExchangeRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchange.service.ExchangeService;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.entity.ExchangeParticipant;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangeparticipant.repository.ExchangeParticipantRepository;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangetimeslot.entity.ExchangeTimeSlot;
+import com.helloiamoneteamnicetomeetyou.hackathon.domain.exchangetimeslot.repository.ExchangeTimeSlotRepository;
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.user.entity.User;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ApplicationException;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.exception.ErrorCode;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventPublisher;
 import com.helloiamoneteamnicetomeetyou.hackathon.global.sse.SseEventType;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,8 +33,9 @@ import org.springframework.transaction.annotation.Transactional;
  * 그 사람이 하지 않은 일이 그 사람 이름으로 남는다. 부스에서 흐름을 이어 주려고 만든 기능이
  * 참가자 기록을 덮어쓰는 도구가 되면 안 된다.
  *
- * <p>시간 슬롯 선택과 약속 확정은 아직 없다. 이슈 #29 의 {@code ExchangeService} 가 dev 에
- * 들어오면 그 서비스를 그대로 부르면 되고, 그때까지 여기서 격자 계산을 다시 만들지 않는다.
+ * <p><b>시간 칸을 넣는 것은 {@link ExchangeService#updateTimeSlots} 를 그대로 부른다.</b>
+ * 사용자가 자기 화면에서 고르는 것과 완전히 같은 경로라, 검증도 저장도 SSE 도 따라온다.
+ * 어드민에서 격자 계산을 다시 만들면 어드민으로 넣은 칸만 다르게 저장되는 길이 생긴다.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,6 +44,8 @@ public class AdminExchangeService {
 
     private final ExchangeRepository exchangeRepository;
     private final ExchangeParticipantRepository exchangeParticipantRepository;
+    private final ExchangeTimeSlotRepository exchangeTimeSlotRepository;
+    private final ExchangeService exchangeService;
     private final SseEventPublisher sseEventPublisher;
 
     public List<ExchangeView> findExchanges() {
@@ -43,15 +54,39 @@ public class AdminExchangeService {
             return List.of();
         }
 
+        List<Long> exchangeIds = exchanges.stream().map(Exchange::getId).toList();
+
         Map<Long, List<ExchangeParticipant>> participantsByExchange =
-                exchangeParticipantRepository
-                        .findAllByExchangeIdIn(exchanges.stream().map(Exchange::getId).toList())
-                        .stream()
+                exchangeParticipantRepository.findAllByExchangeIdIn(exchangeIds).stream()
                         .collect(Collectors.groupingBy(participant -> participant.getExchange().getId()));
 
+        Map<Long, Map<UUID, List<Integer>>> slotsByExchange = slotsByExchange(exchangeIds);
+
         return exchanges.stream()
-                .map(exchange -> toView(exchange, participantsByExchange.getOrDefault(exchange.getId(), List.of())))
+                .map(exchange -> toView(
+                        exchange,
+                        participantsByExchange.getOrDefault(exchange.getId(), List.of()),
+                        slotsByExchange.getOrDefault(exchange.getId(), Map.of())))
                 .toList();
+    }
+
+    /**
+     * 교환별, 사람별 고른 칸. 한 번에 읽어서 나눈다.
+     *
+     * <p>교환마다 따로 물으면 화면에 뜬 카드 수만큼 쿼리가 늘어난다.
+     */
+    private Map<Long, Map<UUID, List<Integer>>> slotsByExchange(List<Long> exchangeIds) {
+        Map<Long, Map<UUID, List<Integer>>> slots = new LinkedHashMap<>();
+
+        for (ExchangeTimeSlot slot : exchangeTimeSlotRepository.findAllByExchangeIdIn(exchangeIds)) {
+            slots.computeIfAbsent(slot.getExchange().getId(), id -> new LinkedHashMap<>())
+                    .computeIfAbsent(slot.getUser().getId(), id -> new ArrayList<>())
+                    .add(slot.getSlotIndex());
+        }
+
+        slots.values().forEach(byUser -> byUser.values().forEach(Collections::sort));
+
+        return slots;
     }
 
     /** 오른쪽 패널에서 "이 사람이 낀 약속" 을 보여 줄 때 쓴다. */
@@ -61,7 +96,13 @@ public class AdminExchangeService {
                 .toList();
     }
 
-    private ExchangeView toView(Exchange exchange, List<ExchangeParticipant> participants) {
+    private ExchangeView toView(
+            Exchange exchange, List<ExchangeParticipant> participants, Map<UUID, List<Integer>> slotsByUser) {
+
+        List<ParticipantView> views = participants.stream()
+                .map(participant -> toParticipantView(participant, slotsByUser))
+                .toList();
+
         return new ExchangeView(
                 exchange.getId(),
                 exchange.getStatus(),
@@ -70,10 +111,12 @@ public class AdminExchangeService {
                 exchange.getZone() == null ? null : exchange.getZone().getBooth().getName(),
                 exchange.getExchangeTime(),
                 exchange.getCreatedAt(),
-                participants.stream().map(this::toParticipantView).toList());
+                exchange.getSlotBaseTime(),
+                TimeSlotGrid.earliestOverlap(views.stream().map(ParticipantView::slots).toList()),
+                views);
     }
 
-    private ParticipantView toParticipantView(ExchangeParticipant participant) {
+    private ParticipantView toParticipantView(ExchangeParticipant participant, Map<UUID, List<Integer>> slotsByUser) {
         User user = participant.getUser();
         return new ParticipantView(
                 participant.getId(),
@@ -81,7 +124,8 @@ public class AdminExchangeService {
                 user.getId().toString().substring(0, 8),
                 user.getUsername(),
                 participant.getStatus(),
-                user.isAdminManaged());
+                user.isAdminManaged(),
+                slotsByUser.getOrDefault(user.getId(), List.of()));
     }
 
     /** 더미 대신 수락한다. 참가자 전원의 화면이 바뀌어야 해서 SSE 를 같이 내보낸다. */
@@ -90,6 +134,27 @@ public class AdminExchangeService {
         ExchangeParticipant participant = findDummyParticipant(participantId);
         participant.accept();
         publishToBooth(participant.getExchange(), SseEventType.MATCH_ACCEPTED);
+    }
+
+    /**
+     * 더미가 고른 시간 칸을 운영자가 대신 넣는다.
+     *
+     * <p><b>사용자 화면과 같은 길로 보낸다.</b> {@link ExchangeService#updateTimeSlots} 가 참가자
+     * 확인, 확정 여부, 칸 번호 검증, 저장, 그리고 참가자 전원에게 나가는
+     * {@code EXCHANGE_TIME_UPDATED} 까지 전부 한다. 여기서 다시 만들면 어드민으로 넣은 칸만
+     * 다르게 저장되는 길이 생긴다.
+     *
+     * <p>체크를 하나도 안 하면 폼이 {@code slots} 를 아예 안 보낸다. 그것을 빈 목록으로 다루지
+     * 않으면 "고른 것 전부 지우기" 를 할 방법이 없어진다.
+     */
+    @Transactional
+    public void updateTimeSlotsAsDummy(Long participantId, List<Integer> slots) {
+        ExchangeParticipant participant = findDummyParticipant(participantId);
+
+        exchangeService.updateTimeSlots(
+                participant.getExchange().getId(),
+                participant.getUser().getId(),
+                slots == null ? List.of() : slots);
     }
 
     @Transactional

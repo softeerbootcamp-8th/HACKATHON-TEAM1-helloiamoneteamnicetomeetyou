@@ -1572,10 +1572,20 @@ dialog.sheet .sheet-actions {
   color: var(--brand-strong);
 }
 
+/*
+  교환 카드.
+
+  align-items 를 start 로 둔다. 기본값(stretch)이면 한 줄에 있는 카드가 전부 그 줄에서 가장
+  높은 카드에 맞춰 늘어나서, 시간 격자가 없는 카드 안이 통째로 빈칸이 된다.
+
+  칸 폭을 조금 넓힌 것은 안에 8칸 격자가 들어가기 때문이다. 340px 에서는 칸 하나가 22px 라
+  시각 라벨이 칸보다 넓어진다.
+*/
 .ex-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(392px, 1fr));
+  align-items: start;
+  gap: 14px;
 }
 
 .ex {
@@ -1654,17 +1664,140 @@ dialog.sheet .sheet-actions {
 
 .ex-ps {
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .ex-ps.accepted {
   color: var(--brand-strong);
 }
 .ex-ps.rejected {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .ex-ps.pending {
   margin-right: auto;
+}
+
+/* --------------------------------------------------------------------------
+   교환 카드 안의 시간 격자
+
+   사용자 화면의 8칸 격자를 같은 모양으로 옮긴 것이다. 두 화면을 나란히 놓고 보게 되는
+   자리라, 칸 번호와 색이 같은 뜻이어야 운영자가 헷갈리지 않는다.
+   -------------------------------------------------------------------------- */
+.ex-time {
+  padding: 0 14px 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 11px;
+}
+
+.ex-time-head,
+.ex-time-row {
+  display: grid;
+  grid-template-columns: 58px repeat(8, minmax(0, 1fr)) 58px;
+  align-items: center;
+  gap: 4px;
+}
+
+.ex-time-row + .ex-time-row,
+.ex-time-head + .ex-time-row {
+  margin-top: 4px;
+}
+
+.ex-time-name {
+  overflow: hidden;
+  color: var(--ink-sub);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ex-time-head .ex-time-name {
+  color: var(--muted);
+}
+
+.ex-time-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  text-align: center;
+}
+
+/* 전원이 되는 칸. 사용자 화면이 밑줄을 긋는 자리와 같은 뜻이다. */
+.ex-time-label.all {
+  color: var(--brand-strong);
+  font-weight: 700;
+}
+
+.ex-cell {
+  position: relative;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--tile);
+  transition: background var(--snap);
+}
+
+.ex-cell.on {
+  background: var(--brand);
+}
+
+/*
+  실제 참가자 줄은 읽기 전용이다. 색을 옅게 두어 "여기는 못 고친다" 가 눌러 보기 전에
+  보이게 한다.
+*/
+.ex-cell.read {
+  opacity: 0.55;
+}
+
+/*
+  체크박스를 숨기지 않고 칸을 덮게 둔다. display:none 으로 치우면 폼이 값을 안 보내고
+  키보드 Tab 으로도 닿지 않는다.
+*/
+.ex-cell > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ex-cell > input:focus-visible {
+  outline: none;
+}
+
+.ex-cell:has(> input:focus-visible) {
+  box-shadow: 0 0 0 3px var(--brand-ring);
+}
+
+.ex-time-row.dummy .ex-cell:hover {
+  background: var(--brand-soft);
+}
+
+.ex-time-row.dummy .ex-cell.on:hover {
+  background: var(--brand-strong);
+}
+
+.ex-time-act {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+button.ex-time-act {
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.ex-time-note {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ex-time-note b {
+  color: var(--brand-strong);
+  font-variant-numeric: tabular-nums;
 }
 
 .ex > footer {
