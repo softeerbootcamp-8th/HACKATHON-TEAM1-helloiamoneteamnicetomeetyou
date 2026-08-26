@@ -6,7 +6,17 @@
     <meta name="theme-color" content="#2cb3ed" />
     <title>NearLy 어드민</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/admin-assets/admin.css" />
+    <!--/*
+      주소에 파일 내용 해시가 붙는다(`admin-<md5>.css`). `application.yml` 의
+      `spring.web.resources.chain.strategy.content` 가 붙여 준다.
+
+      그냥 `/admin-assets/admin.css` 로 두었더니 운영자 브라우저가 옛 파일을 계속 썼다.
+      스프링이 이 경로에 Cache-Control 을 안 붙여서, 브라우저가 Last-Modified 를 보고
+      제 나름대로 유효기간을 잡는다(휴리스틱 캐싱). 그래서 시간 격자를 새로 넣은 뒤에도
+      격자 CSS 가 없는 옛 파일이 적용돼서, 어드민 교환 탭이 글자만 줄줄이 나왔다.
+      내용이 바뀌면 주소가 바뀌므로 강력 새로고침을 부탁할 일이 없어진다.
+    */-->
+    <link rel="stylesheet" th:href="@{/admin-assets/admin.css}" href="/admin-assets/admin.css" />
   </head>
   <body>
     <!--/*
@@ -966,6 +976,6 @@
       </div>
     </dialog>
 
-    <script src="/admin-assets/admin.js"></script>
+    <script th:src="@{/admin-assets/admin.js}" src="/admin-assets/admin.js"></script>
   </body>
 </html>
