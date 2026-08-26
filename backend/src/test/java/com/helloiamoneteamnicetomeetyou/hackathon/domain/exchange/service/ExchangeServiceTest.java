@@ -419,6 +419,8 @@ class ExchangeServiceTest {
     void 교환을_마치면_준_사람의_보유_수량이_준다() throws Exception {
         Item item = withId(Item.of(null, "카드", null), ITEM_ID);
         UserHaveItem meHave = UserHaveItem.of(me, item, 3);
+        // 개수는 예약 시점에 이미 줄어 있다. 완료는 그 뒤를 잇는 것뿐이라 여기서 먼저 예약해 둔다.
+        meHave.reserve(1);
         given(exchangeItemRepository.findByExchangeId(EXCHANGE_ID))
                 .willReturn(List.of(ExchangeItem.create(exchange, me, item, partner, 1)));
         given(userHaveItemRepository.findByUserIdAndItemId(ME, ITEM_ID)).willReturn(Optional.of(meHave));
@@ -558,7 +560,7 @@ class ExchangeServiceTest {
     private UserHaveItem reservedHaveItem() throws Exception {
         Item item = withId(Item.of(exchange.getZone().getBooth(), "IONIQ 5 N", null), 7L);
         UserHaveItem haveItem = UserHaveItem.of(me, item, 2);
-        haveItem.reserve();
+        haveItem.reserve(1);
         return haveItem;
     }
 }

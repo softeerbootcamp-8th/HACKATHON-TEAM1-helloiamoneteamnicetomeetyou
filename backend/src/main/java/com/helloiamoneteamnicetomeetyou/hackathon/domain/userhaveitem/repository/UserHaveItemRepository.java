@@ -32,10 +32,10 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
      * 카드를 하나라도 보유 등록한 사람으로 유도한다. 부스에 왔지만 아직 등록하지 않은 사람은
      * 목록에 뜨지 않는다.
      *
-     * <p><b>{@code LEFT} 이고 남은 수량이 있는 줄만 남긴다</b>(시안 desc 165:3500 2·5번).
-     * 매칭이 성사되면 {@link com.helloiamoneteamnicetomeetyou.hackathon.domain.matching.service.MatchingService}
-     * 가 그 카드를 {@code RESERVED} 로 바꾸는데, 그 줄을 계속 내려보내면 이미 임자가 있는 카드가
-     * 대기장에 남아서 찔러봐야 성사되지 않는다. 매칭 쿼리들이 쓰는 조건과 같은 것이다.
+     * <p><b>지금 새로 내줄 수 있는 개수({@code quantityLeft})가 남은 줄만 남긴다</b>
+     * (시안 desc 165:3500 2·5번). 매칭이 그 개수만큼 예약해 가기 때문에, 가진 걸 전부 다른
+     * 교환 하나에 내줬으면 0이 되어 빠진다. 여러 장 중 일부만 예약됐으면 남은 만큼은 계속
+     * 대기장에 남는다 — 매칭 쿼리들이 쓰는 조건과 같은 것이다.
      *
      * <p>정렬 기준이 행마다 달라져서(내 희망 카드인지, 몇 번째로 찾는 카드인지) SQL 로 옮길 수
      * 없다. 여기서는 {@code id} 오름차순으로만 고정해 두고 나머지는 서비스가 메모리에서 정렬한다.
@@ -47,7 +47,6 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
             join fetch h.user
             where i.booth.id = :boothId
               and h.user.id <> :userId
-              and h.status = 'LEFT'
               and h.quantityLeft > 0
             order by h.id asc
             """)
@@ -90,8 +89,8 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
     List<UserHaveItem> findAllWithItem();
 
     void deleteByUserId(UUID userId);
-    // 내 LEFT 아이템 전체 (want-item 등록 후 매칭 트리거용)
-    @Query("SELECT uhi FROM UserHaveItem uhi JOIN FETCH uhi.item WHERE uhi.user.id = :userId AND uhi.status = 'LEFT' AND uhi.quantityLeft > 0")
+    // 내 아이템 중 지금 새로 내줄 수 있는 것 전체 (want-item 등록 후 매칭 트리거용)
+    @Query("SELECT uhi FROM UserHaveItem uhi JOIN FETCH uhi.item WHERE uhi.user.id = :userId AND uhi.quantityLeft > 0")
     List<UserHaveItem> findMyLeftItems(@Param("userId") UUID userId);
 
     /**
@@ -108,7 +107,6 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
             ON my_uwi.item_id = uhi.item_id
            AND my_uwi.user_id = :myUserId
         WHERE uhi.user_id != :myUserId
-          AND uhi.status = 'LEFT'
           AND uhi.quantity_left > 0
           AND uhi.user_id NOT IN (
               SELECT ep.user_id FROM exchange_participants ep
@@ -149,7 +147,6 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
           AND uhi.user_id IN :bIds
           AND uwi.user_id IN :cIds
           AND uhi.user_id != uwi.user_id
-          AND uhi.status = 'LEFT'
           AND uhi.quantity_left > 0
           AND NOT EXISTS (
               SELECT 1 FROM exchange_items ei
@@ -170,6 +167,6 @@ public interface UserHaveItemRepository extends JpaRepository<UserHaveItem, Long
                                 @Param("cIds") Collection<String> cIds);
 
     // createExchange에서 UserHaveItem 엔티티 로드 (quantityLeft 감소용)
-    @Query("SELECT uhi FROM UserHaveItem uhi JOIN FETCH uhi.item WHERE uhi.user.id = :userId AND uhi.item.id IN :itemIds AND uhi.status = 'LEFT' AND uhi.quantityLeft > 0")
+    @Query("SELECT uhi FROM UserHaveItem uhi JOIN FETCH uhi.item WHERE uhi.user.id = :userId AND uhi.item.id IN :itemIds AND uhi.quantityLeft > 0")
     List<UserHaveItem> findByUserIdAndItemIds(@Param("userId") UUID userId, @Param("itemIds") Set<Long> itemIds);
 }

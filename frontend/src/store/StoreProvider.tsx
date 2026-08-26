@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useReducer, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react'
 
+import { fetchMyHaveItems, fetchMyWantItems, type RegisteredItem } from '@/features/catalog/api'
 import { useCatalog } from '@/features/catalog/useCatalog'
 import { fetchActiveExchange, fetchExchange, fetchZones } from '@/lib/exchange'
 import { useBoothEvents } from '@/lib/use-booth-events'
@@ -8,6 +9,7 @@ import { ALL_WAITING } from '@/mocks/data'
 
 import { StoreContext } from './context'
 import { initialState, reducer } from './reducer'
+import type { Selection } from './types'
 
 /** 시안의 `토스트 정리` 가 정한 노출 시간이다. 5초 뒤에 스스로 사라진다. */
 const TOAST_MS = 5000
@@ -24,6 +26,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     나머지는 목업으로 계속 돈다.
   */
   const boothId = catalog.status === 'ready' ? catalog.boothId : null
+
+  // 내 카드를 서버에서 받아 채우는 것을 한 번만 시도했는지. 온보딩을 건너뛰고 홈이든
+  // /have 든 어디로 먼저 들어오든, 새로고침 한 번에 한 번만 물으면 된다.
+  const haveNeedsHydratedRef = useRef(false)
 
   useEffect(() => {
     if (boothId === null) return
@@ -50,6 +56,47 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       cancelled = true
     }
   }, [boothId, myUserId])
+
+  /**
+   * 온보딩을 건너뛰거나 /have, /needs 로 곧바로 들어온 사람의 카드를 서버에서 받아 채운다.
+   *
+   * `state.have`, `state.needs` 는 그 두 화면을 실제로 거쳐야만 채워지는 로컬 상태라, 새로고침
+   * 한 번이면 서버에는 등록이 남아 있어도 화면은 빈 채로 시작한다. 이미 뭔가 골라 둔 상태를
+   * 덮어쓰지 않도록, 아직 하나도 안 채워졌을 때 딱 한 번만 받는다.
+   */
+  useEffect(() => {
+    if (catalog.status !== 'ready') return
+    if (haveNeedsHydratedRef.current) return
+    if (state.have.length > 0 || state.needs.length > 0) return
+    haveNeedsHydratedRef.current = true
+
+    const { mockIdOf } = catalog
+    const controller = new AbortController()
+
+    const toSelections = (rows: RegisteredItem[]): Selection[] =>
+      rows
+        .map((row) => ({ itemId: mockIdOf(row.itemId), qty: row.quantity }))
+        .filter((s): s is Selection => s.itemId !== undefined)
+
+    void (async () => {
+      try {
+        const [have, needs] = await Promise.all([
+          fetchMyHaveItems(myUserId, controller.signal),
+          fetchMyWantItems(myUserId, controller.signal),
+        ])
+        if (controller.signal.aborted) return
+        dispatch({
+          type: 'have-needs-hydrated',
+          have: toSelections(have),
+          needs: toSelections(needs),
+        })
+      } catch {
+        // 못 받아도 화면은 뜬다. /have 에서 직접 고치면 그때 다시 맞는다.
+      }
+    })()
+
+    return () => controller.abort()
+  }, [catalog, myUserId, state.have.length, state.needs.length])
 
   /**
    * 실시간 알림을 받으면 약속을 서버에서 다시 읽는다.

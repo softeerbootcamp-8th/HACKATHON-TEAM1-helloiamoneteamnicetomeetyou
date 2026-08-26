@@ -143,12 +143,12 @@ public class MatchingService {
         give.forEach((itemId, qty) -> {
             UserHaveItem hi = myMap.get(itemId);
             items.add(ExchangeItem.create(exchange, myUser, hi.getItem(), bestUser, qty));
-            hi.reserve();
+            hi.reserve(qty);
         });
         receive.forEach((itemId, qty) -> {
             UserHaveItem hi = bestMap.get(itemId);
             items.add(ExchangeItem.create(exchange, bestUser, hi.getItem(), myUser, qty));
-            hi.reserve();
+            hi.reserve(qty);
         });
         exchangeItemRepository.saveAll(items);
         notifyParticipants(exchange, items, List.of(myUser, bestUser));
@@ -262,7 +262,7 @@ public class MatchingService {
 
     /**
      * 3인 Exchange를 저장한다. 교환할 아이템 ID는 이미 결정된 상태로 받는다.
-     * 매칭 시점에는 status를 RESERVED로 변경만 한다. quantityLeft 감소는 거래 완료 시점에 처리한다.
+     * 매칭 시점에 quantityLeft 를 곧바로 줄인다. 완료 시점에는 상태만 정리한다.
      */
     private Optional<Exchange> createThreeWayExchange(
             User myUser,
@@ -298,9 +298,9 @@ public class MatchingService {
         );
         exchangeItemRepository.saveAll(items);
 
-        myHaveItem.reserve();
-        bHaveItem.reserve();
-        cHaveItem.reserve();
+        myHaveItem.reserve(1);
+        bHaveItem.reserve(1);
+        cHaveItem.reserve(1);
 
         notifyParticipants(exchange, items, List.of(myUser, userB, userC));
         return Optional.of(exchange);

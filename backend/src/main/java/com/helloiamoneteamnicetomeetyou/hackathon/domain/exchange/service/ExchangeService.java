@@ -185,13 +185,13 @@ public class ExchangeService {
     /**
      * 이 교환이 잡아 둔 카드를 전부 풀어 다시 매칭 후보로 돌려놓는다.
      *
-     * <p>거절과 취소가 함께 쓴다. 풀지 않으면 카드가 {@code RESERVED} 에 갇혀 그 사람은 다시는
-     * 매칭되지 않는다 — 매칭 쿼리가 {@code status = 'LEFT'} 인 카드만 본다.
+     * <p>거절과 취소가 함께 쓴다. 풀지 않으면 카드가 {@code quantityLeft} 에 못 잡혀 그 사람은
+     * 다시는 매칭되지 않는다 — 매칭 쿼리가 {@code quantityLeft > 0} 인 카드만 본다.
      */
     private void releaseReservations(Long exchangeId) {
         for (ExchangeItem item : exchangeItemRepository.findByExchangeId(exchangeId)) {
             userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
-                    .ifPresent(UserHaveItem::cancelReservation);
+                    .ifPresent(hi -> hi.cancelReservation(item.getQuantity()));
         }
     }
 
@@ -397,10 +397,14 @@ public class ExchangeService {
         return toResponse(exchange);
     }
 
-    /** 준 사람 쪽 재고를 줄인다. */
+    /**
+     * 준 사람 쪽 재고를 확정한다.
+     *
+     * <p>개수는 이미 예약 시점({@code reserve})에 깎여 있다. 여기서 또 깎으면 두 번 깎인다.
+     */
     private void giveAway(ExchangeItem item) {
         userHaveItemRepository.findByUserIdAndItemId(item.getFromUser().getId(), item.getItem().getId())
-                .ifPresent(hi -> hi.completeExchange(item.getQuantity()));
+                .ifPresent(UserHaveItem::completeExchange);
     }
 
     /**

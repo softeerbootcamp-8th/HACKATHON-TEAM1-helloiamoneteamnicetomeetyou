@@ -212,7 +212,7 @@ class UserHaveItemServiceTest {
     @DisplayName("교환에 예약된 카드는 해제할 수 없다")
     void 예약된_카드는_해제할_수_없다() {
         UserHaveItem reserved = UserHaveItem.of(User.of(USER_ID), Mockito.mock(Item.class), 1);
-        reserved.reserve();
+        reserved.reserve(1);
         given(userHaveItemRepository.findByUserIdAndItemId(USER_ID, ITEM_ID))
                 .willReturn(Optional.of(reserved));
 
