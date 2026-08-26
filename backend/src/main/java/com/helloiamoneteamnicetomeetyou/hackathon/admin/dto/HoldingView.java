@@ -5,21 +5,27 @@ import com.helloiamoneteamnicetomeetyou.hackathon.domain.userhaveitem.entity.Use
 import com.helloiamoneteamnicetomeetyou.hackathon.domain.userwantitem.entity.UserWantItem;
 
 /**
- * 사용자가 들고 있는 카드 한 줄.
+ * 사용자가 내놓기로 등록해 둔 카드 한 줄.
  *
- * <p>{@code quantity} 는 등록한 개수이고 {@code quantityLeft} 는 아직 남은 개수다. 둘이 갈리는
- * 것은 <b>매칭이 잡은 카드는 예약만 걸고 실제 개수는 교환이 끝날 때 줄기 때문</b>이다. 부스에서
- * "분명히 두 장 등록했는데 왜 매칭이 안 잡히지" 를 풀려면 남은 개수와 상태가 보여야 한다.
+ * <p>{@code registered} 는 내놓기로 등록한 개수이고 {@code quantityLeft} 는 그중 아직 새로 내줄
+ * 수 있는 개수다. 둘이 갈리는 것은 <b>매칭이 잡은 카드는 예약만 걸고 실제 개수는 교환이 끝날 때
+ * 줄기 때문</b>이다. 부스에서 "분명히 두 장 등록했는데 왜 매칭이 안 잡히지" 를 풀려면 남은
+ * 개수와 상태가 보여야 한다.
+ *
+ * <p><b>보유 개수가 아니라 등록 개수를 담는다.</b> {@code /api/have-items} 가 화면에 되살리는
+ * 값과 같은 {@link UserHaveItem#getRegisteredQuantity()} 라, 관람객이 자기 화면에서 보는 숫자와
+ * 운영자가 보는 숫자가 같다. 보유 개수를 쓰면 내놓는 중에 같은 카드를 교환으로 하나 더 받은
+ * 사람의 숫자가 두 화면에서 갈린다.
  *
  * <p>희망 카드는 이 값들이 없어서 전부 {@code null} 이다.
  */
-public record HoldingView(Long id, ItemView item, Integer quantity, Integer quantityLeft, ItemStatus status) {
+public record HoldingView(Long id, ItemView item, Integer registered, Integer quantityLeft, ItemStatus status) {
 
     public static HoldingView of(UserHaveItem have) {
         return new HoldingView(
                 have.getId(),
                 ItemView.of(have.getItem()),
-                have.getQuantity(),
+                have.getRegisteredQuantity(),
                 have.getQuantityLeft(),
                 have.getStatus());
     }
@@ -60,9 +66,10 @@ public record HoldingView(Long id, ItemView item, Integer quantity, Integer quan
     /**
      * 등록한 개수와 남은 개수가 다른지. 다를 때만 화면에 둘 다 보여 준다.
      *
-     * <p>늘 둘 다 적으면 "1 / 1" 이 줄마다 붙어서 다른 것이 눈에 안 띈다.
+     * <p>늘 둘 다 적으면 "1 / 1" 이 줄마다 붙어서 다른 것이 눈에 안 띈다. 지금은 둘이 갈리는
+     * 자리가 교환에 묶인 몫뿐이라, 이 줄이 보이면 그만큼이 약속에 걸려 있다는 뜻이다.
      */
     public boolean partlyGone() {
-        return quantity != null && quantityLeft != null && !quantity.equals(quantityLeft);
+        return registered != null && quantityLeft != null && !registered.equals(quantityLeft);
     }
 }
