@@ -4,22 +4,31 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 
 import { router } from '@/app/router'
-import { getDeviceId } from '@/store/identity'
+import { CatalogProvider } from '@/features/catalog/CatalogProvider'
+import { NotificationProvider } from '@/features/notification/NotificationProvider'
+import { PokeProvider } from '@/features/poke/PokeProvider'
 import { StoreProvider } from '@/store/StoreProvider'
 
 import './index.css'
-
-// 로그인 없이 기기를 식별한다. 백엔드 인증 방식이 정해지면 이 자리만 바꾼다.
-getDeviceId()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {/* index.css 의 media query 는 CSS 전환만 끈다. motion 의 애니메이션은 JS 가
         인라인 스타일로 그리기 때문에 여기서 따로 꺼 줘야 실제로 멈춘다. */}
     <MotionConfig reducedMotion="user">
-      <StoreProvider>
-        <RouterProvider router={router} />
-      </StoreProvider>
+      {/* 기기 식별자를 서버에 등록하고 부스 카드 목록을 받아 둔다. 카드 등록 화면이 쓴다. */}
+      <CatalogProvider>
+        {/* 서버에 오간 찔러보기를 들고 실시간 알림을 구독한다. 부스를 알아야 구독할 수
+            있어서 CatalogProvider 안쪽이다. */}
+        <PokeProvider>
+          {/* 알림함도 부스를 알아야 실시간 갱신을 구독할 수 있어서 같은 자리다. */}
+          <NotificationProvider>
+            <StoreProvider>
+              <RouterProvider router={router} />
+            </StoreProvider>
+          </NotificationProvider>
+        </PokeProvider>
+      </CatalogProvider>
     </MotionConfig>
   </StrictMode>,
 )

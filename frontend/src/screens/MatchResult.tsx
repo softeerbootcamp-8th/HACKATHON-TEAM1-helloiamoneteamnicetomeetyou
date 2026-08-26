@@ -2,25 +2,66 @@ import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 
-import { GoodsFace } from '@/components/domain/GoodsCard'
+import { RejectDialog } from '@/components/domain/ConfirmDialogs'
+import { EmptyState } from '@/components/domain/EmptyState'
+import { OneToOneView, ThreeWayView } from '@/components/domain/ExchangeCards'
 import { Button, TextButton } from '@/components/ui/Button'
-import { Dialog } from '@/components/ui/Dialog'
-import { cn } from '@/lib/cn'
+import { TopBar } from '@/components/ui/TopBar'
+import { acceptExchange, rejectExchange } from '@/features/matching/api'
 import { springSnap } from '@/lib/motion'
-import { itemById, MY_IDENTITY } from '@/mocks/data'
 import { useLastDefined } from '@/lib/useLastDefined'
+import { fetchExchange } from '@/lib/exchange'
+import { getDeviceId } from '@/store/identity'
 import { useStore } from '@/store/useStore'
 
 /**
  * 매칭 결과. 1:1 과 삼자 교환이 한 화면에서 갈린다.
- * 자동 매칭으로 잡힌 것과 찔러보기로 성사된 것은 제목이 다르다.
+ *
+ * 자동 매칭으로 잡힌 것과 찔러보기로 성사된 것은 제목뿐 아니라 빠져나가는 길이 다르다.
+ * 자동 매칭은 아직 거절할 수 있고, 찔러보기 성사는 이미 서로 합의한 자리라 거절 대신
+ * 뒤로가기만 둔다.
  */
 export function MatchResult() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const { state, dispatch } = useStore()
-  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [rejectOpen, setRejectOpen] = useState(false)
   const match = useLastDefined(state.match)
+  const [accepting, setAccepting] = useState(false)
+
+  /**
+   * 매칭 결과를 받아들이고 장소 화면으로 넘어간다.
+   *
+   * 서버가 이때 만날 자리와 시간 격자, 약속 식별자를 붙인다. 매칭이 교환을 만드는 시점에는
+   * 아직 제안일 뿐이라 그것들이 비어 있다.
+   *
+   * 상대의 수락을 기다리지 않는다. 각자 장소와 시간 화면으로 들어가 맞춰 보는 흐름이다.
+   */
+  const goToPlace = async () => {
+    if (!match) return
+
+    // 목업으로 심어 준 매칭은 서버에 교환이 없다. 화면만 넘긴다.
+    if (match.exchangeId === null) {
+      navigate('/place')
+      return
+    }
+
+    const myUserId = getDeviceId()
+    setAccepting(true)
+    try {
+      await acceptExchange(match.exchangeId, myUserId)
+
+      // 수락한 직후의 약속을 바로 읽어 둔다. 알림을 기다리면 장소 화면이 잠깐 비어 보인다.
+      const exchange = await fetchExchange(match.exchangeId)
+      dispatch({ type: 'exchange-synced', exchange, myUserId, match, activate: true })
+      navigate('/place')
+    } catch {
+      dispatch({ type: 'toast', message: '교환 장소를 열지 못했어요. 잠시 후 다시 시도해주세요' })
+    } finally {
+      setAccepting(false)
+    }
+  }
+
   const demo = params.get('demo')
 
   // 주소로 바로 열었을 때 화면을 볼 수 있게 상태를 심어 준다.
@@ -30,21 +71,21 @@ export function MatchResult() {
 
   if (!match) {
     return (
-      <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-          <p className="text-[15px] text-neutral-500">진행 중인 매칭이 없어요.</p>
-          <Button onClick={() => navigate('/home')}>홈으로</Button>
-        </div>
-      </div>
+      <EmptyState
+        title="진행 중인 매칭이 없어요"
+        description={'교환 대기장에서 원하는 카드를\n먼저 찔러보세요.'}
+        onAction={() => navigate('/home')}
+      />
     )
   }
 
-  const headline =
-    match.origin === 'poke'
-      ? '이렇게 교환할게요'
-      : match.kind === 'ONE_TO_ONE'
-        ? '서로 원하는 카드가\n정확히 맞았어요'
-        : '셋이 교환하면\n모두 원하는 걸 얻어요'
+  const fromPoke = match.origin === 'poke'
+
+  const headline = fromPoke
+    ? '이렇게 교환할게요'
+    : match.kind === 'ONE_TO_ONE'
+      ? '서로 원하는 카드가\n정확히 맞았어요'
+      : '셋이 교환하면\n모두 원하는 걸 얻어요'
 
   const sub =
     match.kind === 'ONE_TO_ONE'
@@ -53,6 +94,9 @@ export function MatchResult() {
 
   return (
     <div className="flex h-full flex-col md:mx-auto md:w-full md:max-w-[900px] md:px-10">
+      {/* 찔러보기로 성사된 화면에만 뒤로가기가 있다. 자동 매칭은 거절이 그 자리를 대신한다. */}
+      {fromPoke && <TopBar onBack={() => navigate('/home')} />}
+
       {/*
         데스크톱에서는 스크롤 없이 한 화면에 다 들어와야 한다. 삼자 교환은 카드가
         세 장이라 세로로 길어서, 넓은 화면에서는 가운데로 모으고 넘침을 막는다.
@@ -72,7 +116,7 @@ export function MatchResult() {
             제목이 다른 화면보다 아래로 내려가서 화면마다 위치가 달라 보인다. */}
         <div className="md:flex md:min-h-0 md:flex-1 md:items-center md:justify-center">
           {match.kind === 'ONE_TO_ONE' ? (
-            <OneToOneView giveItemId={match.giveItemId} receiveItemId={match.receiveItemId} />
+            <OneToOneView pairs={match.pairs} />
           ) : (
             <ThreeWayView
               myItemId={match.giveItemId}
@@ -86,116 +130,26 @@ export function MatchResult() {
       </div>
 
       <div className="shrink-0 px-6 pt-4 pb-8">
-        <Button
-          onClick={() => {
-            dispatch({ type: 'start-appointment' })
-            navigate('/place')
-          }}
-        >
-          교환 장소보기
+        <Button disabled={accepting} onClick={() => void goToPlace()}>
+          {accepting ? '교환 장소를 여는 중' : '교환 장소 확인하기'}
         </Button>
-        <TextButton onClick={() => setConfirmOpen(true)}>거절하기</TextButton>
+        {!fromPoke && <TextButton onClick={() => setRejectOpen(true)}>거절하기</TextButton>}
       </div>
 
-      <Dialog
-        open={confirmOpen}
-        title="교환을 거절할까요?"
-        description="거절하면 다시 상대를 찾습니다."
-        cancelLabel="아니요"
-        confirmLabel="거절할게요"
-        onCancel={() => setConfirmOpen(false)}
-        onConfirm={() => {
-          setConfirmOpen(false)
+      <RejectDialog
+        open={rejectOpen}
+        onKeep={() => setRejectOpen(false)}
+        onReject={() => {
+          setRejectOpen(false)
+          if (match.exchangeId !== null) {
+            rejectExchange(match.exchangeId, getDeviceId()).catch((error: unknown) =>
+              console.error('[exchange] 거절 실패', error),
+            )
+          }
           dispatch({ type: 'decline-match' })
           navigate('/home')
         }}
       />
-    </div>
-  )
-}
-
-function ExchangeCard({
-  itemId,
-  label,
-  compact = false,
-}: {
-  itemId: string
-  label: string
-  /** 카드 세 장이 세로로 쌓이는 자리. 데스크톱에서 화면을 넘기지 않게 줄인다. */
-  compact?: boolean
-}) {
-  const item = itemById(itemId)
-  return (
-    <div className="text-center">
-      <p className="mb-3 text-[12px] font-bold text-ink">{label}</p>
-      <motion.div
-        initial={{ opacity: 0, y: 16, scale: 0.94 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={springSnap}
-        className={cn(
-          'rounded-2xl bg-white p-3 shadow-[0_6px_22px_rgba(0,0,0,0.10)]',
-          compact ? 'w-[124px] md:w-[112px]' : 'w-[124px] md:w-[140px]',
-        )}
-      >
-        <GoodsFace item={item} size={compact ? 'md' : 'lg'} />
-        <p className="mt-2.5 text-center text-[12px] font-bold text-ink">{item.name}</p>
-        <p className="text-center text-[11px] text-neutral-400">{item.nameKo}</p>
-      </motion.div>
-    </div>
-  )
-}
-
-function OneToOneView({
-  giveItemId,
-  receiveItemId,
-}: {
-  giveItemId: string
-  receiveItemId: string
-}) {
-  return (
-    <div className="mt-10 flex items-center justify-center gap-3 md:mt-0">
-      <ExchangeCard itemId={giveItemId} label="내가 주는 카드" />
-      <span className="anim-breathe mt-6 text-[20px] text-ink">⇄</span>
-      <ExchangeCard itemId={receiveItemId} label="내가 받는 카드" />
-    </div>
-  )
-}
-
-function ThreeWayView({
-  myItemId,
-  giverNickname,
-  giverItemId,
-  receiverNickname,
-  receiverItemId,
-}: {
-  myItemId: string
-  giverNickname: string
-  giverItemId: string
-  receiverNickname: string
-  receiverItemId: string
-}) {
-  return (
-    <div className="mt-8 md:mt-0">
-      <div className="flex justify-center">
-        <ExchangeCard
-          compact
-          itemId={myItemId}
-          label={`나 (${MY_IDENTITY.fruit} ${MY_IDENTITY.number})`}
-        />
-      </div>
-
-      <div className="mt-3 flex items-center justify-center gap-24 text-[18px] text-brand md:mt-1">
-        <span className="anim-float-sm">↗</span>
-        <span className="anim-float-sm" style={{ animationDelay: '0.8s' }}>
-          ↘
-        </span>
-      </div>
-
-      <div className="mt-3 flex items-start justify-center gap-3 md:mt-1">
-        <ExchangeCard compact itemId={giverItemId} label={giverNickname} />
-        <span className="anim-nudge-x-back mt-16 text-[18px] text-brand">←</span>
-        <ExchangeCard compact itemId={receiverItemId} label={receiverNickname} />
-      </div>
     </div>
   )
 }

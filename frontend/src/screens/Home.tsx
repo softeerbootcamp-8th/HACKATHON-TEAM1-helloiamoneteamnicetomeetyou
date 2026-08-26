@@ -2,28 +2,57 @@ import { AnimatePresence, motion, type PanInfo } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { CardStack } from '@/components/domain/CardStack'
+import { AppointmentStatusRail } from '@/components/domain/AppointmentStatus'
 import { BottomSheet } from '@/components/domain/BottomSheet'
-import { GoodsFace } from '@/components/domain/GoodsCard'
+import { CardStack } from '@/components/domain/CardStack'
+import { GoodsFace, ItemCard } from '@/components/domain/GoodsCard'
+import { PushOptInBanner } from '@/components/domain/PushOptInBanner'
 import { RadarRings } from '@/components/domain/Radar'
 import { RadarUser } from '@/components/domain/RadarUser'
-import { BellIcon, ClockIcon, SparkleIcon } from '@/components/ui/icons'
+import { BellIcon } from '@/components/ui/icons'
+import { useCatalog } from '@/features/catalog/useCatalog'
+import { useNotification } from '@/features/notification/useNotification'
+import { usePoke } from '@/features/poke/usePoke'
 import { cn } from '@/lib/cn'
 import { tick } from '@/lib/haptics'
 import { springSheet, springSnap, staggerChild, staggerParent } from '@/lib/motion'
-import { ALL_WAITING, itemById, ZONES } from '@/mocks/data'
-import { radarUsers, sortedWaitingList, wantedFromMe } from '@/store/matching'
+import { usePush, type PushState } from '@/lib/use-push'
+import { itemById, type Item } from '@/mocks/data'
+import { appointmentStatus, sortedAppointments } from '@/store/appointment-status'
+import { getDeviceId } from '@/store/identity'
+import { radarUsers, sortedWaitingList, waitingStatus, wantedFromMe } from '@/store/matching'
 import { useStore } from '@/store/useStore'
 
 export function Home() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
+  const {
+    waiting: serverWaiting,
+    sent,
+    received,
+    error: pokeError,
+    clearError,
+    refresh: refreshPokes,
+    ready: pokeReady,
+  } = usePoke()
+  const { state: catalog } = useCatalog()
+  const {
+    notifications: serverNotifications,
+    unreadCount,
+    markRead: markNotificationRead,
+  } = useNotification()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  // 앱을 닫아 둔 사이의 알림. 여는 자리는 알림 목록 위다.
+  const { state: pushState, enable: enablePush } = usePush(getDeviceId())
   const [hovered, setHovered] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   // 방금 카드를 놓은 상대. 고리가 한 번 터지고 나서 찔러보기 확인 화면으로 넘어간다.
   const [burstOn, setBurstOn] = useState<string | null>(null)
+  // "다른 카드 보기" 를 누른 횟수. 레이더에 뒷순위 카드를 올리는 데 쓴다.
+  const [radarPage, setRadarPage] = useState(0)
+  // 내 카드 묶음을 눌러서 펼쳐 본 상태. 펼친 동안에는 끌어놓기를 하지 않는다.
+  const [fanOpen, setFanOpen] = useState(false)
   // 밀어서 치운 배너. 내용이 바뀌면 다시 뜬다.
   const [dismissedBanner, setDismissedBanner] = useState<string | null>(null)
   const bannerDragRef = useRef(false)
@@ -37,20 +66,136 @@ export function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /**
+   * 홈에 들어올 때마다 목록을 다시 읽는다.
+   *
+   * <b>각 줄의 `wanted` 와 "내가 줄 수 있는 카드" 는 서버가 내 등록 내용과 견줘 계산한다.</b>
+   * 그래서 찾는 카드를 고치고 돌아오면 그 값이 이미 낡아 있다. 다시 읽지 않으면 방금 등록한
+   * 카드가 레이더에 뜨지 않아서 새로고침해야 보이는 것처럼 된다.
+   */
+  useEffect(() => {
+    refreshPokes()
+  }, [refreshPokes])
+
+  // 찔러보기 요청이 실패한 사유를 띄운다. 서버 message 는 그대로 보여줘도 되는 한글
+  // 문장이라는 것이 팀 약속이다. 띄운 뒤에는 지워서 화면을 옮겨도 다시 뜨지 않게 한다.
+  useEffect(() => {
+    if (!pokeError) return
+    dispatch({ type: 'toast', message: pokeError })
+    clearError()
+  }, [pokeError, dispatch, clearError])
+
   // 배열을 그대로 의존성에 넣으면 렌더마다 새 참조라 매번 다시 계산한다.
   // 문자열 하나로 눌러서 값이 실제로 바뀔 때만 돌게 한다.
   const needKey = state.needs.map((s) => s.itemId).join(',')
   const needIds = useMemo(() => (needKey ? needKey.split(',') : []), [needKey])
-  const radar = useMemo(() => radarUsers(needIds), [needIds])
-  const list = useMemo(() => sortedWaitingList(needIds), [needIds])
 
-  const haveIds = state.have.map((h) => h.itemId)
-  const topItemId = state.have[0]?.itemId ?? 'sf'
-  const haveCount = state.have.reduce((sum, s) => sum + s.qty, 0)
   const pendingTarget =
     state.outgoingPoke?.status === 'pending' ? state.outgoingPoke.targetUserId : null
-  const appointment = state.appointment
-  const zone = ZONES.find((z) => z.id === appointment?.zoneId)
+  const pinned = useMemo(() => (pendingTarget ? [pendingTarget] : []), [pendingTarget])
+
+  const radar = useMemo(() => radarUsers(needIds, radarPage, pinned), [needIds, radarPage, pinned])
+  const list = useMemo(() => sortedWaitingList(needIds), [needIds])
+
+  const mockItemOf = catalog.status === 'ready' ? catalog.mockItemOf : undefined
+
+  /**
+   * 서버 데이터를 쓸지, 목업으로 떨어질지.
+   *
+   * <b>목록이 비었다는 것도 서버가 준 답이다.</b> 서버가 붙어 있는데 아무도 없으면 "부스에
+   * 사람이 없다" 가 사실이고, 그 자리를 목업 대기자로 덮으면 화면이 거짓말을 한다. 게다가
+   * 그 카드는 끌어다 놓아도 서버로 나가지 않는다. 목업으로 떨어지는 것은 서버가 아직
+   * 준비되지 않았을 때뿐이다(부스나 카드가 없거나 연결 실패).
+   */
+  const useServerData = pokeReady
+
+  // 답을 기다리는 상대. 그 사람 카드는 다시 보낼 수 없게 잠근다 (시안 desc 165:3514).
+  const pendingOwnerIds = useMemo(
+    () => new Set(sent.filter((p) => p.status === 'PENDING').map((p) => p.targetUserId)),
+    [sent],
+  )
+
+  /**
+   * 레이더에 세울 상대를 서버 목록에서 뽑는다.
+   *
+   * 시안 규칙이다 (desc 165:3500 2번) — 먼저 등록된 순으로 최대 5개, 카드 종류마다 한 명씩.
+   * 목록 자체가 이미 내 희망 카드만 담고 있어서 여기서 다시 걸러내지 않는다.
+   *
+   * <b>목업에 짝이 없는 카드는 세우지 않는다.</b> 카드 그림과 약칭이 목업에만 있어서 그릴
+   * 수가 없다. 어드민 시드를 목업 이름과 맞추면 이 일이 생기지 않는다.
+   */
+  const serverRadarPool = useMemo(() => {
+    const seen = new Set<number>()
+    return serverWaiting
+      .slice()
+      .sort((a, b) => a.haveItemId - b.haveItemId)
+      .flatMap((row) => {
+        if (seen.has(row.item.id)) return []
+        const item = mockItemOf?.(row.item.id)
+        if (!item) return []
+        seen.add(row.item.id)
+        return [{ row, item }]
+      })
+  }, [serverWaiting, mockItemOf])
+
+  /**
+   * 지금 세울 다섯 명. "다른 카드 보기" 를 누르면 뒷순위로 넘어간다.
+   *
+   * 답변을 기다리는 상대는 자리를 지킨다. 시안이 "찔러보기 답변 대기 중 상태인 아이템은
+   * 새로고침하지 않고 화면에 계속 표시" 라고 못박아 뒀다(desc 165:3500 4번).
+   */
+  const serverRadar = useMemo(() => {
+    const held = serverRadarPool.filter((s) => pendingOwnerIds.has(s.row.ownerId)).slice(0, 5)
+    const rest = serverRadarPool.filter((s) => !pendingOwnerIds.has(s.row.ownerId))
+    const room = Math.max(5 - held.length, 0)
+    const rotated =
+      rest.length === 0
+        ? []
+        : Array.from({ length: Math.min(room, rest.length) }, (_, i) => {
+            return rest[(radarPage * room + i) % rest.length]
+          })
+    return [...held, ...rotated]
+  }, [serverRadarPool, pendingOwnerIds, radarPage])
+
+  /**
+   * 레이더 한 칸. 서버와 목업을 같은 모양으로 맞춰 두면 배치와 끌어놓기 코드가 하나로 남는다.
+   *
+   * 둘을 각각 그리면 각도 계산과 표적 처리가 두 벌이 되고, 한쪽만 고쳐서 어긋난다.
+   */
+  const radarSlots: {
+    targetId: string
+    item: Item
+    label: string
+    pending: boolean
+  }[] = useServerData
+    ? serverRadar.map(({ row, item }) => ({
+        // 표적은 보유 등록 줄이다. 같은 사람이 여러 카드를 내놓아도 어느 카드를 달라는
+        // 것인지가 이 값으로 정해진다.
+        targetId: String(row.haveItemId),
+        item,
+        label: row.item.name,
+        pending: pendingOwnerIds.has(row.ownerId),
+      }))
+    : radar.map((user) => ({
+        targetId: user.id,
+        item: itemById(user.itemId),
+        label: user.nickname,
+        pending: pendingTarget === user.id,
+      }))
+
+  const haveIds = state.have.map((h) => h.itemId)
+  const topItemId = state.have[0]?.itemId ?? 'avn'
+  const haveCount = state.have.reduce((sum, s) => sum + s.qty, 0)
+  const match = state.match
+
+  // 매칭이 잡힌 상대는 전체리스트에서 "매칭됨" 으로 나온다.
+  // 이미 약속을 잡은 상대도 매칭된 상대다.
+  const matchedUserIds = [match, ...state.appointments.map((a) => a.match)]
+    .filter((m) => m !== null)
+    .flatMap((m) => (m.kind === 'ONE_TO_ONE' ? [m.partner.id] : [m.giver.id, m.receiver.id]))
+
+  // 약속이 둘 이상이면 가까운 순으로 늘어놓고 가로로 밀어서 본다.
+  const statuses = sortedAppointments(state.appointments).map(appointmentStatus)
 
   /** 끌고 있는 좌표로 어떤 상대 위에 있는지 찾는다. */
   const hitTest = (point: { x: number; y: number }): string | null => {
@@ -72,11 +217,19 @@ export function Home() {
     return null
   }
 
+  /**
+   * 이 표적에 지금 보낼 수 있는지.
+   *
+   * 답을 기다리는 상대는 막는다. 끌어놓는 동작 자체는 되지만 강조 표시가 붙지 않아서 보낼
+   * 수 없다는 것이 손끝으로 전해진다 (시안 desc 165:3514 "드래그 앤 드롭은 가능하나,
+   * 이미지 상태 변화 X & 해당 화면 잔류").
+   */
+  const isPendingTarget = (targetId: string): boolean =>
+    radarSlots.some((slot) => slot.targetId === targetId && slot.pending)
+
   const onDrag = (_: unknown, info: PanInfo) => {
     const found = hitTest(info.point)
-    // 이미 답을 기다리는 상대에게는 다시 보낼 수 없다. 끌어놓는 동작 자체는 되지만
-    // 강조 표시가 붙지 않아서 보낼 수 없다는 것이 손끝으로 전해진다.
-    const next = found && found !== pendingTarget ? found : null
+    const next = found && !isPendingTarget(found) ? found : null
     // 대상에 처음 올라탄 순간에만 울린다. 매 프레임 울리면 손이 얼얼해진다.
     if (next && next !== hovered) tick(8)
     setHovered(next)
@@ -87,7 +240,7 @@ export function Home() {
    * 화면이 바로 바뀌면 무슨 일이 일어났는지 안 보여서 물결이 퍼지는 동안 붙잡아 둔다.
    */
   const sendPokeTo = (targetId: string) => {
-    if (pendingTarget === targetId) return
+    if (isPendingTarget(targetId)) return
     tick([10, 40, 14])
     setBurstOn(targetId)
     window.setTimeout(() => {
@@ -105,50 +258,41 @@ export function Home() {
   }
 
   /**
-   * 위에 뜨는 배너. 밀어서 치울 수 있어서 무엇을 치웠는지 구분할 id 가 필요하다.
-   * 제목으로 구분하면 같은 문구의 새 알림이 와도 계속 숨어 있어서 버튼이 안 먹는 것처럼 보인다.
+   * 위에 뜨는 알림 카드. 시안의 `알림 수신 예시` 자리다. 밀어서 치울 수 있어서
+   * 무엇을 치웠는지 구분할 id 가 필요하다. 제목으로 구분하면 같은 문구의 새 알림이 와도
+   * 계속 숨어 있어서 버튼이 안 먹는 것처럼 보인다.
    */
   const banner = (() => {
-    if (appointment?.stage === 'confirmed') {
-      return {
-        id: `appt-confirmed-${appointment.confirmedSlot}`,
-        tone: 'brand' as const,
-        title: `${appointment.confirmedLabel} ${zone?.name ?? ''}`,
-        body: `${itemById(state.match?.giveItemId ?? topItemId).name} 거래`,
-        onClick: () => navigate('/appointment'),
-      }
-    }
-    if (appointment) {
-      return {
-        id: `appt-${appointment.stage}`,
-        tone: 'brand' as const,
-        title:
-          appointment.stage === 'time-conflict' ? '시간 조율 중이에요' : '약속을 잡는 중이에요',
-        body: `${itemById(state.match?.giveItemId ?? topItemId).name} 거래`,
-        onClick: () => navigate('/time'),
-      }
-    }
-    if (state.match) {
+    if (match) {
       const who =
-        state.match.kind === 'ONE_TO_ONE'
-          ? state.match.partner.id
-          : `${state.match.giver.id}-${state.match.receiver.id}`
+        match.kind === 'ONE_TO_ONE' ? match.partner.id : `${match.giver.id}-${match.receiver.id}`
       return {
-        id: `match-${state.match.origin}-${who}`,
-        tone: 'white' as const,
-        celebrate: state.match.origin === 'poke',
+        id: `match-${match.origin}-${who}`,
+        celebrate: match.origin === 'poke',
         title:
-          state.match.origin === 'poke' ? '찔러보기가 성사됐어요!' : '서로의 니즈가 매칭됐어요!',
-        body: '탭하여 확인',
+          match.origin === 'poke'
+            ? '상대방이 내 신청을 받아들였어요!'
+            : '내가 원하는 굿즈로 교환할 수 있어요!',
         onClick: () => navigate('/match'),
+      }
+    }
+    // 서버에 실제로 온 것이 목업보다 먼저다. 둘이 같이 있으면 실제 요청을 놓치는 쪽이
+    // 손해가 크다.
+    const serverPoke = received[0]
+    if (serverPoke) {
+      return {
+        id: `server-poke-${serverPoke.pokeId}`,
+        tone: 'white' as const,
+        title: '교환 신청이 왔어요~',
+        body: '탭하여 확인',
+        onClick: () => navigate('/poke/received'),
       }
     }
     if (state.incomingPoke) {
       return {
         id: `poke-${state.incomingPoke.fromUserId}-${state.incomingPoke.wantItemId}`,
-        tone: 'white' as const,
-        title: '상대가 교환을 요청했어요',
-        body: '탭하여 확인',
+        celebrate: false,
+        title: '교환 신청이 왔어요~',
         onClick: () => navigate('/poke/received'),
       }
     }
@@ -163,102 +307,228 @@ export function Home() {
   const radarPanel = (
     <div
       ref={radarRef}
-      className="relative flex min-h-0 flex-1 flex-col px-3 pt-4 pb-[84px] md:rounded-3xl md:bg-neutral-50/70 md:px-4 md:pt-2 md:pb-4"
+      className="relative flex min-h-0 flex-1 flex-col px-1 pt-0 pb-[84px] md:rounded-3xl md:bg-neutral-50/70 md:px-4 md:pt-2 md:pb-4"
     >
       {/*
-        무대는 남는 공간을 그대로 쓴다. 정사각형으로 잡아 두었더니 폭에 막혀 아래쪽이
-        통째로 비고 카드끼리도 붙어 보였다. 이제 세로로 긴 화면에서는 타원이 된다.
+        무대는 정사각형이다. 시안의 링이 정원이라 무대가 찌그러지면 원도 같이 찌그러진다.
+        폭을 기준으로 잡되 세로로 짧은 화면에서 넘치지 않게 화면 높이로도 묶어 둔다.
       */}
-      <div className="relative mx-auto min-h-0 w-full max-w-[560px] flex-1">
-        <RadarRings />
+      <div className="relative mx-auto flex min-h-0 w-full max-w-[560px] -translate-y-3 flex-1 flex-col items-center justify-center">
+        <div className="relative aspect-square w-[min(92%,44vh)] shrink-0">
+          <RadarRings />
 
-        {radar.map((user, i) => {
-          const angle = (-90 + i * (360 / Math.max(radar.length, 1))) * (Math.PI / 180)
-          // 가로와 세로 반지름을 따로 둬서 화면이 길수록 위아래로 더 벌어지게 한다.
-          const radiusX = 37
-          const radiusY = 36
-          return (
-            <div
-              key={user.id}
-              className="absolute -translate-x-1/2 -translate-y-1/2"
-              style={{
-                left: `${50 + radiusX * Math.cos(angle)}%`,
-                top: `${50 + radiusY * Math.sin(angle)}%`,
-              }}
-            >
-              <RadarUser
-                user={user}
-                index={i}
-                hovered={hovered === user.id}
-                pending={pendingTarget === user.id}
-                burst={burstOn === user.id}
-                onSelect={() => sendPokeTo(user.id)}
+          {radarSlots.map((slot, i) => {
+            const angle = (-90 + i * (360 / Math.max(radarSlots.length, 1))) * (Math.PI / 180)
+            // 가로와 세로 반지름을 따로 둬서 화면이 길수록 위아래로 더 벌어지게 한다.
+            const radiusX = 41.5
+            const radiusY = 41.5
+            return (
+              <div
+                key={slot.targetId}
+                className="absolute -translate-x-1/2 -translate-y-1/2"
+                style={{
+                  left: `${50 + radiusX * Math.cos(angle)}%`,
+                  top: `${50 + radiusY * Math.sin(angle)}%`,
+                }}
+              >
+                <RadarUser
+                  targetId={slot.targetId}
+                  item={slot.item}
+                  label={slot.label}
+                  index={i}
+                  hovered={hovered === slot.targetId}
+                  pending={slot.pending}
+                  burst={burstOn === slot.targetId}
+                  onSelect={() => sendPokeTo(slot.targetId)}
+                />
+              </div>
+            )
+          })}
+
+          {/* 카드를 펼치면 뒤가 흐려진다. 아무 데나 누르면 다시 접힌다. */}
+          <AnimatePresence>
+            {fanOpen && (
+              <motion.button
+                type="button"
+                aria-label="내 카드 접기"
+                onClick={() => setFanOpen(false)}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-10 bg-neutral-100/70 backdrop-blur-[1px]"
               />
-            </div>
-          )
-        })}
+            )}
+          </AnimatePresence>
 
-        <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+          <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+            <p className="mb-1 text-center text-[11px] font-bold text-ink md:text-[14px]">
+              {fanOpen ? `내 카드 ${state.have.length}종 ${haveCount}장` : '내 카드'}
+            </p>
+
+            {fanOpen ? (
+              <MyCardsFan
+                have={state.have}
+                onEdit={() => {
+                  setFanOpen(false)
+                  navigate('/have')
+                }}
+              />
+            ) : (
+              /*
+              끌면 찔러보기, 그냥 누르면 내 카드를 펼쳐 본다. 끌고 난 뒤에도 click 이
+              따라오기 때문에 끌었는지를 기억해 두고 그 click 은 버린다.
+            */
+              <motion.div
+                drag
+                dragSnapToOrigin
+                dragMomentum={false}
+                dragTransition={{ bounceStiffness: 480, bounceDamping: 30 }}
+                transition={springSnap}
+                onDragStart={() => {
+                  draggedRef.current = true
+                  setDragging(true)
+                }}
+                onDrag={onDrag}
+                onDragEnd={(event, info) => {
+                  onDragEnd()
+                  window.setTimeout(() => {
+                    draggedRef.current = false
+                  }, 0)
+                  void event
+                  void info
+                }}
+                onClick={() => {
+                  if (draggedRef.current) return
+                  setFanOpen(true)
+                }}
+                whileDrag={{ zIndex: 60, cursor: 'grabbing' }}
+                data-my-cards
+                className="cursor-grab touch-none"
+              >
+                <CardStack topItemId={topItemId} count={Math.max(haveCount, 1)} lifted={dragging} />
+              </motion.div>
+            )}
+          </div>
+        </div>
+
+        <p className="mt-8 shrink-0 text-center text-[12px] text-neutral-400 md:text-[14px]">
+          {dragging
+            ? '놓아주면 찔러보기가 전송돼요'
+            : '내 카드 묶음을 상대 카드 위에 끌어서 놓아보세요'}
+        </p>
+
+        {/* 레이더에 올라온 카드를 뒷순위로 새로 채운다. 답변을 기다리는 카드는 남는다. */}
+        <div className="mt-2 shrink-0 text-center">
           <motion.button
             type="button"
-            onClick={() => navigate('/have')}
+            onClick={() => {
+              tick(8)
+              setRadarPage((page) => page + 1)
+            }}
             whileTap={{ scale: 0.94 }}
             transition={springSnap}
-            className="mx-auto mb-1 flex items-center gap-0.5 text-[11px] font-bold text-neutral-500 md:text-[14px]"
+            className="rounded-full bg-neutral-200 px-4 py-1.5 text-[11px] font-bold text-neutral-500"
           >
-            내 카드
-            <span className="text-[13px] text-neutral-300">›</span>
+            다른 카드 보기
           </motion.button>
-
-          {/*
-            끌면 찔러보기, 그냥 누르면 내 카드 편집으로 간다. 끌고 난 뒤에도 click 이
-            따라오기 때문에 끌었는지를 기억해 두고 그 click 은 버린다.
-          */}
-          <motion.div
-            drag
-            dragSnapToOrigin
-            dragMomentum={false}
-            dragTransition={{ bounceStiffness: 480, bounceDamping: 30 }}
-            transition={springSnap}
-            onDragStart={() => {
-              draggedRef.current = true
-              setDragging(true)
-            }}
-            onDrag={onDrag}
-            onDragEnd={(event, info) => {
-              onDragEnd()
-              window.setTimeout(() => {
-                draggedRef.current = false
-              }, 0)
-              void event
-              void info
-            }}
-            onClick={() => {
-              if (draggedRef.current) return
-              navigate('/have')
-            }}
-            whileDrag={{ zIndex: 60, cursor: 'grabbing' }}
-            data-my-cards
-            className="cursor-grab touch-none"
-          >
-            <CardStack topItemId={topItemId} count={Math.max(haveCount, 1)} lifted={dragging} />
-          </motion.div>
         </div>
       </div>
-
-      <p className="mt-5 shrink-0 text-center text-[12px] text-neutral-400 md:text-[14px]">
-        {dragging
-          ? '놓아주면 찔러보기가 전송돼요'
-          : '상대 카드를 누르거나, 내 카드 묶음을 끌어다 놓아보세요'}
-      </p>
     </div>
   )
 
   /**
-   * 전체리스트 한 줄. 시안대로 굿즈 이름, 내가 줄 수 있는 카드, 접속 여부를 보여준다.
+   * 전체리스트 한 줄. 시안대로 굿즈 이름, 내가 줄 수 있는 카드, 매칭 상태를 보여준다.
    * 상대가 원하는 것 중 내가 가진 게 무엇인지가 이 줄에서 바로 보여야 누를지 말지 정한다.
    */
-  const listPanel = (
+  /**
+   * 서버에 등록한 사람들의 카드. 배지는 시안 desc 204:4948 기준으로 가른다.
+   *
+   * "매칭됨" 은 서버가 내려주지 않는다. 나와 그 사람 사이에 이미 성사된 교환이 있는지의
+   * 이야기라, 화면이 들고 있는 현재 매칭 상태에서 판단해야 한다.
+   */
+  const serverListPanel =
+    serverWaiting.length === 0 ? (
+      <p className="py-10 text-center text-[13px] leading-[1.7] text-neutral-400">
+        {needIds.length === 0
+          ? '찾는 카드를 등록하면 그 카드를 가진 사람이 여기 나타나요.'
+          : '아직 이 부스에 찾는 카드를 내놓은 사람이 없어요.'}
+      </p>
+    ) : (
+      <motion.ul
+        variants={staggerParent}
+        initial="hidden"
+        animate="show"
+        className="divide-y divide-neutral-100"
+      >
+        {serverWaiting.map((row) => {
+          const item = mockItemOf?.(row.item.id)
+          const waitingReply = pendingOwnerIds.has(row.ownerId)
+          const status = row.givableItemNames.length > 0 ? '교환 가능' : '그래도 찔러보기'
+
+          return (
+            <motion.li key={row.haveItemId} variants={staggerChild}>
+              <motion.button
+                type="button"
+                onClick={() => navigate(`/poke/confirm?to=${row.haveItemId}`)}
+                disabled={waitingReply}
+                whileTap={waitingReply ? undefined : { scale: 0.98 }}
+                transition={springSnap}
+                className={cn(
+                  'flex w-full items-center gap-4 py-4 text-left',
+                  waitingReply && 'opacity-45',
+                )}
+              >
+                <div className="w-[92px] shrink-0">
+                  {item ? (
+                    <GoodsFace item={item} size="md" />
+                  ) : (
+                    // 목업에 짝이 없는 카드다. 그림은 못 그려도 무엇인지는 보여야 한다.
+                    <span className="flex h-[74px] items-center justify-center rounded-xl bg-tile text-[12px] font-bold text-ink md:h-[88px]">
+                      {row.item.name}
+                    </span>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-[14px] font-bold text-ink">{row.item.name}</p>
+                    <WaitingStatusTag status={status} />
+                  </div>
+
+                  <p className="mt-0.5 text-[10px] font-medium text-[#aeaeb2]">
+                    내가 줄 수 있는 카드
+                  </p>
+                  <p className="truncate text-[11px] text-[#8b8b8b]">
+                    {row.givableItemNames.length > 0
+                      ? row.givableItemNames.join(' · ')
+                      : '아직 없어요'}
+                  </p>
+
+                  {row.ownerWantedItemNames.length > 0 && (
+                    <>
+                      <p className="mt-1 text-[10px] font-medium text-[#aeaeb2]">
+                        상대방이 원하는 것
+                      </p>
+                      <p className="truncate text-[11px] text-[#8b8b8b]">
+                        {row.ownerWantedItemNames.join(' · ')}
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                {waitingReply && (
+                  <span className="shrink-0 text-[11px] font-semibold text-neutral-400">
+                    대기 중
+                  </span>
+                )}
+              </motion.button>
+            </motion.li>
+          )
+        })}
+      </motion.ul>
+    )
+
+  const mockListPanel = (
     <motion.ul
       variants={staggerParent}
       initial="hidden"
@@ -268,6 +538,7 @@ export function Home() {
       {list.map((user) => {
         const item = itemById(user.itemId)
         const givable = wantedFromMe(user, haveIds)
+        const status = waitingStatus(user, haveIds, matchedUserIds)
         return (
           <motion.li key={user.id} variants={staggerChild}>
             <motion.button
@@ -282,20 +553,13 @@ export function Home() {
               )}
             >
               <div className="w-[92px] shrink-0">
-                <GoodsFace item={item} size="lg" />
+                <GoodsFace item={item} size="md" />
               </div>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-[14px] font-bold text-ink">{item.name}</p>
-                  {user.online ? (
-                    <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-[#57d1fe]">
-                      <span className="size-[5px] rounded-full bg-[#57d1fe]" />
-                      접속 중
-                    </span>
-                  ) : (
-                    <span className="shrink-0 text-[11px] text-neutral-300">오프라인</span>
-                  )}
+                  <WaitingStatusTag status={status} />
                 </div>
 
                 <p className="mt-0.5 text-[10px] font-medium text-[#aeaeb2]">
@@ -318,26 +582,32 @@ export function Home() {
     </motion.ul>
   )
 
+  // 레이더와 같은 기준이다. 서버가 붙어 있으면 비어 있는 것도 서버가 준 답이다.
+  const listPanel = useServerData ? serverListPanel : mockListPanel
+
+  /**
+   * 머리에 적히는 개수. <b>아이템 기준으로 센다</b>(시안 desc 165:3500 5번).
+   * 같은 카드를 세 사람이 내놓았어도 고를 수 있는 카드는 한 종류다.
+   */
+  const listCount = useServerData
+    ? new Set(serverWaiting.map((row) => row.item.id)).size
+    : list.length
+
+  const listHeader = (
+    <div className="flex items-end justify-between">
+      <div>
+        <span className="block text-[17px] font-extrabold text-ink">전체리스트</span>
+        <span className="block text-[11px] text-neutral-400">눌러서 찔러보기</span>
+      </div>
+      <span className="text-[12px] text-neutral-400">전체 {listCount}개</span>
+    </div>
+  )
+
   return (
     <div className="relative flex h-full flex-col">
       <header className="flex shrink-0 items-center justify-between px-5 pt-2 md:px-10 md:pt-4">
-        <h1 className="pl-1 text-[23px] font-extrabold tracking-[-0.02em] text-ink">
-          교환 대기장소
-        </h1>
+        <h1 className="pl-1 text-[23px] font-extrabold tracking-[-0.02em] text-ink">교환 대기장</h1>
         <div className="flex items-center gap-1">
-          {/*
-            목데이터만으로는 삼자 교환과 받은 요청을 보기 어려워서 넣어 둔 확인용 버튼이다.
-            실제 서비스에서는 서버가 보내 주는 상황이라 그때 빼면 된다.
-          */}
-          <DemoButton
-            label="요청받기"
-            onClick={() => dispatch({ type: 'seed-demo', kind: 'incoming' })}
-          />
-          <DemoButton
-            label="3인 매칭"
-            onClick={() => dispatch({ type: 'seed-demo', kind: 'three-way' })}
-          />
-
           <motion.button
             type="button"
             aria-label="알림"
@@ -346,7 +616,7 @@ export function Home() {
             className="relative flex size-10 items-center justify-center text-ink"
           >
             <BellIcon className="size-[22px]" />
-            {state.notifications.length > 0 && (
+            {unreadCount > 0 && (
               <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-brand" />
             )}
           </motion.button>
@@ -355,25 +625,45 @@ export function Home() {
 
       {/*
         알림이 와도 아래가 밀리지 않게 한다.
-        모바일은 이 칸의 높이를 고정해서 "자동 매칭 중" 알약이든 배너든 같은 자리를 쓰고,
-        데스크톱은 아예 흐름에서 빼서 화면 위에 띄운다. 둘 다 레이더가 움직이지 않는다.
+        모바일은 이 칸의 높이를 고정해서 "자동 매칭 중" 알약이든 약속 상태 카드든 같은 자리를
+        쓰고, 데스크톱은 아예 흐름에서 빼서 화면 위에 띄운다. 둘 다 레이더가 움직이지 않는다.
       */}
-      <div className="min-h-[78px] shrink-0 px-5 pt-2 md:pointer-events-none md:absolute md:top-[76px] md:left-10 md:z-30 md:min-h-0 md:w-[360px] md:px-0 md:[&>*]:pointer-events-auto">
+      <div className="min-h-[60px] shrink-0 px-5 pt-1 md:pointer-events-none md:absolute md:top-[76px] md:left-10 md:z-30 md:min-h-0 md:w-[360px] md:px-0 md:[&>*]:pointer-events-auto">
         <AnimatePresence mode="popLayout">
-          {state.autoMatching && !banner && (
-            <motion.span
-              key="matching"
-              initial={{ opacity: 0, y: -6, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+          {statuses.length > 0 ? (
+            <motion.div
+              key="appointments"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
               transition={springSnap}
-              className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-1.5 text-[12px] font-bold text-ink"
             >
-              <span className="anim-blink size-1.5 rounded-full bg-ink" />
-              자동 매칭 중
-            </motion.span>
+              <AppointmentStatusRail
+                statuses={statuses}
+                onSelect={(status) => {
+                  dispatch({ type: 'select-appointment', id: status.id })
+                  navigate(status.to)
+                }}
+              />
+            </motion.div>
+          ) : (
+            state.autoMatching && (
+              <motion.span
+                key="matching"
+                initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={springSnap}
+                className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-1.5 text-[12px] font-bold text-white"
+              >
+                <span className="anim-blink size-1.5 rounded-full bg-alarm" />
+                자동 매칭 중
+              </motion.span>
+            )
           )}
+        </AnimatePresence>
 
+        <AnimatePresence>
           {banner && banner.id !== dismissedBanner && (
             <motion.button
               key={banner.id}
@@ -410,50 +700,24 @@ export function Home() {
               exit={{ opacity: 0, y: -10, scale: 0.98 }}
               transition={springSheet}
               whileTap={{ scale: 0.98 }}
-              className={cn(
-                'flex w-full cursor-grab touch-pan-y items-center gap-3 rounded-2xl p-3.5 text-left active:cursor-grabbing',
-                banner.tone === 'brand'
-                  ? 'border border-brand bg-brand/10'
-                  : 'bg-white shadow-[0_4px_18px_rgba(0,0,0,0.10)]',
-              )}
+              className="mt-2 flex w-full cursor-grab touch-pan-y items-center gap-3 rounded-2xl bg-white p-3.5 text-left shadow-[0_4px_18px_rgba(0,0,0,0.10)] active:cursor-grabbing"
             >
+              {/* 시안에서 이 자리는 단색 사각형이다. 안에 아이콘을 넣지 않는다. */}
               <span
+                aria-hidden
                 className={cn(
-                  'flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand text-ink',
-                  'celebrate' in banner && banner.celebrate && 'anim-pop',
+                  'size-9 shrink-0 rounded-xl bg-alarm',
+                  banner.celebrate && 'anim-pop',
                 )}
-              >
-                {banner.tone === 'brand' ? (
-                  <ClockIcon className="size-5" />
-                ) : (
-                  <SparkleIcon className="size-5" />
-                )}
-              </span>
+              />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15px] font-bold text-ink">
+                <span className="block truncate text-[14px] font-bold text-ink">
                   {banner.title}
                 </span>
-                <span className="block truncate text-[12px] text-neutral-500">{banner.body}</span>
+                <span className="block text-[12px] text-neutral-500">탭하여 확인</span>
               </span>
               <span className="text-[18px] text-neutral-300">›</span>
             </motion.button>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {pendingTarget && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              transition={springSheet}
-              className="mt-2 rounded-2xl bg-neutral-400/80 px-4 py-3 text-center"
-            >
-              <p className="text-[14px] font-bold text-white">
-                {ALL_WAITING.find((u) => u.id === pendingTarget)?.nickname}님에게 교환을 제안했어요
-              </p>
-              <p className="text-[12px] text-white/75">답변 기다리는 중</p>
-            </motion.div>
           )}
         </AnimatePresence>
       </div>
@@ -467,10 +731,7 @@ export function Home() {
         {radarPanel}
 
         <aside className="hidden w-[360px] shrink-0 flex-col md:flex lg:w-[420px]">
-          <div className="flex items-baseline justify-between px-1 pb-3">
-            <h2 className="text-[17px] font-extrabold text-ink">전체리스트</h2>
-            <span className="text-[12px] text-neutral-400">전체 {list.length}개</span>
-          </div>
+          <div className="px-1 pb-3">{listHeader}</div>
           <div className="min-h-0 flex-1 overflow-y-auto pr-1 pb-2 no-scrollbar">{listPanel}</div>
         </aside>
 
@@ -478,14 +739,9 @@ export function Home() {
           <BottomSheet
             open={sheetOpen}
             onOpenChange={setSheetOpen}
-            peek={72}
+            peek={86}
             height={460}
-            header={
-              <div className="flex items-baseline justify-between">
-                <span className="text-[17px] font-extrabold text-ink">전체리스트</span>
-                <span className="text-[12px] text-neutral-400">전체 {list.length}개</span>
-              </div>
-            }
+            header={listHeader}
           >
             {listPanel}
           </BottomSheet>
@@ -495,30 +751,177 @@ export function Home() {
       <NotificationSheet
         open={notifOpen}
         onClose={() => setNotifOpen(false)}
-        notifications={state.notifications}
-        onDismiss={(id) => dispatch({ type: 'read-notification', id })}
+        notifications={serverNotifications.map((n) => ({
+          id: String(n.id),
+          kind: n.type,
+          title: n.title,
+          body: n.body,
+        }))}
+        pushState={pushState}
+        onEnablePush={enablePush}
+        onDismiss={(id) => void markNotificationRead(Number(id))}
         onSelect={(kind) => {
           setNotifOpen(false)
-          if (kind === 'poke-received') navigate('/poke/received')
-          else if (kind === 'match' || kind === 'poke-accepted') navigate('/match')
-          else if (kind === 'time-request') navigate('/time')
+          // 문구와 열리는 화면의 짝은 백엔드 PushMessage 와 같은 것을 쓴다.
+          if (kind === 'POKE_RECEIVED') navigate('/poke/received')
+          else if (
+            kind === 'MATCH_SUGGESTED' ||
+            kind === 'MATCH_ACCEPTED' ||
+            kind === 'POKE_ACCEPTED'
+          )
+            navigate('/match')
+          else if (
+            kind === 'EXCHANGE_CREATED' ||
+            kind === 'EXCHANGE_TIME_UPDATED' ||
+            kind === 'EXCHANGE_PLACE_UPDATED'
+          )
+            navigate('/appointment')
+          else if (
+            kind === 'MATCH_REJECTED' ||
+            kind === 'POKE_REJECTED' ||
+            kind === 'EXCHANGE_CANCELLED'
+          )
+            navigate('/home')
         }}
       />
     </div>
   )
 }
 
-/** 확인용 버튼. 목데이터로는 잘 안 나오는 상황을 손으로 만들어 볼 수 있게 한다. */
-function DemoButton({ label, onClick }: { label: string; onClick: () => void }) {
+/** 전체리스트 오른쪽 상태. 매칭됐거나 교환이 되는 상대만 브랜드색으로 눈에 띈다. */
+function WaitingStatusTag({ status }: { status: string }) {
+  const dim = status === '그래도 찔러보기'
+  return (
+    <span
+      className={cn(
+        'flex shrink-0 items-center gap-1.5 text-[11px] font-semibold',
+        dim ? 'text-neutral-300' : 'text-brand',
+      )}
+    >
+      <span className={cn('size-[5px] rounded-full', dim ? 'bg-neutral-300' : 'bg-brand')} />
+      {status}
+    </span>
+  )
+}
+
+/** 부채꼴로 세울 종류 수. 이보다 많으면 격자로 편다. */
+const FANNED_KINDS = 3
+/** 격자에 늘어놓을 종류 수. 한 줄에 세 장씩 세 줄까지만 보여준다. */
+const GRID_KINDS = 9
+
+/**
+ * 눌러서 펼친 내 카드 묶음. 시안의 `4_v1`, `4_v2` 자리다.
+ *
+ * 많이 들고 있는 카드부터 보여준다. 세 종류까지는 시안대로 부채꼴로 세우고, 그보다
+ * 많으면 부채꼴에 끼워 넣어 봐야 이름이 서로 가리기 때문에 한 줄에 세 장씩 격자로 편다.
+ * 무엇을 몇 장 들고 있는지가 이 화면에서 다 보여야 한다.
+ */
+function MyCardsFan({
+  have,
+  onEdit,
+}: {
+  have: { itemId: string; qty: number }[]
+  onEdit: () => void
+}) {
+  const sorted = [...have].sort((a, b) => b.qty - a.qty)
+
+  if (sorted.length === 0) {
+    return (
+      <div className="w-[300px]">
+        <p className="py-10 text-center text-[12px] text-neutral-400">아직 고른 카드가 없어요</p>
+        <EditCardsButton onClick={onEdit} />
+      </div>
+    )
+  }
+
+  if (sorted.length <= FANNED_KINDS) {
+    return (
+      <div className="w-[350px]">
+        <div className="flex items-end justify-center">
+          {sorted.map((selection, i) => {
+            // 가운데 카드를 가장 높이 세우고 양옆으로 눕힌다.
+            const fromCenter = i - (sorted.length - 1) / 2
+            return (
+              <motion.div
+                key={selection.itemId}
+                initial={{ opacity: 0, y: 14, rotate: 0 }}
+                animate={{
+                  opacity: 1,
+                  y: Math.abs(fromCenter) * 16,
+                  rotate: fromCenter * 10,
+                }}
+                transition={{ ...springSnap, delay: i * 0.04 }}
+                style={{ zIndex: 10 - Math.round(Math.abs(fromCenter) * 2) }}
+                className="relative -mx-1.5"
+              >
+                <CardStack topItemId={selection.itemId} count={selection.qty} />
+                <QtyBadge qty={selection.qty} />
+              </motion.div>
+            )
+          })}
+        </div>
+
+        <EditCardsButton onClick={onEdit} />
+      </div>
+    )
+  }
+
+  const shown = sorted.slice(0, GRID_KINDS)
+  const hiddenKinds = sorted.length - shown.length
+
+  return (
+    <div className="w-[300px]">
+      <div className="grid grid-cols-3 gap-2">
+        {shown.map((selection, i) => {
+          const item = itemById(selection.itemId)
+          return (
+            <motion.div
+              key={selection.itemId}
+              initial={{ opacity: 0, y: 10, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ ...springSnap, delay: i * 0.03 }}
+            >
+              <ItemCard item={item} size="sm" className="shadow-[0_4px_16px_rgba(0,0,0,0.10)]">
+                <QtyBadge qty={selection.qty} />
+              </ItemCard>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {hiddenKinds > 0 && (
+        <p className="mt-2 text-center text-[11px] font-bold text-neutral-500">
+          외 {hiddenKinds}종 더
+        </p>
+      )}
+
+      <EditCardsButton onClick={onEdit} />
+    </div>
+  )
+}
+
+/** 카드에 붙는 장수 표시. 한 장이면 굳이 적지 않는다. */
+function QtyBadge({ qty }: { qty: number }) {
+  if (qty <= 1) return null
+  return (
+    <span className="absolute -top-1.5 -right-1 rounded-full bg-ink px-1.5 py-0.5 text-[10px] font-bold text-white">
+      {qty}장
+    </span>
+  )
+}
+
+function EditCardsButton({ onClick }: { onClick: () => void }) {
   return (
     <motion.button
       type="button"
       onClick={onClick}
-      whileTap={{ scale: 0.92 }}
-      transition={springSnap}
-      className="rounded-full border border-dashed border-neutral-300 px-2.5 py-1 text-[11px] font-semibold text-neutral-400"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ ...springSnap, delay: 0.1 }}
+      whileTap={{ scale: 0.95 }}
+      className="mx-auto mt-4 block rounded-full bg-ink px-4 py-2 text-[12px] font-bold text-white"
     >
-      {label}
+      편집하기
     </motion.button>
   )
 }
@@ -577,10 +980,14 @@ function NotificationRow({
         }}
         whileTap={{ scale: 0.98 }}
         transition={springSnap}
-        className="relative w-full cursor-grab touch-pan-y rounded-2xl bg-neutral-50 p-3.5 text-left active:cursor-grabbing"
+        className="relative flex w-full cursor-grab touch-pan-y items-center gap-3 rounded-2xl bg-neutral-50 p-3.5 text-left active:cursor-grabbing"
       >
-        <p className="text-[14px] font-bold text-ink">{notification.title}</p>
-        <p className="text-[12px] text-neutral-400">{notification.body}</p>
+        <span aria-hidden className="size-9 shrink-0 rounded-xl bg-alarm" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14px] font-bold text-ink">{notification.title}</span>
+          <span className="block text-[12px] text-neutral-400">{notification.body}</span>
+        </span>
+        <span className="text-[18px] text-neutral-300">›</span>
       </motion.button>
     </motion.li>
   )
@@ -596,14 +1003,18 @@ function NotificationSheet({
   notifications,
   onSelect,
   onDismiss,
+  pushState,
+  onEnablePush,
 }: {
   open: boolean
   onClose: () => void
   notifications: { id: string; kind: string; title: string; body: string }[]
   onSelect: (kind: string) => void
   onDismiss: (id: string) => void
+  pushState: PushState
+  onEnablePush: () => void
 }) {
-  const body =
+  const list =
     notifications.length === 0 ? (
       <p className="py-10 text-center text-[13px] text-neutral-400">아직 알림이 없어요</p>
     ) : (
@@ -620,6 +1031,14 @@ function NotificationSheet({
         </AnimatePresence>
       </ul>
     )
+
+  // 모바일 시트와 데스크톱 판이 이 하나를 같이 쓴다.
+  const body = (
+    <>
+      <PushOptInBanner state={pushState} onEnable={onEnablePush} />
+      {list}
+    </>
+  )
 
   return (
     <AnimatePresence>

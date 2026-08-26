@@ -2,9 +2,11 @@ import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { GoodsFace } from '@/components/domain/GoodsCard'
 import { Button, TextButton } from '@/components/ui/Button'
 import { springSnap } from '@/lib/motion'
 import { itemById } from '@/mocks/data'
+import { activeAppointment } from '@/store/reducer'
 import { useStore } from '@/store/useStore'
 
 /**
@@ -15,8 +17,7 @@ export function Complete() {
   const navigate = useNavigate()
   const { state, dispatch } = useStore()
   // 정리 전에 무엇을 받았는지 붙잡아 둔다. dispatch 뒤에는 match 가 비기 때문이다.
-  const [received] = useState(() => state.match?.receiveItemId ?? null)
-  const [needsLeft] = useState(() => state.needs.length)
+  const [received] = useState(() => activeAppointment(state)?.match?.receiveItemId ?? null)
 
   useEffect(() => {
     dispatch({ type: 'complete' })
@@ -37,23 +38,20 @@ export function Complete() {
         >
           교환이 완료되었어요!
         </motion.h1>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.12 }}
-          className="mt-2.5 text-[13px] text-neutral-400"
-        >
-          새로운 카드가 내 컬렉션에 추가되었어요.
-        </motion.p>
-
         <motion.div
           initial={{ opacity: 0, scale: 0.7, rotate: -12 }}
           animate={{ opacity: 1, scale: 1, rotate: -4 }}
           transition={{ ...springSnap, delay: 0.16 }}
-          className="mt-14"
+          className="mt-16"
         >
           <div className="anim-float w-[190px] rounded-[22px] bg-white p-4 shadow-[0_16px_44px_rgba(0,0,0,0.16)]">
-            <div className="card-face h-[190px] w-full rounded-2xl" />
+            {item ? (
+              <div className="h-[190px]">
+                <GoodsFace item={item} size="fill" />
+              </div>
+            ) : (
+              <div className="card-face h-[190px] w-full rounded-2xl" />
+            )}
           </div>
         </motion.div>
 
@@ -72,7 +70,7 @@ export function Complete() {
 
       <div className="shrink-0 px-6 pt-4 pb-8">
         <Button variant="brand" onClick={() => navigate('/home')}>
-          {needsLeft > 1 ? '계속 교환하러 가기' : '새로운 상대 찾기'}
+          계속 교환하러 가기
         </Button>
         <TextButton
           onClick={() => {

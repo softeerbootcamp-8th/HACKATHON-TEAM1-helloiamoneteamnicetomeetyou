@@ -29,7 +29,7 @@ public class UserController {
     public ResponseEntity<CommonResponse<Void>> register(
             @RequestBody UserRegisterRequestDto request) {
 
-        boolean created = userService.register(request.userId());
+        boolean created = userService.register(request.userId(), request.username());
 
         return ResponseEntity.status(created ? HttpStatus.CREATED : HttpStatus.OK)
                 .body(CommonResponse.ok("등록했습니다."));

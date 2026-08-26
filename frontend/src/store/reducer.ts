@@ -1,10 +1,20 @@
-import { ALL_WAITING, FIXED_ZONE, itemById } from '@/mocks/data'
+import type { Exchange, Zone } from '@/lib/exchange'
+import { ALL_WAITING, itemById } from '@/mocks/data'
 
-import { findMatch, wantedFromMe, type MatchResult } from './matching'
-import type { ActiveMatch, IncomingPoke, State } from './types'
+import { toAppointment } from './appointment'
+import type { ExchangePair, MatchResult } from './matching'
+import type { ActiveMatch, Appointment, IncomingPoke, State } from './types'
+
+/**
+ * 알림 문구는 시안의 `교환 대기장소 알림 정리` 를 그대로 옮긴 것이다.
+ * 알림은 메인 텍스트만 바뀌고 보조 문구는 전부 "탭하여 확인" 이다.
+ */
+const NOTICE_BODY = '탭하여 확인'
 
 export const initialState: State = {
   onboarded: false,
+  boothId: null,
+  zones: [],
   setupDone: false,
   have: [],
   needs: [],
@@ -14,7 +24,8 @@ export const initialState: State = {
   outgoingPoke: null,
   incomingPoke: null,
   heldIncoming: null,
-  appointment: null,
+  appointments: [],
+  activeAppointmentId: null,
   notifications: [],
   collection: [],
   toast: null,
@@ -29,21 +40,29 @@ export type Action =
   | { type: 'clear-have'; itemId: string }
   | { type: 'clear-need'; itemId: string }
   | { type: 'enter-home' }
-  | { type: 'auto-match-tick' }
+  | { type: 'server-match-arrived'; match: ActiveMatch }
+  | { type: 'server-match-rejected'; exchangeId: number }
   | { type: 'open-match' }
   | { type: 'decline-match' }
   | { type: 'send-poke'; targetUserId: string }
-  | { type: 'poke-answered'; accepted: boolean }
+  | { type: 'poke-answered'; accepted: boolean; chosenItemId?: string }
   | { type: 'receive-poke'; poke: IncomingPoke }
   | { type: 'release-held-poke' }
   | { type: 'accept-incoming'; chosenItemId: string }
   | { type: 'reject-incoming' }
-  | { type: 'start-appointment' }
-  | { type: 'set-my-slots'; slots: number[] }
-  | { type: 'partner-slots-arrived'; slots: Record<string, number[]> }
-  | { type: 'confirm-time'; slot: number; label: string }
+  | { type: 'booth-loaded'; boothId: number; zones: Zone[] }
+  | {
+      type: 'exchange-synced'
+      exchange: Exchange
+      myUserId: string
+      /** 매칭 결과를 아는 자리에서만 넘긴다. 새로고침으로 들어온 경우에는 없다. */
+      match?: ActiveMatch | null
+      /** 이 약속을 지금 보고 있는 것으로 삼을지. 만들자마자 들어갈 때만 참이다. */
+      activate?: boolean
+    }
+  | { type: 'select-appointment'; id: number }
+  | { type: 'my-slots-picked'; slots: number[] }
   | { type: 'request-time-again' }
-  | { type: 'arrive' }
   | { type: 'complete' }
   | { type: 'cancel-appointment' }
   | { type: 'reset' }
@@ -80,12 +99,39 @@ function partnersOf(match: MatchResult): string[] {
   return match.kind === 'ONE_TO_ONE' ? [match.partner.id] : [match.giver.id, match.receiver.id]
 }
 
-/** 교환이 끝난 카드는 다음 매칭에서 빠진다. */
-function consume(state: State, giveItemId: string, receiveItemId: string): Partial<State> {
+/** 이 교환에서 실제로 주고받는 카드 쌍. 삼자 교환은 언제나 한 쌍이다. */
+function pairsOf(match: MatchResult): ExchangePair[] {
+  if (match.kind === 'ONE_TO_ONE') return match.pairs
+  return [{ giveItemId: match.giveItemId, receiveItemId: match.receiveItemId }]
+}
+
+/** 교환이 끝난 카드는 다음 매칭에서 빠진다. 여러 장을 한 번에 바꿨으면 전부 덜어낸다. */
+function consume(state: State, pairs: ExchangePair[]): Partial<State> {
+  let have = state.have
+  let needs = state.needs
+  const collection = [...state.collection]
+
+  for (const pair of pairs) {
+    have = bump(have, pair.giveItemId, -1)
+    needs = bump(needs, pair.receiveItemId, -1)
+    collection.push(pair.receiveItemId)
+  }
+
+  return { have, needs, collection }
+}
+
+export function activeAppointment(state: State): Appointment | null {
+  return state.appointments.find((a) => a.exchangeId === state.activeAppointmentId) ?? null
+}
+
+/** 지금 다루고 있는 약속 하나만 고친다. 나머지 약속은 그대로 둔다. */
+function patchActive(state: State, patch: (appt: Appointment) => Appointment): State {
+  if (state.activeAppointmentId === null) return state
   return {
-    have: bump(state.have, giveItemId, -1),
-    needs: bump(state.needs, receiveItemId, -1),
-    collection: [...state.collection, receiveItemId],
+    ...state,
+    appointments: state.appointments.map((a) =>
+      a.exchangeId === state.activeAppointmentId ? patch(a) : a,
+    ),
   }
 }
 
@@ -121,25 +167,37 @@ export function reducer(state: State, action: Action): State {
 
     case 'enter-home': {
       // 약속이 있으면 자동 매칭을 돌리지 않는다.
-      const canMatch = !state.appointment && !state.match && state.needs.length > 0
+      const canMatch = state.appointments.length === 0 && !state.match && state.needs.length > 0
       return { ...state, autoMatching: canMatch, setupDone: true }
     }
 
-    case 'auto-match-tick': {
-      if (!state.autoMatching || state.match || state.appointment) return state
-      const result = findMatch(
-        state.have.map((s) => s.itemId),
-        state.needs.map((s) => s.itemId),
-      )
-      if (!result) return state
-      if (partnersOf(result).some((id) => state.declined.includes(id))) return state
-
-      const match: ActiveMatch = { ...result, origin: 'auto' }
+    /**
+     * 서버가 SSE 로 실제 매칭을 알려온 것. 이미 화면에 매칭이나 약속이 떠 있으면 덮어쓰지 않는다.
+     */
+    case 'server-match-arrived': {
+      if (state.match || state.appointments.length > 0) return state
       return {
         ...state,
-        match,
+        match: action.match,
         autoMatching: false,
-        notifications: notify(state, 'match', '서로의 니즈가 매칭됐어요!', '탭하여 확인'),
+        notifications: notify(state, 'match', '내가 원하는 굿즈로 교환할 수 있어요!', NOTICE_BODY),
+      }
+    }
+
+    /**
+     * 상대가 이 매칭을 거절했다는 서버 알림. 내가 거절한 게 아니라 상대 쪽에서 온 거라
+     * `decline-match` 와는 다른 자리다. `exchangeId` 가 지금 뜬 매칭과 다르면(이미 다른
+     * 매칭으로 넘어갔거나 약속을 잡은 뒤) 조용히 무시한다 — 뒤늦게 도착한 알림이 엉뚱한
+     * 화면을 지우면 안 된다.
+     */
+    case 'server-match-rejected': {
+      if (state.match?.exchangeId !== action.exchangeId) return state
+      return {
+        ...state,
+        match: null,
+        autoMatching: state.appointments.length === 0 && state.needs.length > 0,
+        notifications: notify(state, 'match-rejected', '상대가 교환을 거절했어요', NOTICE_BODY),
+        toast: '상대가 거절해서 다시 상대를 찾을게요.',
       }
     }
 
@@ -153,8 +211,7 @@ export function reducer(state: State, action: Action): State {
         ...state,
         match: null,
         declined,
-        appointment: null,
-        autoMatching: state.needs.length > 0,
+        autoMatching: state.appointments.length === 0 && state.needs.length > 0,
         toast: '교환을 거절했어요. 다시 상대를 찾을게요.',
       }
     }
@@ -165,7 +222,7 @@ export function reducer(state: State, action: Action): State {
       return {
         ...state,
         outgoingPoke: { targetUserId: target.id, wantItemId: target.itemId, status: 'pending' },
-        toast: null,
+        toast: `${itemById(target.itemId).name} 교환을 제안했어요\n답변 기다리는 중`,
       }
     }
 
@@ -182,26 +239,28 @@ export function reducer(state: State, action: Action): State {
           notifications: notify(
             state,
             'poke-rejected',
-            `${target.nickname}님이 교환을 거절했어요`,
-            '다른 상대를 찾아보세요',
+            `${itemById(target.itemId).name} 교환이 거절되었어요`,
+            NOTICE_BODY,
           ),
-          toast: `${target.nickname}님이 거절했어요`,
+          toast: `${itemById(target.itemId).name} 교환이 거절되었어요`,
         }
       }
 
-      // 상대가 내 묶음 중 자기가 원하는 카드를 골랐다고 본다.
-      const wanted = wantedFromMe(
-        target,
-        state.have.map((s) => s.itemId),
-      )
-      const giveItemId = wanted[0] ?? state.have[0]?.itemId ?? target.needsItemIds[0]
+      // 상대가 내 묶음에서 무엇을 골랐는지는 고른 쪽만 안다.
+      //
+      // 전에는 wantedFromMe 로 짐작했는데, 찔러보기는 정의상 "상대 희망 ∩ 내 보유" 가
+      // 비어 있어서 그 계산이 늘 빈 배열이었다. 그래서 항상 have[0] 으로 떨어져 보낸 사람
+      // 화면에 엉뚱한 카드가 떴다. 고른 카드를 받아 쓰고, 없을 때만 첫 장으로 떨어진다.
+      const giveItemId = action.chosenItemId ?? state.have[0]?.itemId ?? target.needsItemIds[0]
 
       const match: ActiveMatch = {
         kind: 'ONE_TO_ONE',
         partner: target,
+        pairs: [{ giveItemId, receiveItemId: target.itemId }],
         giveItemId,
         receiveItemId: target.itemId,
         origin: 'poke',
+        exchangeId: null,
       }
       return {
         ...state,
@@ -211,26 +270,20 @@ export function reducer(state: State, action: Action): State {
         notifications: notify(
           state,
           'poke-accepted',
-          '찔러보기가 성사됐어요!',
-          `${target.nickname}님이 수락했어요`,
+          '상대방이 내 신청을 받아들였어요!',
+          NOTICE_BODY,
         ),
-        toast: `🎉 ${target.nickname}님이 교환을 수락했어요!`,
+        toast: null,
       }
     }
 
     case 'receive-poke': {
       // 매칭이 도는 중에는 알리지 않고 붙잡아 둔다.
       if (state.autoMatching) return { ...state, heldIncoming: action.poke }
-      const from = ALL_WAITING.find((u) => u.id === action.poke.fromUserId)
       return {
         ...state,
         incomingPoke: action.poke,
-        notifications: notify(
-          state,
-          'poke-received',
-          '상대가 교환을 요청했어요',
-          `${from?.nickname ?? '상대'}님의 찔러보기`,
-        ),
+        notifications: notify(state, 'poke-received', '교환 신청이 왔어요~', NOTICE_BODY),
       }
     }
 
@@ -240,17 +293,11 @@ export function reducer(state: State, action: Action): State {
       // 요청받은 카드의 잔여 수량이 없으면 알리지 않고 조용히 거절 처리한다.
       const left = state.have.find((s) => s.itemId === held.wantItemId)?.qty ?? 0
       if (left <= 0) return { ...state, heldIncoming: null }
-      const from = ALL_WAITING.find((u) => u.id === held.fromUserId)
       return {
         ...state,
         heldIncoming: null,
         incomingPoke: held,
-        notifications: notify(
-          state,
-          'poke-received',
-          '상대가 교환을 요청했어요',
-          `${from?.nickname ?? '상대'}님의 찔러보기`,
-        ),
+        notifications: notify(state, 'poke-received', '교환 신청이 왔어요~', NOTICE_BODY),
       }
     }
 
@@ -262,9 +309,11 @@ export function reducer(state: State, action: Action): State {
       const match: ActiveMatch = {
         kind: 'ONE_TO_ONE',
         partner: from,
+        pairs: [{ giveItemId: incoming.wantItemId, receiveItemId: action.chosenItemId }],
         giveItemId: incoming.wantItemId,
         receiveItemId: action.chosenItemId,
         origin: 'poke',
+        exchangeId: null,
       }
       return { ...state, incomingPoke: null, match, autoMatching: false }
     }
@@ -276,96 +325,112 @@ export function reducer(state: State, action: Action): State {
         toast: '교환 요청을 거절했어요',
       }
 
-    case 'start-appointment':
+    case 'booth-loaded':
+      return { ...state, boothId: action.boothId, zones: action.zones }
+
+    /**
+     * 서버에서 읽어 온 교환으로 약속을 갈아끼운다. 만들었을 때, 실시간 알림을 받았을 때,
+     * 앱을 다시 열었을 때 모두 이 하나를 거친다.
+     *
+     * 이미 들고 있던 같은 약속이 있으면 그 자리에 덮어쓴다. 무엇을 주고받는지는 서버가 모르는
+     * 값이라 이전 것에서 이어받는다.
+     */
+    case 'exchange-synced': {
+      const { exchange, myUserId } = action
+      const previous = state.appointments.find((a) => a.exchangeId === exchange.exchangeId)
+
+      // 끝났거나 취소된 약속은 목록에서 뺀다. 그대로 두면 오지 않을 약속을 계속 보여주게 된다.
+      if (exchange.status === 'CANCELLED') {
+        const appointments = state.appointments.filter((a) => a.exchangeId !== exchange.exchangeId)
+        return {
+          ...state,
+          appointments,
+          activeAppointmentId:
+            state.activeAppointmentId === exchange.exchangeId ? null : state.activeAppointmentId,
+          autoMatching: appointments.length === 0 && state.needs.length > 0,
+          toast: previous ? '교환이 취소됐어요' : state.toast,
+        }
+      }
+
+      const next = toAppointment(exchange, myUserId, previous, action.match)
+      const appointments = previous
+        ? state.appointments.map((a) => (a.exchangeId === next.exchangeId ? next : a))
+        : [...state.appointments, next]
+
+      // 겹치는 시간이 막 생긴 순간에만 알린다. 이미 알린 약속에 또 알리지 않는다.
+      const overlapAppeared = previous?.overlapSlot === null && next.overlapSlot !== null
+
       return {
         ...state,
-        appointment: {
-          stage: 'place',
-          zoneId: FIXED_ZONE.id,
-          mySlots: [],
-          partnerSlots: {},
-          confirmedSlot: null,
-          confirmedLabel: null,
-        },
+        match: action.match ? null : state.match,
+        appointments,
+        activeAppointmentId: action.activate ? next.exchangeId : state.activeAppointmentId,
         autoMatching: false,
-      }
-
-    case 'set-my-slots': {
-      if (!state.appointment) return state
-      return {
-        ...state,
-        appointment: { ...state.appointment, mySlots: action.slots, stage: 'time-waiting' },
+        notifications: overlapAppeared
+          ? notify(state, 'time-matched', '시간 매칭이 완료되었어요!', NOTICE_BODY)
+          : state.notifications,
       }
     }
 
-    case 'partner-slots-arrived': {
-      if (!state.appointment) return state
-      return { ...state, appointment: { ...state.appointment, partnerSlots: action.slots } }
-    }
+    case 'select-appointment':
+      return { ...state, activeAppointmentId: action.id }
 
-    case 'confirm-time': {
-      if (!state.appointment) return state
+    /**
+     * 칸을 눌렀을 때 화면을 먼저 바꾼다. 서버 응답을 기다렸다 칠하면 손가락을 뗀 뒤에야
+     * 칸이 차서 눌린 느낌이 사라진다. 저장이 실패하면 그때 다시 읽어 되돌린다.
+     */
+    case 'my-slots-picked':
+      return patchActive(state, (appt) => ({ ...appt, mySlots: action.slots }))
+
+    case 'request-time-again':
       return {
         ...state,
-        appointment: {
-          ...state.appointment,
-          stage: 'confirmed',
-          confirmedSlot: action.slot,
-          confirmedLabel: action.label,
-        },
-      }
-    }
-
-    case 'request-time-again': {
-      if (!state.appointment) return state
-      return {
-        ...state,
-        appointment: { ...state.appointment, stage: 'time-conflict', partnerSlots: {} },
         notifications: notify(
           state,
           'time-request',
-          '혹시.. 다른 시간도 되시나요?',
-          `${itemById(state.match?.giveItemId ?? 'nv74').name} 거래`,
+          '혹시... 다른 시간도 가능하세요?',
+          NOTICE_BODY,
         ),
         toast: '상대에게 시간 조율을 요청했어요',
       }
-    }
-
-    case 'arrive': {
-      if (!state.appointment) return state
-      return { ...state, appointment: { ...state.appointment, stage: 'arrived' } }
-    }
 
     case 'complete': {
-      if (!state.match) return state
-      const { giveItemId, receiveItemId } = state.match
-      const next = consume(state, giveItemId, receiveItemId)
+      const active = activeAppointment(state)
+      if (!active) return state
+      // 매칭 결과를 모르면 무엇을 주고받았는지도 모른다. 그때는 카드를 건드리지 않는다.
+      const next = active.match ? consume(state, pairsOf(active.match)) : {}
+      const appointments = state.appointments.filter((a) => a.exchangeId !== active.exchangeId)
       return {
         ...state,
         ...next,
-        match: null,
-        appointment: null,
+        appointments,
+        activeAppointmentId: null,
         outgoingPoke: null,
         declined: [],
-        // 성사 이후 Needs 가 남아 있으면 자동 매칭을 다시 돌린다.
-        autoMatching: (next.needs ?? state.needs).length > 0,
+        // 성사 이후 Needs 가 남아 있고 다른 약속이 없으면 자동 매칭을 다시 돌린다.
+        autoMatching: appointments.length === 0 && (next.needs ?? state.needs).length > 0,
       }
     }
 
-    case 'cancel-appointment':
+    case 'cancel-appointment': {
+      const appointments = state.appointments.filter(
+        (a) => a.exchangeId !== state.activeAppointmentId,
+      )
       return {
         ...state,
-        appointment: null,
+        appointments,
+        activeAppointmentId: null,
         match: null,
         outgoingPoke: null,
-        autoMatching: state.needs.length > 0,
-        toast: '거래를 취소했어요',
+        autoMatching: appointments.length === 0 && state.needs.length > 0,
+        toast: '약속을 취소했어요',
       }
+    }
 
     case 'seed-demo': {
       // 특정 화면을 바로 열어 볼 수 있게 상태를 심어 준다. 주소로만 들어올 수 있고
       // 실제 흐름에서는 쓰이지 않는다.
-      const have = state.have.length > 0 ? state.have : [{ itemId: 'nv74', qty: 2 }]
+      const have = state.have.length > 0 ? state.have : [{ itemId: 'avn', qty: 2 }]
 
       if (action.kind === 'three-way') {
         const giver = ALL_WAITING.find((u) => u.id === 'u3')
@@ -378,17 +443,24 @@ export function reducer(state: State, action: Action): State {
           have,
           needs: state.needs.length > 0 ? state.needs : [{ itemId: 'i5n', qty: 1 }],
           autoMatching: false,
-          appointment: null,
+          appointments: [],
+          activeAppointmentId: null,
           match: {
             kind: 'THREE_WAY',
             giver,
             receiver,
-            giveItemId: 'nv74',
+            giveItemId: 'avn',
             receiveItemId: 'i5n',
-            middleItemId: 'pony',
+            middleItemId: 'i30f',
             origin: 'auto',
+            exchangeId: null,
           },
-          notifications: notify(state, 'match', '서로의 니즈가 매칭됐어요!', '탭하여 확인'),
+          notifications: notify(
+            state,
+            'match',
+            '내가 원하는 굿즈로 교환할 수 있어요!',
+            NOTICE_BODY,
+          ),
         }
       }
 
@@ -404,14 +476,9 @@ export function reducer(state: State, action: Action): State {
         incomingPoke: {
           fromUserId: from.id,
           wantItemId: have[0].itemId,
-          offeredItemIds: ['i5n', 'sf', 'cas'],
+          offeredItemIds: ['i5n', 'i30f', 'kona'],
         },
-        notifications: notify(
-          state,
-          'poke-received',
-          '상대가 교환을 요청했어요',
-          `${from.nickname}님의 찔러보기`,
-        ),
+        notifications: notify(state, 'poke-received', '교환 신청이 왔어요~', NOTICE_BODY),
       }
     }
 
