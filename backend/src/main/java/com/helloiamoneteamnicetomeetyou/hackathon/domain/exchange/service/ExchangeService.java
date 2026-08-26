@@ -244,6 +244,47 @@ public class ExchangeService {
     }
 
     /**
+     * 만날 자리를 바꾼다.
+     *
+     * <p>구역은 어드민이 만들고 고치고 지운다. 그래서 화면이 보낸 이름이나 좌표를 믿지 않고
+     * {@code zoneId} 로 다시 읽는다. 화면이 목록을 받아 둔 사이에 어드민이 이름을 바꿨을 수
+     * 있는데, 그때 화면이 들고 있던 옛 값을 저장하면 어드민이 고친 것이 되돌려진다.
+     *
+     * <p><b>같은 부스의 구역만 고를 수 있다.</b> 약도는 부스마다 다른 그림이고 좌표도 그 그림
+     * 안에서의 비율이라, 다른 부스의 구역을 넣으면 핀이 엉뚱한 자리를 가리킨다.
+     *
+     * <p>바꾼 사람만 알면 소용없어서 참가자 전원에게 알린다. 상대가 옛 자리에서 기다리는 것이
+     * 이 기능에서 제일 나쁜 결과다.
+     */
+    @Transactional
+    public ExchangeResponseDto updateZone(Long exchangeId, UUID userId, Long zoneId) {
+        Exchange exchange = getExchange(exchangeId);
+
+        // 참가자인지를 먼저 본다. 남의 약속을 건드린 사람에게 그 약속의 상태를 알려 주면 안 된다.
+        getParticipant(exchangeId, userId);
+
+        // 아직 아무도 수락하지 않은 교환은 자리가 안 붙어 있다. 그대로 두면 어느 부스인지 알 길이
+        // 없어서 아래 부스 대조에서 터진다. 수락 전에는 옮길 자리 자체가 없다고 답하는 것이 맞다.
+        if (!exchange.hasAppointment()) {
+            throw new ApplicationException(ErrorCode.EXCHANGE_NOT_ACCEPTED);
+        }
+
+        Zone zone = zoneRepository.findById(zoneId)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.ZONE_NOT_FOUND));
+
+        Long boothId = exchange.getZone().getBooth().getId();
+        if (!boothId.equals(zone.getBooth().getId())) {
+            throw new ApplicationException(ErrorCode.ZONE_NOT_FOUND);
+        }
+
+        exchange.changeZone(zone);
+
+        notifyParticipants(exchangeId, participantIds(exchangeId), SseEventType.EXCHANGE_PLACE_UPDATED);
+
+        return toResponse(exchange);
+    }
+
+    /**
      * 시간을 처음부터 다시 고른다. 화면의 "시간 조율 요청하기" 다.
      *
      * <p>내 것만 지우면 안 된다. 겹치는 칸이 없다는 것은 상대의 선택도 함께 봐야 알 수 있는
